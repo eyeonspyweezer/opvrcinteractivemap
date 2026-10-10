@@ -426,13 +426,15 @@ function groupsOf(owner) {
 // GitHub page links (.../blob/main/File.PNG) become direct image links
 function imgUrl(u) {
   u = String(u || '').trim();
+  console.log("result:", u);
   if (!u) 
-  console.log("result:", u)
   return '';
   const m = u.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+)$/i);
-  if (m) console.log("result:", m) return `https://github.com/${m[1]}/${m[2]}/raw/${m[3]}/${m[4]}`;
+  if (m) 
+  console.log("result:", m);
+  return `https://github.com/${m[1]}/${m[2]}/raw/${m[3]}/${m[4]}`;
   const r = u.match(/^\/?blob\/[^/]+\/(.+)$/i);
-  console.log("result:", r ? r[1] : u)
+  console.log("result:", r ? r[1] : u);
   return r ? r[1] : u;
 }
 
