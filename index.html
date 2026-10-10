@@ -197,8 +197,7 @@ body { background: var(--bg); }
   <label><input type="checkbox" id="optNames" checked> Island names on the map</label>
   <label><input type="checkbox" id="optHideUnnamed"> Hide Unnamed Islands</label>
   <label><input type="checkbox" id="optHideUnowned"> Hide unowned islands</label>
-  <label>Polygon opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
-  <label>Flag opacity: <span id="optFlagOpacityVal"></span><input type="range" id="optFlagOpacity" min="0" max="1" step="0.05"></label>
+  <label>Fill opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
 </div>
 
 <script>
@@ -248,7 +247,6 @@ const NO_OWNER_COLOR = 'rgb(0, 146, 70)';        // no owner at all (green)
 const OWNED_NO_CREW_COLOR = 'rgb(128, 0, 128)'; // has owner, but no crew/group in the crew sheet (purple)
 // Polygon fill transparency: 0 = invisible fill, 1 = fully solid. Change this number to adjust all polygons.
 let POLYGON_FILL_OPACITY = 0.5; // solid color / stripe fill opacity
-let FLAG_FILL_OPACITY = 0.45;   // flag image fill opacity inside polygons
 
 const $ = (id) => document.getElementById(id);
 const setStatus = (t) => console.log(t); // no status panel in the public page
@@ -351,7 +349,7 @@ function applyFlagFill(layer) {
   [layer, ...(layer._ghosts || [])].forEach((x) => {
     if (!x._path) return;
     x._path.setAttribute('fill', `url(#${layer._flagFill})`);
-    x._path.setAttribute('fill-opacity', String(FLAG_FILL_OPACITY));
+    x._path.setAttribute('fill-opacity', String(POLYGON_FILL_OPACITY));
   });
 }
 function applyHidden(layer) {
@@ -600,11 +598,14 @@ function applyStyle(layer) {
   if (stripeId) {
     layer._stripeFill = stripeId;
     [layer, ...(layer._ghosts || [])].forEach((x) => {
-      if (x._path) x._path.setAttribute('fill', `url(#${stripeId})`);
+      if (!x._path) return;
+      x._path.setAttribute('fill', `url(#${stripeId})`);
+      x._path.setAttribute('fill-opacity', String(POLYGON_FILL_OPACITY));
     });
   } else {
     layer._stripeFill = null;
   }
+  
 }
 const restyleAll = () => drawnItems.eachLayer(applyStyle);
 
@@ -1011,15 +1012,7 @@ $('optOpacityVal').textContent = POLYGON_FILL_OPACITY;
 $('optOpacity').addEventListener('input', (e) => {
   POLYGON_FILL_OPACITY = parseFloat(e.target.value);
   $('optOpacityVal').textContent = POLYGON_FILL_OPACITY;
-  restyleAll();
-});
-$('optFlagOpacity').value = FLAG_FILL_OPACITY;
-$('optFlagOpacityVal').textContent = FLAG_FILL_OPACITY;
-$('optFlagOpacity').addEventListener('input', (e) => {
-  FLAG_FILL_OPACITY = parseFloat(e.target.value);
-  $('optFlagOpacityVal').textContent = FLAG_FILL_OPACITY;
-  // re-apply flag opacity without reloading images
-  drawnItems.eachLayer((l) => applyFlagFill(l));
+  restyleAll(); // updates colors, stripes, and flags together
 });
 if (lowResources) { $('optFlags').checked = false; $('optFlags').title = 'Turned off automatically (data saver / low memory)'; }
 </script>
