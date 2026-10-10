@@ -428,12 +428,12 @@ function imgUrl(u) {
   u = String(u || '').trim();
   if (!u) return '';
   const m = u.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+)$/i);
-  if (m) return `https://github.com/${m[1]}/${m[2]}/blob/${m[3]}/${m[4]}?raw=true`;
-  const r = u.match(/^\/?blob\/[^/]+\/(.+)$/i);   // "/blob/main/CrewFlags/X.PNG" -> "CrewFlags/X.PNG" (same site)
+  if (m) return `https://github.com/${m[1]}/${m[2]}/raw/${m[3]}/${m[4]}`;
+  const r = u.match(/^\/?blob\/[^/]+\/(.+)$/i);
   return r ? r[1] : u;
 }
 
-const flagFor = (name) => imgUrl(nationFlag.get(name.toLowerCase())) || `flags/${slug(name)}.png`;
+const flagFor = (name) => imgUrl(nationFlag.get(name.toLowerCase())) || '';
 
 function uniqueOwners(raw) {
   const m = new Map();
