@@ -27,7 +27,7 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: rgb(25, 25, 25); --fg: #fff; } }
 :root[data-theme="dark"] { --bg: rgb(25, 25, 25); --fg: #fff; }
 @media (pointer: coarse) { :root { --fab: clamp(52px, 13vmin, 68px); } }
-:root { --sfg: rgb(0, 0, 0); --inv: 0; }
+:root { --sfg: rgb(62,44,42); --inv: 0; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sfg: #fff; --inv: 1; } }
 :root[data-theme="dark"] { --sfg: #fff; --inv: 1; }
 
@@ -145,14 +145,16 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #settingsFrame label { display: block; margin: 8px 0; }
 #settingsFrame input[type=range] { width: 100%; }
 .map-label div { transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none; font-family: inherit; font-size: 12px; color: #fff; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000; }
+body { background: var(--bg); }
+#sZoom { color: var(--sfg); }
 </style>
 </head>
 <body>
 <div id="map"></div>
 
 <div id="sideList">
-  <!-- NOTE: replace this placeholder with your own logo, e.g. <img class="list-icon" src="logo.png" alt=""> -->
-  <svg class="list-icon" viewBox="0 0 100 40"><rect x="1" y="1" width="98" height="38" rx="6" fill="none" stroke="currentColor" stroke-width="2"/><text x="50" y="25" text-anchor="middle" font-size="12" fill="currentColor">ICON</text></svg>
+ 
+  <img class="list-icon" src="VRCTitle.PNG" alt="">
   <div id="listButtons"></div>
   <div id="listLive"></div>
 </div>
@@ -181,7 +183,7 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 <div id="searchFrame">
   <div class="srow">
     <input id="sIsland" type="text" placeholder="Search islands" autocomplete="off">
-    <button id="sZoom" type="button" aria-label="Zoom to island"><span class="black-icon">🔎</span></button>
+    <button id="sZoom" type="button" aria-label="Zoom to island"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="10" cy="10" r="6"/><path d="M15 15l6 6"/></svg></button>
   </div>
   <div class="slist" id="lIsland"></div>
   <input id="sOrg" type="text" placeholder="Search groups / crews" autocomplete="off">
@@ -215,7 +217,8 @@ const LIST_BUTTONS = [
 ];
 const imageUrl = 'TargetedMap.PNG';
 // URLs of your white icon images (for example the files you upload to GitHub). Empty = the emoji shows instead.
-const ICONS = { search: '', discord: '', vrchat: '', settings: '' };
+const ICONS = { search: '', discord: 'DiscordIcon.PNG', vrchat: 'VRCIcon.PNG', settings: '' };
+
 // VRChat world pages for islands/ships. Keys are polygon names in lowercase.
 const VRC_WORLDS = {
   'thousand sunny #1': 'https://vrchat.com/home/world/wrld_f37dfa48-f423-448a-87b4-fe48d70bbd00/info',
@@ -280,7 +283,7 @@ const WRAP_COPIES = 3;     // copies on each side
 const eachShape = (fn) => { drawnItems.eachLayer(fn); ghostItems.eachLayer(fn); };
 const shiftLL = (ll, dx) => Array.isArray(ll) ? ll.map((x) => shiftLL(x, dx)) : L.latLng(ll.lat, ll.lng + dx);
 const shiftCoords = (c, dx) => typeof c[0] === 'number' ? [c[0] + dx, c[1]] : c.map((x) => shiftCoords(x, dx));
-function setLayerStyle(layer, style) { layer.setStyle(style); (layer._ghosts || []).forEach((g) => g.setStyle(style)); }
+function setLayerStyle(layer, style) { layer.setStyle(style); (layer._ghosts || []).forEach((g) => g.setStyle(style)); applyFlagFill(layer); }
 function makeGhosts(layer) {
   layer._ghosts = [];
   if (!mapWidth) return;
@@ -291,6 +294,11 @@ function makeGhosts(layer) {
     wireClick(g, layer);
     ghostItems.addLayer(g);
     layer._ghosts.push(g);
+  }
+  applyFlagFill(layer);
+  applyHidden(layer);
+}
+
   }
 }
 // Move any polygon that sits on a repeated copy (far left/right) back onto the main map
@@ -310,29 +318,55 @@ let flagRun = 0;
 function flagReady(url, cb) {
   if (flagCache.has(url)) { if (flagCache.get(url)) cb(); return; }
   const t = new Image();
-  t.onload = () => { flagCache.set(url, true); cb(); };
+  t.onload = () => { flagCache.set(url, { w: t.naturalWidth, h: t.naturalHeight }); cb(); };
   t.onerror = () => flagCache.set(url, false);
   t.src = url;
 }
+
+const flagPatterns = new Map();
+function flagPattern(url) {
+  if (flagPatterns.has(url)) return flagPatterns.get(url);
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = map.getRenderer(drawnItems.getLayers()[0])._container;
+  let defs = svg.querySelector('defs');
+  if (!defs) { defs = document.createElementNS(NS, 'defs'); svg.insertBefore(defs, svg.firstChild); }
+  const { w, h } = flagCache.get(url);
+  const id = 'flagpat-' + flagPatterns.size;
+  const pat = document.createElementNS(NS, 'pattern');
+  pat.setAttribute('id', id); pat.setAttribute('patternUnits', 'objectBoundingBox');
+  pat.setAttribute('width', '1'); pat.setAttribute('height', '1');
+  pat.setAttribute('viewBox', `0 0 ${w} ${h}`); pat.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+  const im = document.createElementNS(NS, 'image');
+  im.setAttribute('href', url); im.setAttribute('width', w); im.setAttribute('height', h);
+  pat.appendChild(im); defs.appendChild(pat);
+  flagPatterns.set(url, id);
+  return id;
+}
+function applyFlagFill(layer) {
+  if (!layer._flagFill) return;
+  [layer, ...(layer._ghosts || [])].forEach((x) => { if (x._path) x._path.setAttribute('fill', `url(#${layer._flagFill})`); });
+}
+function applyHidden(layer) {
+  [layer, ...(layer._ghosts || [])].forEach((x) => { if (x._path) x._path.style.display = layer._hidden ? 'none' : ''; });
+}
 function rebuildFlags() {
   const run = ++flagRun;
+  drawnItems.eachLayer((l) => { l._flagFill = null; });
+  restyleAll();
   rebuildLabels();
-  flagItems.clearLayers();
-  if (!OPT.flags || !mapWidth) return;
+  if (!OPT.flags) return;
   drawnItems.eachLayer((l) => {
     const groups = ownersOf(resolveOwner(l.feature.properties)).flatMap(groupsOf);
     if (!groups.length) return;
     const url = flagFor(groups[0]);
     flagReady(url, () => {
       if (run !== flagRun) return;
-      const c = turf.pointOnFeature(l.toGeoJSON()).geometry.coordinates;
-      for (let k = -WRAP_COPIES; k <= WRAP_COPIES; k++) {
-        L.marker([c[1], c[0] + k * mapWidth], { interactive: false, keyboard: false,
-          icon: L.icon({ iconUrl: url, iconSize: [30, 20], iconAnchor: [15, 10], className: 'map-flag' }) }).addTo(flagItems);
-      }
+      l._flagFill = flagPattern(url);
+      applyFlagFill(l);
     });
   });
 }
+
 const refreshAll = () => { restyleAll(); rebuildFlags(); };
 
 
@@ -391,15 +425,35 @@ function groupsOf(owner) {
   if (n.length) return n;
   return leaderMap.size ? [`${o} Kingdom`] : [];
 }
-const flagFor = (name) => nationFlag.get(name.toLowerCase()) || `flags/${slug(name)}.png`;
+// GitHub page links (.../blob/main/File.PNG) become direct image links
+function imgUrl(u) {
+  u = String(u || '').trim();
+  if (!u) return '';
+  const m = u.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+)$/i);
+  if (m) return `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${m[3]}/${m[4]}`;
+  const r = u.match(/^\/?blob\/[^/]+\/(.+)$/i);   // "/blob/main/CrewFlags/X.PNG" -> "CrewFlags/X.PNG" (same site)
+  return r ? r[1] : u;
+}
+const flagFor = (name) => imgUrl(nationFlag.get(name.toLowerCase())) || `flags/${slug(name)}.png`;
 
+function uniqueOwners(raw) {
+  const m = new Map();
+  ownersOf(raw).forEach((o) => {
+    const c = cleanOwner(o), k = ownerKey(c), best = aliasOf(c) || c;
+    if (!m.has(k) || best.length > m.get(k).length) m.set(k, best);
+  });
+  return [...m.values()];
+}
 function ownerLabel(raw) {
-  return ownersOf(raw).map((o) => {
-    const c = cleanOwner(o), n = nationsOf(c);
+  return uniqueOwners(raw).map((c) => {
+    const n = nationsOf(c);
+    const same = n.find((x) => ownerKey(x) === ownerKey(c));
+    if (same) return same;
     if (n.length) return `${c} (${n.join(', ')})`;
     return leaderMap.size ? `${c} Kingdom` : c;
-  }).join(' / ');
+  }).filter((v, i, a) => a.indexOf(v) === i).join(' / ');
 }
+
 
 function teamColor(raw) {
   if (!ownerMap.size && !leaderMap.size) return '';            // nothing loaded yet: keep saved colors
@@ -449,11 +503,11 @@ function tipContent(layer) {
   const owner = ownerLabel(raw);
   const el = document.createElement('div');
   el.style.whiteSpace = 'pre-line';
-  el.textContent = `${p.index} = ${p.name}` + (owner ? '\nOwner: ' : '');
+  el.textContent = `${p.name}` + (owner ? '\nOwner: ' : '');
   if (owner) {
     const s = document.createElement('span');
     s.textContent = owner;
-    if (linkOf(raw)) { s.style.textDecoration = 'underline'; s.style.textDecorationColor = '#000'; }
+    if (linkOf(raw)) { s.style.textDecoration = 'underline'; s.style.textDecorationColor = 'rgb(62, 44, 42)'; }
     el.appendChild(s);
   }
   const w = worldOf(p.name);
@@ -714,7 +768,7 @@ function collect() {
       if (!owners.has(key)) owners.set(key, { label: aliasOf(raw) || raw, layers: new Set() });
       const o = owners.get(key);
       o.layers.add(l);
-      if (!aliasOf(raw) && raw.length < o.label.length) o.label = raw;
+      if (!aliasOf(raw) && raw.length > o.label.length) o.label = raw;
       groupsOf(raw).forEach((n) => {
         const k = n.toLowerCase();
         if (!orgs.has(k)) orgs.set(k, { label: n, flag: flagFor(n), layers: new Set() });
