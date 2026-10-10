@@ -356,7 +356,8 @@ function rebuildFlags() {
   drawnItems.eachLayer((l) => {
     const groups = ownersOf(resolveOwner(l.feature.properties)).flatMap(groupsOf);
     if (!groups.length) return;
-    const url = flagFor(groups[0]);
+    const url = groups.map(flagFor).find(Boolean);
+    if (!url) return;
     flagReady(url, () => {
       if (run !== flagRun) return;
       l._flagFill = flagPattern(url);
@@ -438,7 +439,8 @@ function imgUrl(u) {
   return r ? r[1] : u;
 }
 
-const flagFor = (name) => imgUrl(nationFlag.get(name.toLowerCase())) || '';
+const flagFor = (name) => imgUrl(nationFlag.get(name.toLowerCase()));   // only the link from the sheet, no guessing
+
 
 function uniqueOwners(raw) {
   const m = new Map();
@@ -590,7 +592,7 @@ function loadNations(text) {
     if (f && !nationFlag.has(r.a.toLowerCase())) nationFlag.set(r.a.toLowerCase(), f);
   });
   refreshAll();
-  setStatus(`Loaded ${rows.length} crew rows, ${nationColor.size} with Team Color.`);
+    setStatus(`Loaded ${rows.length} crew rows, ${nationColor.size} with Team Color, ${nationFlag.size} with flag links.`);
 }
 
 
