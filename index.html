@@ -427,16 +427,14 @@ function groupsOf(owner) {
 // GitHub page links (.../blob/main/File.PNG) become direct image links
 function imgUrl(u) {
   u = String(u || '').trim();
-  console.log("result:", u);
-  if (!u) 
-  return '';
+  if (!u) return '';
+  // full GitHub blob page → direct raw file
   const m = u.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+)$/i);
-  if (m) 
-  console.log("result:", m);
-  return `https://github.com/${m[1]}/${m[2]}/raw/${m[3]}/${m[4]}`;
+  if (m) return `https://github.com/${m[1]}/${m[2]}/raw/${m[3]}/${m[4]}`;
+  // relative /blob/… path (common when people paste from the GitHub UI)
   const r = u.match(/^\/?blob\/[^/]+\/(.+)$/i);
-  console.log("result:", r ? r[1] : u);
-  return r ? r[1] : u;
+  if (r) return r[1];          // or build a full raw URL if you prefer
+  return u;                    // already a usable URL
 }
 
 const flagFor = (name) => imgUrl(nationFlag.get(name.toLowerCase()));   // only the link from the sheet, no guessing
