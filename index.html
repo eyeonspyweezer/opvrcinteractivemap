@@ -915,7 +915,7 @@ function renameIsland(sheetName, idx) {
   }
     // Strip trailing " (anything)" — e.g. "Conomi Islands (Arlong Park)" → "Conomi Islands"
   // Also handles nested/odd spacing: "Name (note)", "Name（note）"
-  const stripped = name.replace(/\s*[\(\（][^\)\）]*[\)\）]\s*$/u, '').trim();
+  const stripped = name.replace(/\s*\([^)]*\)\s*$/, '').trim();
   if (stripped && stripped.toLowerCase() !== low) {
     // Prefer whatever exists on the map (with or without "Island", etc.)
     const hit = onMap(idx, stripped)
