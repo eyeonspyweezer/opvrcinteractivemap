@@ -98,6 +98,9 @@ html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay
 .slist { display: none; max-height: 28dvh; overflow-y: auto; border: 1px solid var(--fg); }
 .slist.open { display: block; }
 .sitem { position: relative; display: block; width: 100%; padding: 6px 8px; text-align: center; font: inherit; background: var(--bg); color: var(--sfg); border: 0; border-bottom: 1px solid var(--fg); cursor: pointer; }
+.sitem.missing { color: #c62828; }      /* red = in sheet, not on map */
+.sitem.duplicate { color: #ef6c00; }    /* orange = several sheet rows → same name */
+.sitem.missing.duplicate { color: #ef6c00; } /* orange wins if both */
 .sitem.hasflag { padding-left: 48px; }
 .sitem img.flag { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 30px; height: auto; max-height: 80%; }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--bg); color: var(--sfg); border-radius: 0; }
@@ -685,10 +688,38 @@ function loadIslands(text) {
   });
   rebuildGhosts();
 }
+let ownerIslandLabels = new Map(); // lowercase → display name (after rename)
+
+let ownerIslandLabels = new Map(); // lowercase → display label after rename
+
 function loadOwners(text) {
   const skip = CONFIG.statusHeaders.map((h) => h.toLowerCase());
-  const rows = parseSheet(text, CONFIG.islandHeaders, CONFIG.ownerHeaders).filter((r) => !skip.includes(r.h2));
-  ownerMap = new Map(rows.map((r) => [r.a.toLowerCase(), r.b]));
+  const rows = parseSheet(text, CONFIG.islandHeaders, CONFIG.ownerHeaders)
+    .filter((r) => !skip.includes(r.h2));
+  const idx = mapNameIndex();
+
+  ownerMap = new Map();
+  ownerIslandLabels = new Map();
+
+  // count how many sheet rows land on the same final name
+  const hits = new Map(); // lowercase final → { label, owners: [] }
+
+  rows.forEach((r) => {
+    const label = renameIsland(r.a, idx);
+    if (!label) return;
+    const k = label.toLowerCase();
+    if (!hits.has(k)) hits.set(k, { label, owners: [] });
+    hits.get(k).owners.push(r.b);
+  });
+
+  const dupKeys = new Set();
+    hits.forEach((v, k) => {
+      if (v.owners.length > 1) dupKeys.add(k); // more than one sheet row → this name
+      ownerMap.set(k, v.owners.filter(Boolean).join(' / '));
+      ownerIslandLabels.set(k, v.label);
+    });
+    window.__islandDupKeys = dupKeys;
+
   refreshAll();
   setStatus(`Loaded ${ownerMap.size} owner rows.`);
 }
@@ -844,7 +875,94 @@ loadDiscord();
 setInterval(loadDiscord, 300000);
 // ===== Search frame: islands (by name) / groups / owners =====
 // Owner spellings that mean the same person. 'Name shown in the list': ['other spellings']. Example: 'Lincoln': ['thelincoln65']
+
 const OWNER_ALIASES = {};
+  // Sheet island names → map names (keys are lowercase)
+// Exact overrides (keys are lowercase). Add more anytime.
+const ISLAND_RENAMES = {
+  'dressrosa kingdom': 'Dressrosa',
+  'rest of wano': 'The rest of Wano',
+  'lodestar island': 'Loadestar',
+  'loadestar island': 'Loadestar'
+};
+
+// All polygon names currently on the map (lowercase → exact label)
+function mapNameIndex() {
+  const idx = new Map();
+  drawnItems.eachLayer((l) => {
+    const n = String(l.feature?.properties?.name || '').trim();
+    if (n) idx.set(n.toLowerCase(), n);
+  });
+  return idx;
+}
+
+function onMap(idx, name) {
+  return idx.get(String(name || '').trim().toLowerCase()) || null;
+}
+
+/** Turn a sheet island name into the best map name (or a cleaned display name). */
+function renameIsland(sheetName, idx) {
+  let name = String(sheetName || '').trim();
+  if (!name) return '';
+
+  const low = name.toLowerCase();
+
+  // 1) Exact override table
+  if (ISLAND_RENAMES[low]) {
+    const fixed = ISLAND_RENAMES[low];
+    return onMap(idx, fixed) || fixed;
+  }
+    // Strip trailing " (anything)" — e.g. "Conomi Islands (Arlong Park)" → "Conomi Islands"
+  // Also handles nested/odd spacing: "Name (note)", "Name（note）"
+  const stripped = name.replace(/\s*[\(\（][^\)\）]*[\)\）]\s*$/u, '').trim();
+  if (stripped && stripped.toLowerCase() !== low) {
+    // Prefer whatever exists on the map (with or without "Island", etc.)
+    const hit = onMap(idx, stripped)
+      || onMap(idx, `${stripped} Island`)
+      || onMap(idx, stripped.replace(/\s+Island$/i, ''));
+    if (hit) return hit;
+    // Not on map yet — still use the cleaned name for the red "missing" list
+    name = stripped;
+  }
+
+  // 2) "G-5 Base" / "G-12 Base" → "G-5" / "G-12"
+  let m = name.match(/^G\s*[-–]?\s*(\d+)\s+Base$/i);
+  if (m) {
+    const cand = `G-${m[1]}`;
+    return onMap(idx, cand) || cand;
+  }
+
+  // 3) "80th Branch" / "1st Branch" → "G-80" / "G-1"
+  m = name.match(/^(\d+)(?:st|nd|rd|th)\s+Branch$/i);
+  if (m) {
+    const cand = `G-${m[1]}`;
+    return onMap(idx, cand) || cand;
+  }
+
+  // 4) "Name Island" ↔ "Name" depending on what exists on the map
+  m = name.match(/^(.+?)\s+Island$/i);
+  if (m) {
+    const base = m[1].trim();
+    const withIsland = onMap(idx, `${base} Island`);
+    const without = onMap(idx, base);
+    if (withIsland) return withIsland;       // map has "Foodvalten Island"
+    if (without) return without;             // map has "Foodvalten" only
+    // neither on map — prefer short form as display
+    return base;
+  } else {
+    // Sheet says "Foodvalten" but map has "Foodvalten Island"
+    const withIsland = onMap(idx, `${name} Island`);
+    const exact = onMap(idx, name);
+    if (exact) return exact;
+    if (withIsland) return withIsland;
+  }
+
+  // 5) Case-insensitive exact match to a map polygon
+  const exact = onMap(idx, name);
+  if (exact) return exact;
+
+  return name; // unknown — keep sheet spelling for the red "missing" list
+}
 const norm = (s) => String(s || '').toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]/g, '');
 // Shared owners are split on these (change here if needed): "/"  ","  "&"  and the word "and"
 const OWNER_SPLIT = /\s*(?:\/|,|&|\band\b)\s*/i;
@@ -885,10 +1003,14 @@ function wireClick(target, layer) {
 
 function collect() {
   const islands = [], orgs = new Map(), owners = new Map();
+  const onMapKeys = new Set();
+
   drawnItems.eachLayer((l) => {
     const p = l.feature && l.feature.properties;
     if (!p) return;
-    islands.push({ label: String(p.name), layers: [l] });
+    const label = String(p.name);
+    onMapKeys.add(label.toLowerCase());
+    islands.push({ label, layers: [l], missing: false, duplicate: false, unnamed: label.includes('???') });
     ownersOf(resolveOwner(p)).forEach((raw) => {
       const key = ownerKey(raw);
       if (!owners.has(key)) owners.set(key, { label: aliasOf(raw) || raw, layers: new Set() });
@@ -902,11 +1024,31 @@ function collect() {
       });
     });
   });
-  // Crews with a leader always appear in the group list, even if they own no island
-  leaderMap.forEach((crews) => crews.forEach((n) => { const k = n.toLowerCase(); if (!orgs.has(k)) orgs.set(k, { label: n, flag: flagFor(n), layers: new Set() }); }));
-  const list = (m) => [...m.values()].map((o) => ({ label: o.label, flag: o.flag, layers: [...o.layers] }));
-  return { islands, orgs: list(orgs), owners: list(owners) };
-}
+
+  // How many *original sheet rows* collapsed onto each final name?
+  // (recompute quickly from ownerIslandLabels — duplicates = same final key from different sheet names)
+  // We mark duplicate when the joined owner string had multiple contributions:
+  // simpler: any final name that appears more than once in the raw rename pass is stored below.
+  // Use a side map filled in loadOwners:
+  const dupKeys = window.__islandDupKeys || new Set();
+
+  ownerIslandLabels.forEach((label, k) => {
+    if (onMapKeys.has(k)) {
+      // already on map — mark duplicate if several sheet rows mapped here
+      if (dupKeys.has(k)) {
+        const item = islands.find((i) => i.label.toLowerCase() === k);
+        if (item) item.duplicate = true;
+      }
+      return;
+    }
+    islands.push({
+      label,
+      layers: [],
+      missing: true,
+      duplicate: dupKeys.has(k),
+      unnamed: false
+    });
+  });
 
 let searchAF = 0, pickedIsland = null;
 function flashLayers(layers) {
@@ -928,11 +1070,29 @@ function showLayers(layers) {
 function fillList(listEl, items, filter, onPick) {
   const q = filter.trim().toLowerCase();
   listEl.textContent = '';
+
+  // 0 = normal A–Z, 1 = digits / non-letter start, 2 = missing (not on map), 3 = ??? unnamed
+  const sortBucket = (i) => {
+    if (i.unnamed || String(i.label).includes('???')) return 3;
+    if (i.missing) return 2;
+    const s = String(i.label || '').trim();
+    if (!/^[A-Za-z]/.test(s) || /\d/.test(s)) return 1;
+    return 0;
+  };
+
   items.filter((i) => i.label.toLowerCase().includes(q))
-    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+    .sort((a, b) => {
+      const d = sortBucket(a) - sortBucket(b);
+      if (d) return d;
+      return a.label.localeCompare(b.label, undefined, { numeric: true });
+    })
     .forEach((i) => {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'sitem';
+      b.type = 'button';
+      let cls = 'sitem';
+      if (i.missing) cls += ' missing';
+      if (i.duplicate) cls += ' duplicate';
+      b.className = cls;
       if (i.flag) {
         const img = document.createElement('img');
         img.className = 'flag'; img.alt = ''; img.src = i.flag;
@@ -947,7 +1107,12 @@ function fillList(listEl, items, filter, onPick) {
 }
 const closeLists = () => document.querySelectorAll('.slist').forEach((l) => l.classList.remove('open'));
 [
-  ['sIsland', 'lIsland', 'islands', (i) => { pickedIsland = i; $('sIsland').value = i.label; }],
+  ['sIsland', 'lIsland', 'islands', (i) => {
+    pickedIsland = i;
+    $('sIsland').value = i.label;
+    if (i.missing) setStatus('Not on map (sheet only): ' + i.label);
+    else if (i.layers && i.layers.length) showLayers(i.layers);
+  }],
   ['sOrg', 'lOrg', 'orgs', (i) => { $('sOrg').value = i.label; showLayers(i.layers); }],
   ['sOwner', 'lOwner', 'owners', (i) => { $('sOwner').value = i.label; showLayers(i.layers); }]
 ].forEach(([inId, listId, key, pick]) => {
