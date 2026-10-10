@@ -534,16 +534,19 @@ function stripePattern(colors) {
   const key = colors.join('|');
   if (stripePatterns.has(key)) return stripePatterns.get(key);
 
-  const id = 'stripe-' + stripePatterns.size;
+  const layers = drawnItems.getLayers();
+  if (!layers.length) return null;
+
   const NS = 'http://www.w3.org/2000/svg';
-  let defs = document.querySelector('#map svg defs');
+  // MUST be the same SVG Leaflet uses for polygons (same as flagPattern)
+  const svg = map.getRenderer(layers[0])._container;
+  let defs = svg.querySelector('defs');
   if (!defs) {
-    const svg = document.querySelector('#map svg');
-    if (!svg) return null;
     defs = document.createElementNS(NS, 'defs');
-    svg.prepend(defs);
+    svg.insertBefore(defs, svg.firstChild);
   }
 
+  const id = 'stripe-' + stripePatterns.size;
   const n = colors.length;
   const pat = document.createElementNS(NS, 'pattern');
   pat.setAttribute('id', id);
@@ -1024,6 +1027,15 @@ function collect() {
       });
     });
   });
+  leaderMap.forEach((crews) => crews.forEach((n) => {
+    const k = n.toLowerCase();
+    if (!orgs.has(k)) orgs.set(k, { label: n, flag: flagFor(n), layers: new Set() });
+  }));
+  const list = (m) => [...m.values()].map((o) => ({
+    label: o.label, flag: o.flag, layers: [...o.layers]
+  }));
+  return { islands, orgs: list(orgs), owners: list(owners) };
+}
 
   // How many *original sheet rows* collapsed onto each final name?
   // (recompute quickly from ownerIslandLabels — duplicates = same final key from different sheet names)
