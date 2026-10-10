@@ -693,8 +693,6 @@ function loadIslands(text) {
 }
 let ownerIslandLabels = new Map(); // lowercase → display name (after rename)
 
-let ownerIslandLabels = new Map(); // lowercase → display label after rename
-
 function loadOwners(text) {
   const skip = CONFIG.statusHeaders.map((h) => h.toLowerCase());
   const rows = parseSheet(text, CONFIG.islandHeaders, CONFIG.ownerHeaders)
