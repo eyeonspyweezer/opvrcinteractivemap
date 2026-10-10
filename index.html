@@ -1220,9 +1220,10 @@ function fillList(listEl, items, filter, onPick) {
       const b = document.createElement('button');
       b.type = 'button';
       let cls = 'sitem';
-      if (i.missing) cls += ' missing';
-      if (i.duplicate) cls += ' duplicate';
-      b.className = cls;
+        if (i.missing) cls += ' missing';
+        if (i.unnamed || String(i.label).includes('???')) cls += ' missing';
+        if (i.duplicate) cls += ' duplicate';
+        b.className = cls;
       if (i.flag) {
         const img = document.createElement('img');
         img.className = 'flag'; img.alt = ''; img.src = i.flag;
