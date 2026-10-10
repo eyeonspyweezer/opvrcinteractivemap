@@ -195,7 +195,10 @@ body { background: var(--bg); }
   <label><input type="checkbox" id="optColors"> Island colors</label>
   <label><input type="checkbox" id="optFlags" checked> Flags on the map</label>
   <label><input type="checkbox" id="optNames" checked> Island names on the map</label>
+  <label><input type="checkbox" id="optHideUnnamed"> Hide Unnamed Islands</label>
+  <label><input type="checkbox" id="optHideUnowned"> Hide unowned islands</label>
   <label>Polygon opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
+  <label>Flag opacity: <span id="optFlagOpacityVal"></span><input type="range" id="optFlagOpacity" min="0" max="1" step="0.05"></label>
 </div>
 
 <script>
@@ -229,7 +232,7 @@ const VRC_WORLDS = {
 // Settings defaults. Flags are skipped automatically on data saver, 2G or low-memory devices (where the browser reports it).
 const conn = navigator.connection || {};
 const lowResources = !!(conn.saveData || /2g/.test(conn.effectiveType || '') || (navigator.deviceMemory && navigator.deviceMemory <= 2));
-const OPT = { colors: false, flags: !lowResources, names: true };
+const OPT = { colors: false, flags: !lowResources, names: true, hideUnnamed: false, hideUnowned: false };
 // Paste Google Sheets links here (see the steps above). Leave '' to skip one.
 const SHEETS = { worlds: '', announcements: '', events: '',
   owners: 'https://docs.google.com/spreadsheets/d/14I31HO_9qbplW8LWP63-itFL1eAjL0O-ecEAxxCOJpM/',
@@ -240,10 +243,12 @@ const GROUP_COLORS = {
   worldgovernment: 'rgb(0, 90, 255)',
   revolutionaryarmy: 'rgb(180, 0, 0)'
 };
-const DEFAULT_GROUP_COLOR = 'rgb(0, 0, 0)';      // any other group/crew
-const NO_OWNER_COLOR = 'rgb(255, 255, 255)';     // islands with no leader
+const DEFAULT_GROUP_COLOR = 'rgb(0, 0, 0)';      // known crew with no Team Color in the sheet
+const NO_OWNER_COLOR = 'rgb(0, 146, 70)';        // no owner at all (green)
+const OWNED_NO_CREW_COLOR = 'rgb(128, 0, 128)'; // has owner, but no crew/group in the crew sheet (purple)
 // Polygon fill transparency: 0 = invisible fill, 1 = fully solid. Change this number to adjust all polygons.
-let POLYGON_FILL_OPACITY = 0.5; // starting value when the page loads; the debug slider changes it live
+let POLYGON_FILL_OPACITY = 0.5; // solid color / stripe fill opacity
+let FLAG_FILL_OPACITY = 0.45;   // flag image fill opacity inside polygons
 
 const $ = (id) => document.getElementById(id);
 const setStatus = (t) => console.log(t); // no status panel in the public page
@@ -344,11 +349,33 @@ function applyFlagFill(layer) {
   if (layer._stripeFill) return; // multi-crew stripes win over a single flag
   if (!layer._flagFill) return;
   [layer, ...(layer._ghosts || [])].forEach((x) => {
-    if (x._path) x._path.setAttribute('fill', `url(#${layer._flagFill})`);
+    if (!x._path) return;
+    x._path.setAttribute('fill', `url(#${layer._flagFill})`);
+    x._path.setAttribute('fill-opacity', String(FLAG_FILL_OPACITY));
   });
 }
 function applyHidden(layer) {
-  [layer, ...(layer._ghosts || [])].forEach((x) => { if (x._path) x._path.style.display = layer._hidden ? 'none' : ''; });
+  [layer, ...(layer._ghosts || [])].forEach((x) => {
+    if (x._path) x._path.style.display = layer._hidden ? 'none' : '';
+  });
+}
+
+function shouldHide(layer) {
+  const name = String(layer.feature.properties.name || '');
+  if (OPT.hideUnnamed && name.includes('???')) return true;
+  if (OPT.hideUnowned) {
+    const owner = resolveOwner(layer.feature.properties);
+    if (!ownersOf(owner).length) return true;
+  }
+  return false;
+}
+
+function rebuildVisibility() {
+  drawnItems.eachLayer((l) => {
+    l._hidden = shouldHide(l);
+    applyHidden(l);
+  });
+  rebuildLabels();
 }
 function rebuildFlags() {
   const run = ++flagRun;
@@ -369,7 +396,7 @@ function rebuildFlags() {
   });
 }
 
-const refreshAll = () => { restyleAll(); rebuildFlags(); };
+const refreshAll = () => { restyleAll(); rebuildFlags(); rebuildVisibility(); };
 
 
 
@@ -475,15 +502,28 @@ function teamColor(raw) {
 
 // All distinct group colors for an island (for multi-crew stripes)
 function groupColorsOf(raw) {
+  const owners = ownersOf(raw);
+  if (!owners.length) return [];
+
   const colors = [];
   const seen = new Set();
-  for (const g of ownersOf(raw).flatMap(groupsOf)) {
-    const c = nationColor.get(g.toLowerCase()) || GROUP_COLORS[norm(g)] || DEFAULT_GROUP_COLOR;
-    if (!seen.has(c)) {
-      seen.add(c);
-      colors.push(c);
+  let anyCrew = false;
+
+  for (const o of owners) {
+    const crews = nationsOf(cleanOwner(o));
+    if (!crews.length) continue;
+    anyCrew = true;
+    for (const g of crews) {
+      const c = nationColor.get(g.toLowerCase()) || GROUP_COLORS[norm(g)] || DEFAULT_GROUP_COLOR;
+      if (!seen.has(c)) {
+        seen.add(c);
+        colors.push(c);
+      }
     }
   }
+
+  // Owned person/name exists, but nothing in the crews sheet links them to a crew
+  if (!anyCrew) return [OWNED_NO_CREW_COLOR];
   return colors;
 }
 
@@ -944,6 +984,7 @@ function rebuildLabels() {
   labelItems.clearLayers();
   if (!OPT.names || !mapWidth) return;
   drawnItems.eachLayer((l) => {
+    if (l._hidden) return;
     const name = String(l.feature.properties.name || '');
     if (!name || name.includes('???')) return;
     const c = turf.pointOnFeature(l.toGeoJSON()).geometry.coordinates;
@@ -963,9 +1004,23 @@ document.querySelectorAll('.ico').forEach((el) => {
 $('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked; restyleAll(); });
 $('optFlags').addEventListener('change', (e) => { OPT.flags = e.target.checked; rebuildFlags(); });
 $('optNames').addEventListener('change', (e) => { OPT.names = e.target.checked; rebuildLabels(); });
+$('optHideUnnamed').addEventListener('change', (e) => { OPT.hideUnnamed = e.target.checked; rebuildVisibility(); });
+$('optHideUnowned').addEventListener('change', (e) => { OPT.hideUnowned = e.target.checked; rebuildVisibility(); });
 $('optOpacity').value = POLYGON_FILL_OPACITY;
 $('optOpacityVal').textContent = POLYGON_FILL_OPACITY;
-$('optOpacity').addEventListener('input', (e) => { POLYGON_FILL_OPACITY = parseFloat(e.target.value); $('optOpacityVal').textContent = POLYGON_FILL_OPACITY; restyleAll(); });
+$('optOpacity').addEventListener('input', (e) => {
+  POLYGON_FILL_OPACITY = parseFloat(e.target.value);
+  $('optOpacityVal').textContent = POLYGON_FILL_OPACITY;
+  restyleAll();
+});
+$('optFlagOpacity').value = FLAG_FILL_OPACITY;
+$('optFlagOpacityVal').textContent = FLAG_FILL_OPACITY;
+$('optFlagOpacity').addEventListener('input', (e) => {
+  FLAG_FILL_OPACITY = parseFloat(e.target.value);
+  $('optFlagOpacityVal').textContent = FLAG_FILL_OPACITY;
+  // re-apply flag opacity without reloading images
+  drawnItems.eachLayer((l) => applyFlagFill(l));
+});
 if (lowResources) { $('optFlags').checked = false; $('optFlags').title = 'Turned off automatically (data saver / low memory)'; }
 </script>
 </body>
