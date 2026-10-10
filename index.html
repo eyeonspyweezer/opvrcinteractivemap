@@ -406,7 +406,9 @@ function rebuildFlags() {
   rebuildLabels();
   if (!OPT.flags) return;
   drawnItems.eachLayer((l) => {
-    const groups = ownersOf(resolveOwner(l.feature.properties)).flatMap(groupsOf);
+    const groups = preferMarines(
+      ownersOf(resolveOwner(l.feature.properties)).flatMap(groupsOf)
+    );
     if (!groups.length) return;
     const url = groups.map(flagFor).find(Boolean);
     if (!url) return;
@@ -490,7 +492,41 @@ function imgUrl(u) {
 }
 
 const flagFor = (name) => imgUrl(nationFlag.get(name.toLowerCase()));   // only the link from the sheet, no guessing
+// If both Marines and World Government are present, keep Marines only
+function preferMarines(names) {
+  const list = [...names];
+  const isMarines = (s) => /marine/i.test(s);
+  const isWG = (s) => /world\s*government|worldgovernment/i.test(s);
+  const hasM = list.some(isMarines);
+  const hasW = list.some(isWG);
+  if (hasM && hasW) return list.filter((s) => !isWG(s));
+  return list;
+}
+function groupColorsOf(raw) {
+  const owners = ownersOf(raw);
+  if (!owners.length) return [];
 
+  const colors = [];
+  const seen = new Set();
+  let anyCrew = false;
+
+  let crews = preferMarines(
+    owners.flatMap((o) => nationsOf(cleanOwner(o)))
+  );
+
+  for (const g of crews) {
+    if (!g) continue;
+    anyCrew = true;
+    const c = nationColor.get(g.toLowerCase()) || GROUP_COLORS[norm(g)] || DEFAULT_GROUP_COLOR;
+    if (!seen.has(c)) {
+      seen.add(c);
+      colors.push(c);
+    }
+  }
+
+  if (!anyCrew) return [OWNED_NO_CREW_COLOR];
+  return colors;
+}
 
 function uniqueOwners(raw) {
   const m = new Map();
@@ -653,6 +689,7 @@ function tipContent(layer) {
   const p = layer.feature.properties;
   const raw = resolveOwner(p); // exact string from the island owner sheet
   const el = document.createElement('div');
+  
 
   const line = (label, value, opts = {}) => {
     if (!value) return;
@@ -682,9 +719,11 @@ function tipContent(layer) {
   if (ownerOnly) line('Owner:', ownerOnly, { underline: !!linkOf(raw) });
 
   // Crews/groups derived from those owners — separate line
-  const crews = [...new Set(
-    ownersOf(raw).flatMap(groupsOf).filter((g) => g && !/ Kingdom$/i.test(g))
-  )];
+  const crews = preferMarines([
+    ...new Set(
+      ownersOf(raw).flatMap(groupsOf).filter((g) => g && !/ Kingdom$/i.test(g))
+    )
+  ]);
   if (crews.length) line('Crew:', crews.join(', '));
 
   const w = worldOf(p.name);
