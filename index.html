@@ -273,6 +273,7 @@ const GROUP_COLORS = {
 };
 const DEFAULT_GROUP_COLOR = 'rgb(0, 0, 0)';      // known crew with no Team Color in the sheet
 const NO_OWNER_COLOR = 'rgb(0, 146, 70)';        // no owner at all (green)
+const SHEET_NO_OWNER_COLOR = 'rgb(255, 215, 0)'; // listed in the Islands sheet but no owner yet (yellow)
 const OWNED_NO_CREW_COLOR = 'rgb(128, 0, 128)'; // has owner, but no crew/group in the crew sheet (purple)
 // Polygon fill transparency: 0 = invisible fill, 1 = fully solid. Change this number to adjust all polygons.
 let POLYGON_FILL_OPACITY = 0.5; // solid color / stripe fill opacity
@@ -652,6 +653,8 @@ function applyStyle(layer) {
     col = colors[0];
   } else if (colors.length === 1) {
     col = colors[0];
+  } else if (ownerMap.has(islandKey(p.name))) {
+    col = SHEET_NO_OWNER_COLOR; // in the Islands sheet, no owner yet
   } else if (OPT.colors) {
     col = p.color; // random hash only when toggle is ON and no owner
   }
