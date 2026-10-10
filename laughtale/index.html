@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex">
+<title>Island map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+
+<style>
+
+.leaflet-container {
+  background: transparent;
+}
+/* NOTE FOR ANY AI ASSISTANT / FUTURE EDITS: PlayfairDisplay-Bold.ttf supports ONLY the characters A-Z and 0-9. It is limited with unicode-range in the @font-face below. All other characters must come from the fallback fonts in the font-family stack (Helvetica Neue, Arial, sans-serif). Do not assume the custom font has lowercase letters, punctuation or symbols. There is intentionally no font-loading JavaScript. */
+@font-face {
+  font-family: 'PlayfairDisplay';
+  src: url('../PlayfairDisplay-Bold.ttf') format('truetype');
+  font-weight: 700;
+  unicode-range: U+0030-0039, U+0041-005A; /* 0-9 and A-Z only */
+}
+
+:root { --bg: rgb(227, 201, 152); --fg: rgb(59, 38, 20); --fab: clamp(48px, 6vmin, 64px); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: rgb(25, 25, 25); --fg: #fff; } }
+:root[data-theme="dark"] { --bg: rgb(25, 25, 25); --fg: #fff; }
+@media (pointer: coarse) { :root { --fab: clamp(52px, 13vmin, 68px); } }
+:root { --sfg: rgb(0, 0, 0); --inv: 0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sfg: #fff; --inv: 1; } }
+:root[data-theme="dark"] { --sfg: #fff; --inv: 1; }
+
+html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay', 'Helvetica Neue', Arial, sans-serif; font-weight: 700; }
+#map { width: 100%; height: 100vh; height: 100dvh; }
+.drawing path.leaflet-interactive { pointer-events: none; }
+.leaflet-editing-icon { width: 10px !important; height: 10px !important; margin: -5px 0 0 -5px !important; }
+.leaflet-tooltip { font-family: inherit; }
+/* Leaflet buttons: zoom (+ and -) and the draw/edit toolbar. They follow the same colors as the panel (--bg and --fg). */
+.leaflet-bar { border: 1px solid var(--fg); box-shadow: none; }
+.leaflet-bar a,
+.leaflet-bar a:hover,
+.leaflet-bar a:focus { background-color: var(--bg); color: var(--fg); border-bottom-color: var(--fg); }
+.leaflet-bar a:hover { filter: brightness(1.15); }
+.leaflet-bar a.leaflet-disabled { background-color: var(--bg); color: var(--fg); opacity: .5; }
+
+/* Small action buttons that appear while drawing (Finish, Delete last point, Cancel, Save) */
+.leaflet-draw-actions a,
+.leaflet-draw-actions a:hover { background-color: var(--bg); color: var(--fg); border-color: var(--fg); }
+
+/* The draw/edit icons are black images, so in dark mode they get inverted to white. The background is set to the opposite color so it ends up as dark. */
+:root[data-theme="dark"] .leaflet-draw-toolbar > a { filter: invert(1); background-color: rgb(230, 230, 230); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .leaflet-draw-toolbar > a { filter: invert(1); background-color: rgb(230, 230, 230); }
+}
+
+#panel, #sideList {
+  position: fixed; z-index: 1000; box-sizing: border-box;
+  background: var(--bg); color: var(--fg); border-radius: 6px; font-size: 14px;
+}
+#panel { top: 10px; right: 64px; width: min(270px, calc(100vw - 74px)); max-height: 60dvh; overflow: auto; padding: 10px; }
+#panelHeader { margin: -10px -10px 8px; padding: 8px 10px; border-bottom: 1px solid var(--fg); cursor: move; touch-action: none; user-select: none; display: flex; justify-content: space-between; align-items: center; }
+#panel.collapsed #panelBody { display: none; }
+#panel label { display: block; margin-bottom: 8px; }
+#panel input[type=text] { box-sizing: border-box; width: 100%; margin-top: 3px; font-size: 16px; }
+#panel input[type=file] { width: 100%; margin-top: 3px; }
+#panel button { margin: 3px 3px 3px 0; }
+#status, #debugBody { margin-top: 6px; font-size: 13px; }
+
+/* Left list: full height, square corners, opens top to bottom like unrolling a document. Outline = text color. */
+/* Transparency: 90% opaque = 10% see-through. Use 80% to 95% for 0.2 to 0.05 transparency. */
+#sideList {
+  left: 0; top: 0; bottom: 0; height: 100dvh; max-height: none; border-radius: 0;
+  width: clamp(150px, 22vw, 260px); overflow-y: auto; padding: 8px 8px calc(var(--fab) + 50px);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  border: 1px solid var(--fg);
+  clip-path: inset(0 0 100% 0); visibility: hidden;
+  transition: clip-path .4s ease, visibility 0s linear .4s;
+}
+#sideList.open { clip-path: inset(0); visibility: visible; transition: clip-path .4s ease, visibility 0s; }
+@media (pointer: coarse) { #sideList { width: clamp(140px, 40vw, 220px); } }
+/* Icon fills ~90% of the list width and scales with it */
+.list-icon { display: block; width: 90%; height: auto; margin: 4px auto 10px; }
+.list-btn { display: block; box-sizing: border-box; width: 100%; margin-bottom: 8px; padding: 10px; background: var(--bg); color: var(--fg); border: 1px solid var(--fg); border-radius: 6px; text-align: center; text-decoration: none; text-transform: uppercase; }
+
+.round-btn {
+  position: fixed; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  width: var(--fab); height: var(--fab); border-radius: 50%; color: #fff; text-decoration: none; border: 0; cursor: pointer;
+  font-size: calc(var(--fab) * 0.45); box-shadow: 0 2px 8px rgba(0,0,0,.35); transition: transform .15s;
+}
+.round-btn:hover { transform: scale(1.08); }
+#fabBlue  { right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(28px + env(safe-area-inset-bottom, 0px)); background: #5865F2; }
+#fabBlack { right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(28px + var(--fab) + 10px + env(safe-area-inset-bottom, 0px)); background: #000; }
+#listToggle { left: 14px; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); background: var(--bg); color: var(--fg); border: 1px solid var(--fg); }
+#searchBtn { right: calc(24px + var(--fab)); bottom: calc(28px + env(safe-area-inset-bottom, 0px)); background: var(--bg); border: 1px solid var(--fg); }
+.black-icon { filter: brightness(0) invert(var(--inv)); }
+#searchFrame {
+  display: none; position: fixed; z-index: 1000; box-sizing: border-box;
+  right: calc(34px + 2 * var(--fab)); bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  width: min(300px, calc(100vw - 2 * var(--fab) - 50px)); max-height: 70dvh; overflow-y: auto; padding: 8px;
+  background: var(--bg); color: var(--sfg); border: 1px solid var(--fg); border-radius: 6px;
+}
+#searchFrame.open { display: block; }
+#searchFrame input { box-sizing: border-box; width: 100%; margin: 4px 0; padding: 6px; font: inherit; font-size: 16px; background: var(--bg); color: var(--sfg); border: 1px solid var(--fg); border-radius: 4px; }
+.srow { display: flex; gap: 6px; align-items: center; }
+.srow input { flex: 1; min-width: 0; }
+#sZoom { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--bg); border: 1px solid var(--fg); cursor: pointer; }
+.slist { display: none; max-height: 28dvh; overflow-y: auto; border: 1px solid var(--fg); }
+.slist.open { display: block; }
+.sitem { position: relative; display: block; width: 100%; padding: 6px 8px; text-align: center; font: inherit; background: var(--bg); color: var(--sfg); border: 0; border-bottom: 1px solid var(--fg); cursor: pointer; }
+.sitem.hasflag { padding-left: 48px; }
+.sitem img.flag { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 30px; height: auto; max-height: 80%; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--bg); color: var(--sfg); border-radius: 0; }
+a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-color: var(--sfg); }
+
+#fabBlue { overflow: visible; }
+#fabBlue .dc-logo { position: relative; z-index: 1; transition: opacity .2s; }
+#fabBlue .dc-server { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; opacity: 0; transition: opacity .2s; }
+#fabBlue:hover .dc-logo { opacity: .35; }
+#fabBlue:hover .dc-server.ready { opacity: var(--dc-icon-opacity); }
+#dcInfo {
+  position: absolute; right: 50%; top: 0; bottom: 0; z-index: -1; width: 0; overflow: hidden; white-space: nowrap;
+  display: flex; flex-direction: column; justify-content: center; box-sizing: border-box;
+  background: rgb(70, 70, 70); color: #fff; border-radius: calc(var(--fab) / 2) 0 0 calc(var(--fab) / 2);
+  font-size: clamp(11px, calc(var(--fab) * 0.26), 14px); line-height: 1.3; transition: width .25s ease;
+}
+#dcInfo[hidden] { display: none; }
+
+#dcInfo > div { padding: 0 calc(var(--fab) / 2 + 6px) 0 14px; text-align: right; position: relative; z-index: 1; }
+.dc-row { display: flex; justify-content: space-between; gap: 14px; align-items: center; }
+#fabBlue:hover #dcInfo { width: 230px; }
+#dcBg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: var(--dc-splash-opacity); }
+
+#dcInfo .dc-title { font-weight: 700; }
+
+.dc-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.dc-dot.on { background: rgb(35, 165, 90); }
+.dc-dot.off { background: rgb(128, 132, 142); }
+:root { --dc-splash-opacity: .15; --dc-icon-opacity: .4; }
+
+.live-title { margin: 12px 0 4px; font-weight: 700; border-bottom: 1px solid var(--fg); }
+.live-item { display: block; margin-bottom: 8px; padding: 6px; font-size: 13px; color: var(--fg); text-decoration: none; border: 1px solid var(--fg); }
+.live-head { font-weight: 700; }
+.map-flag { object-fit: contain; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="sideList">
+  <!-- NOTE: replace this placeholder with your own logo, e.g. <img class="list-icon" src="logo.png" alt=""> -->
+  <svg class="list-icon" viewBox="0 0 100 40"><rect x="1" y="1" width="98" height="38" rx="6" fill="none" stroke="currentColor" stroke-width="2"/><text x="50" y="25" text-anchor="middle" font-size="12" fill="currentColor">ICON</text></svg>
+  <div id="listButtons"></div>
+  <div id="listLive"></div>
+</div>
+<button id="listToggle" class="round-btn" type="button" aria-label="Show or hide list">☰</button>
+
+<div id="panel">
+  <div id="panelHeader"><span>Map areas — drag here</span><span><button id="themeBtn" type="button">◐</button><button id="toggle" type="button">–</button></span></div>
+  <div id="panelBody">
+    <label>TSV #1 islands (exported file): <input id="tsv1" type="file" accept=".tsv,.txt"></label>
+    <label>TSV #2 owners: <input id="tsv2" type="file" accept=".tsv,.txt"></label>
+    <label>TSV #3 nations / leaders / Team Color: <input id="tsv3" type="file" accept=".tsv,.txt"></label>
+    <hr>
+    <label>Code (optional): <input id="areaCode" type="text"></label>
+    <label>Name (optional): <input id="areaName" type="text" placeholder="Blank = use code"></label>
+    <button id="downloadList" type="button">Download TSV</button>
+    <div id="status">Load files above, then draw a shape.</div>
+    <hr>
+    <label><input id="hideDebug" type="checkbox"> Hide debug</label>
+    <div id="debugBody">
+      Font: PlayfairDisplay if found, otherwise a regular font.
+      <label>Polygon opacity: <span id="opacityValue"></span>
+        <input id="opacitySlider" type="range" min="0" max="1" step="0.05" style="width:100%">
+      </label>
+      <label>Go to polygon index (press Enter): <input id="goIndex" type="text" style="width:100%;font-size:16px"></label>
+      <label>New index (blank = unchanged): <input id="editIndex" type="text" style="width:100%;font-size:16px"></label>
+        <label>New name (blank = unchanged): <input id="editName" type="text" style="width:100%;font-size:16px"></label>
+        <button id="applyEdit" type="button">Apply to selected polygon</button>
+        <button id="autoArrange" type="button">Auto-arrange indexes (1 to N)</button>
+        <div id="dupList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- NOTE: replace the emoji inside each button with your own icon, e.g. <img src="icon.png" alt="" style="width:60%;height:60%">, and replace each href. -->
+<a id="fabBlack" class="round-btn" href="https://vrchat.com/home/group/grp_677be38a-564d-432f-be95-f2e319bb4b13" target="_blank" rel="noopener" aria-label="Second link">🌐</a>
+<a id="fabBlue" class="round-btn" href="https://discord.gg/bpj4Gu4MX" target="_blank" rel="noopener" aria-label="First link">
+  <img id="dcIcon" class="dc-server" alt="">
+  <span class="dc-logo">🔗</span>
+  <div id="dcInfo" hidden>
+    <span id="dcBg"></span>
+    <div class="dc-title" id="dcName"></div>
+    <div class="dc-row">
+      <span><span class="dc-dot off"></span><span id="dcOff"></span></span>
+      <span><span class="dc-dot on"></span><span id="dcOn"></span></span>
+    </div>
+  </div>
+</a>
+<button id="searchBtn" class="round-btn" type="button" aria-label="Search"><span class="black-icon">🔍</span></button>
+<div id="searchFrame">
+  <div class="srow">
+    <input id="sIsland" type="text" placeholder="Search islands" autocomplete="off">
+    <button id="sZoom" type="button" aria-label="Zoom to island"><span class="black-icon">🔎</span></button>
+  </div>
+  <div class="slist" id="lIsland"></div>
+  <input id="sOrg" type="text" placeholder="Search groups / crews" autocomplete="off">
+  <div class="slist" id="lOrg"></div>
+  <input id="sOwner" type="text" placeholder="Search island owners" autocomplete="off">
+  <div class="slist" id="lOwner"></div>
+</div>
+
+<script>
+// ===== CONFIG: change these if the header words in your Google Sheets change (case ignored) =====
+const CONFIG = {
+  islandHeaders: ['Location', 'Island / Location', 'Island'],      // TSV #2 first column
+  ownerHeaders:  ['Owner(s)', 'Owner', 'Controller', 'Status'],    // TSV #2 second column (all header words used)
+  statusHeaders: ['Status'],                                       // sections with these headers are NOT owners (e.g. Special Zone)                        // TSV #2 second column
+  nationHeaders: ['Crews/Groups', 'Nations', 'Nation'],            // TSV #3 first column
+  leaderHeaders: ['Owner(s)', 'Owner', 'Leaders(s)', 'Leader(s)', 'Leaders', 'Leader'], // TSV #3 second column
+  colorHeaders:  ['Team Color', 'Team Colour'],                    // TSV #3 optional extra column
+  flagHeaders:   ['Flag', 'Flag URL'],                             // TSV #3 optional: flag image path/URL for the group
+  linkHeaders:   ['Website', 'Link', 'More Info']                  // TSV #3 optional: link for the leader's name                    // TSV #3 optional extra column
+};
+// Left-list buttons. Empty = none shown. Example: { label: 'Rules', url: 'https://example.com' }
+const LIST_BUTTONS = [
+  { label: 'Island Tracker List (VRGoofy)', url: 'https://docs.google.com/spreadsheets/d/14I31HO_9qbplW8LWP63-itFL1eAjL0O-ecEAxxCOJpM/' },
+  { label: 'Crew Tracker List (Dave)', url: 'https://docs.google.com/spreadsheets/d/1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk/' }
+];
+const imageUrl = '../TargetedMap.PNG';
+// Paste Google Sheets links here (see the steps above). Leave '' to skip one.
+const SHEETS = { worlds: '', announcements: '', events: '',
+  owners: 'https://docs.google.com/spreadsheets/d/14I31HO_9qbplW8LWP63-itFL1eAjL0O-ecEAxxCOJpM/',
+  nations: 'https://docs.google.com/spreadsheets/d/1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk/' };
+  // Island colors. Keys are the group name in lowercase with no spaces/symbols and no leading "the".
+const GROUP_COLORS = {
+  marines: 'rgb(0, 90, 255)',
+  worldgovernment: 'rgb(0, 90, 255)',
+  revolutionaryarmy: 'rgb(180, 0, 0)'
+};
+const DEFAULT_GROUP_COLOR = 'rgb(0, 0, 0)';      // any other group/crew
+const NO_OWNER_COLOR = 'rgb(255, 255, 255)';     // islands with no leader
+// Polygon fill transparency: 0 = invisible fill, 1 = fully solid. Change this number to adjust all polygons.
+let POLYGON_FILL_OPACITY = 0.5; // starting value when the page loads; the debug slider changes it live
+
+const $ = (id) => document.getElementById(id);
+const setStatus = (t) => { $('status').textContent = t; };
+
+// ===== UI: theme, list, debug =====
+$('themeBtn').addEventListener('click', () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+});
+$('listToggle').addEventListener('click', () => $('sideList').classList.toggle('open'));
+LIST_BUTTONS.forEach((b) => {
+  const a = document.createElement('a');
+  a.className = 'list-btn'; a.textContent = b.label; a.href = b.url; a.target = '_blank'; a.rel = 'noopener';
+  $('listButtons').appendChild(a);
+});
+$('hideDebug').addEventListener('change', (e) => { $('debugBody').style.display = e.target.checked ? 'none' : 'block'; });
+
+
+// ===== Map =====
+const map = L.map('map', { crs: L.CRS.Simple, maxZoom: 4, minZoom: -5 });
+map.setView([0, 0], 0);
+map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
+map.zoomControl.setPosition('topright');
+const drawnItems = new L.FeatureGroup().addTo(map);
+// ===== Globe-style wrapping: polygons are also drawn as read-only copies one map width left/right =====
+const ghostItems = new L.FeatureGroup().addTo(map);
+let mapWidth = 0;          // image width, set when the map image loads
+const WRAP_COPIES = 3;     // copies on each side
+const eachShape = (fn) => { drawnItems.eachLayer(fn); ghostItems.eachLayer(fn); };
+const shiftLL = (ll, dx) => Array.isArray(ll) ? ll.map((x) => shiftLL(x, dx)) : L.latLng(ll.lat, ll.lng + dx);
+const shiftCoords = (c, dx) => typeof c[0] === 'number' ? [c[0] + dx, c[1]] : c.map((x) => shiftCoords(x, dx));
+function setLayerStyle(layer, style) { layer.setStyle(style); (layer._ghosts || []).forEach((g) => g.setStyle(style)); }
+function makeGhosts(layer) {
+  layer._ghosts = [];
+  if (!mapWidth) return;
+  for (let k = -WRAP_COPIES; k <= WRAP_COPIES; k++) {
+    if (!k) continue;
+    const g = L.polygon(shiftLL(layer.getLatLngs(), k * mapWidth), layer.options);
+    g.bindTooltip(() => tipContent(layer), { sticky: true });
+    wireClick(g, layer);
+    ghostItems.addLayer(g);
+    layer._ghosts.push(g);
+  }
+}
+// Move any polygon that sits on a repeated copy (far left/right) back onto the main map
+function normalizeToMainMap() {
+  if (!mapWidth) return;
+  drawnItems.eachLayer((l) => {
+    const k = Math.floor(l.getBounds().getCenter().lng / mapWidth);
+    if (k) l.setLatLngs(shiftLL(l.getLatLngs(), -k * mapWidth));
+  });
+}
+function rebuildGhosts() { normalizeToMainMap(); ghostItems.clearLayers(); drawnItems.eachLayer(makeGhosts); rebuildFlags(); }
+
+// ===== Flags in the middle of each island (a flag only shows if its image file exists) =====
+const flagItems = new L.FeatureGroup().addTo(map);
+const flagCache = new Map();
+let flagRun = 0;
+function flagReady(url, cb) {
+  if (flagCache.has(url)) { if (flagCache.get(url)) cb(); return; }
+  const t = new Image();
+  t.onload = () => { flagCache.set(url, true); cb(); };
+  t.onerror = () => flagCache.set(url, false);
+  t.src = url;
+}
+function rebuildFlags() {
+  const run = ++flagRun;
+  flagItems.clearLayers();
+  if (!mapWidth) return;
+  drawnItems.eachLayer((l) => {
+    const groups = ownersOf(resolveOwner(l.feature.properties)).flatMap(groupsOf);
+    if (!groups.length) return;
+    const url = flagFor(groups[0]);
+    flagReady(url, () => {
+      if (run !== flagRun) return;
+      const c = turf.pointOnFeature(l.toGeoJSON()).geometry.coordinates;
+      for (let k = -WRAP_COPIES; k <= WRAP_COPIES; k++) {
+        L.marker([c[1], c[0] + k * mapWidth], { interactive: false, keyboard: false,
+          icon: L.icon({ iconUrl: url, iconSize: [30, 20], iconAnchor: [15, 10], className: 'map-flag' }) }).addTo(flagItems);
+      }
+    });
+  });
+}
+const refreshAll = () => { restyleAll(); rebuildFlags(); };
+
+map.addControl(new L.Control.Draw({
+  position: 'topright',
+  draw: { polygon: { allowIntersection: false }, rectangle: false, polyline: false, circle: false, circlemarker: false, marker: false },
+  edit: { featureGroup: drawnItems }
+}));
+map.on(L.Draw.Event.DRAWSTART, () => map.getContainer().classList.add('drawing'));
+map.on(L.Draw.Event.DRAWSTOP, () => map.getContainer().classList.remove('drawing'));
+// Edit/delete mode: hide the repeated copies (they can't be edited) and bring them back afterwards
+const hideCopies = () => { ghostItems.clearLayers(); flagItems.clearLayers(); };
+map.on(L.Draw.Event.EDITSTART, hideCopies);
+map.on(L.Draw.Event.DELETESTART, () => { hideCopies(); setStatus('Delete mode: click a polygon to remove it, then press Save.'); });
+const afterEdit = () => { rebuildGhosts(); refreshDuplicates(); };
+map.on(L.Draw.Event.EDITSTOP, afterEdit);
+map.on(L.Draw.Event.DELETESTOP, afterEdit);
+map.on(L.Draw.Event.DELETED, afterEdit);
+
+// ===== Snapping while drawing: a cursor inside an island is pushed to that island's nearest edge =====
+const polysOf = (layer) => { const ll = layer.getLatLngs(); return (ll[0][0] instanceof L.LatLng) ? [ll] : ll; };
+const toXY = (ring) => ring.map((p) => [p.lng, p.lat]);
+function inRing(pt, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function nearestOnRing(p, ring) {
+  let best = null, bd = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], b = ring[(i + 1) % ring.length];
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = dx * dx + dy * dy;
+    const t = len ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len)) : 0;
+    const q = [a[0] + t * dx, a[1] + t * dy];
+    const d = (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2;
+    if (d < bd) { bd = d; best = q; }
+  }
+  return { pt: best, d: bd };
+}
+function snapToEdge(latlng) {
+  const p = [latlng.lng, latlng.lat];
+  let out = null;
+  eachShape((l) => {
+    if (out) return;
+    polysOf(l).forEach((rings0) => {
+      if (out) return;
+      const rings = rings0.map(toXY);
+      if (!inRing(p, rings[0]) || rings.slice(1).some((r) => inRing(p, r))) return;
+      let best = null, bd = Infinity;
+      rings.forEach((r) => { const q = nearestOnRing(p, r); if (q.d < bd) { bd = q.d; best = q.pt; } });
+      out = L.latLng(best[1], best[0]);
+    });
+  });
+  return out;
+}
+const baseMove = L.Draw.Polygon.prototype._onMouseMove;
+L.Draw.Polygon.prototype._onMouseMove = function (e) {
+  baseMove.call(this, e);
+  const s = this._currentLatLng && snapToEdge(this._currentLatLng);
+  if (!s) return;
+  this._currentLatLng = s;
+  this._mouseMarker.setLatLng(s);
+  this._updateGuide(this._map.latLngToLayerPoint(s));
+  this._updateTooltip(s);
+};
+
+// ===== Data from TSV #2 and #3 =====
+let ownerMap = new Map();    // island (lowercase) -> owner
+let leaderMap = new Map();   // leader (lowercase) -> [nations]
+let nationColor = new Map(); // nation (lowercase) -> color
+let nationFlag = new Map();  // nation (lowercase) -> flag image
+let leaderLink = new Map();  // leader (lowercase) -> website
+
+function parseSheet(text, aHeads, bHeads) {
+  const rows = text.replace(/^\uFEFF/, '').split(/\r?\n/)
+    .map((l) => l.split('\t').map((c) => c.trim())).filter((r) => r[0] || r[1]);
+  const a = aHeads.map((s) => s.toLowerCase()), b = bHeads.map((s) => s.toLowerCase());
+  const isHead = (r) => a.includes(r[0].toLowerCase()) && b.includes((r[1] || '').toLowerCase());
+  const out = [];
+  let head = null, lastA = '';
+  rows.forEach((r, i) => {
+    if (isHead(r)) { head = r.map((h) => h.toLowerCase()); lastA = ''; return; }
+    if (!head) return;
+    if (rows[i + 1] && isHead(rows[i + 1])) return; // section title row
+    if (!r[0]) r[0] = lastA;                        // blank first cell = same entry as the row above
+    if (!r[0]) return;
+    lastA = r[0];
+    const cols = {};
+    head.forEach((h, k) => { cols[h] = r[k] || ''; });
+    out.push({ a: r[0], b: r[1] || '', h2: head[1], cols });
+  });
+  return out;
+}
+
+function normColor(c) {
+  c = (c || '').trim();
+  if (/^\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}$/.test(c)) return `rgb(${c})`;
+  if (/^[0-9a-f]{6}$/i.test(c)) return '#' + c;
+  return c;
+}
+const resolveOwner = (p) => ownerMap.has((p.name || '').toLowerCase()) ? ownerMap.get(p.name.toLowerCase()) : (p.owner || '');
+const cleanOwner = (o) => String(o).replace(/\?+$/, '').trim();
+const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// An owner with no crew becomes "<owner> Kingdom"
+function groupsOf(owner) {
+  const o = cleanOwner(owner), n = nationsOf(o);
+  if (n.length) return n;
+  return leaderMap.size ? [`${o} Kingdom`] : [];
+}
+const flagFor = (name) => nationFlag.get(name.toLowerCase()) || `../flags/${slug(name)}.png`;
+
+function ownerLabel(raw) {
+  return ownersOf(raw).map((o) => {
+    const c = cleanOwner(o), n = nationsOf(c);
+    if (n.length) return `${c} (${n.join(', ')})`;
+    return leaderMap.size ? `${c} Kingdom` : c;
+  }).join(' / ');
+}
+
+function teamColor(raw) {
+  if (!ownerMap.size && !leaderMap.size) return '';            // nothing loaded yet: keep saved colors
+  const owners = ownersOf(raw);
+  if (!owners.length) return NO_OWNER_COLOR;
+  for (const g of owners.flatMap(groupsOf)) {
+    const c = nationColor.get(g.toLowerCase()) || GROUP_COLORS[norm(g)];
+    if (c) return c;
+  }
+  return DEFAULT_GROUP_COLOR;
+}
+function linkOf(raw) {
+  for (const o of ownersOf(raw)) {
+    const k = ownerKey(o);
+    for (const [leader, url] of leaderLink) if (ownerKey(leader) === k) return url;
+  }
+  return '';
+}
+function applyStyle(layer) {
+  const p = layer.feature.properties;
+  const col = teamColor(resolveOwner(p)) || NO_OWNER_COLOR;
+  setLayerStyle(layer, { color: col, fillColor: col, fillOpacity: POLYGON_FILL_OPACITY, weight: 2 });
+
+}
+const restyleAll = () => drawnItems.eachLayer(applyStyle);
+let selectedLayer = null;
+let flashFrame = null;
+
+// Fade one polygon from 100% opacity down to the current opacity over 1 second
+function flashLayer(layer) {
+  cancelAnimationFrame(flashFrame);
+  restyleAll();
+  const start = performance.now();
+  const step = (now) => {
+    const t = Math.min((now - start) / 1000, 1);
+    setLayerStyle(layer, { fillOpacity: 1 + (POLYGON_FILL_OPACITY - 1) * t });
+    if (t < 1) flashFrame = requestAnimationFrame(step);
+  };
+  flashFrame = requestAnimationFrame(step);
+}
+
+// Zoom to a polygon, select it for the edit fields, and flash it
+function goToLayer(layer) {
+  map.flyToBounds(layer.getBounds(), { duration: 1 });
+  selectedLayer = layer;
+  const p = layer.feature.properties;
+  $('editIndex').value = p.index;
+  $('editName').value = p.name;
+  flashLayer(layer);
+}
+
+$('goIndex').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const typed = e.target.value.trim();
+  if (!typed) return;
+  let found = null;
+  drawnItems.eachLayer((l) => {
+    const idx = String(l.feature?.properties?.index ?? '').trim().toLowerCase();
+    if (!found && idx === typed.toLowerCase()) found = l;
+  });
+  if (!found) { setStatus(`No polygon with index ${typed}.`); return; }
+  goToLayer(found);
+  setStatus(`Showing index ${typed}.`);
+});
+
+// List of polygons that share a name. Entries disappear once the name is changed or the polygon is deleted.
+function refreshDuplicates() {
+  const groups = new Map();
+  drawnItems.eachLayer((l) => {
+    const p = l.feature && l.feature.properties;
+    if (!p) return;
+    const key = String(p.name || '').trim().toLowerCase();
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(l);
+  });
+  const box = $('dupList');
+  box.textContent = '';
+  let any = false;
+  groups.forEach((layers) => {
+    if (layers.length < 2) return;
+    any = true;
+    layers.forEach((l) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.style.display = 'block';
+      b.style.width = '100%';
+      b.textContent = `${l.feature.properties.name} (index ${l.feature.properties.index})`;
+      b.addEventListener('click', () => { goToLayer(l); setStatus(`Showing ${l.feature.properties.name}.`); });
+      box.appendChild(b);
+    });
+    box.appendChild(document.createElement('hr'));
+  });
+  if (!any) box.textContent = 'No duplicate names.';
+}
+
+// Renumber every polygon 1 to N, keeping their current order
+$('autoArrange').addEventListener('click', () => {
+  const layers = [];
+  drawnItems.eachLayer((l) => { if (l.feature && l.feature.properties) layers.push(l); });
+  if (!layers.length) { setStatus('No polygons to arrange.'); return; }
+  if (!confirm(`Renumber ${layers.length} polygons from 1 to ${layers.length}? The order follows their current index numbers.`)) return;
+  const num = (l) => { const s = String(l.feature.properties.index).trim(); return /^\d+$/.test(s) ? parseInt(s, 10) : Infinity; };
+  layers.sort((a, b) => { const x = num(a), y = num(b); return x === y ? 0 : (x < y ? -1 : 1); });
+  layers.forEach((l, i) => { l.feature.properties.index = String(i + 1); });
+  if (selectedLayer) $('editIndex').value = selectedLayer.feature.properties.index;
+  updatePlaceholder();
+  refreshDuplicates();
+  setStatus(`Renumbered ${layers.length} polygons: 1 to ${layers.length}. Click Download TSV to save.`);
+});
+
+refreshDuplicates();
+$('applyEdit').addEventListener('click', () => {
+  if (!selectedLayer) { setStatus('Go to a polygon first (type its index above and press Enter).'); return; }
+  const p = selectedLayer.feature.properties;
+  const newIndex = $('editIndex').value.trim();
+  const newName = $('editName').value.trim();
+
+  if (newIndex && newIndex.toLowerCase() !== String(p.index).toLowerCase()) {
+    let taken = false;
+    drawnItems.eachLayer((l) => {
+      if (l !== selectedLayer && String(l.feature?.properties?.index ?? '').trim().toLowerCase() === newIndex.toLowerCase()) taken = true;
+    });
+    if (taken) { setStatus(`Index ${newIndex} is already used by another polygon.`); return; }
+    p.index = newIndex;
+  }
+  if (newName) p.name = newName;
+
+  refreshAll();
+  updatePlaceholder();
+  $('goIndex').value = p.index;
+  refreshDuplicates();
+  setStatus(`Updated: ${p.index} = ${p.name}.`);
+});
+$('opacitySlider').value = POLYGON_FILL_OPACITY;
+$('opacityValue').textContent = POLYGON_FILL_OPACITY;
+$('opacitySlider').addEventListener('input', (e) => {
+  POLYGON_FILL_OPACITY = parseFloat(e.target.value);
+  $('opacityValue').textContent = POLYGON_FILL_OPACITY;
+  restyleAll();
+});
+
+function tipContent(layer) {
+  const p = layer.feature.properties;
+  const raw = resolveOwner(p);
+  const owner = ownerLabel(raw);
+  const el = document.createElement('div');
+  el.style.whiteSpace = 'pre-line';
+  el.textContent = `${p.index} = ${p.name}` + (owner ? '\nOwner: ' : '');
+  if (owner) {
+    const s = document.createElement('span');
+    s.textContent = owner;
+    if (linkOf(raw)) { s.style.textDecoration = 'underline'; s.style.textDecorationColor = '#000'; }
+    el.appendChild(s);
+  }
+  const w = worldOf(p.name);
+  if (w && w.players) el.appendChild(document.createTextNode(`\nPlayers: ${w.players}`));
+  return el;
+}
+
+// ===== Islands =====
+const randomColor = () => NO_OWNER_COLOR; // every new polygon starts white
+function nextIndex() {
+  let max = 0;
+  drawnItems.eachLayer((l) => { const n = parseInt(l.feature?.properties?.index, 10); if (!isNaN(n) && n > max) max = n; });
+  return max + 1;
+}
+const updatePlaceholder = () => { $('areaCode').placeholder = `Blank = ${nextIndex()}`; };
+
+function addIsland(geometry, props) {
+  const layer = L.geoJSON({ type: 'Feature', properties: props, geometry }).getLayers()[0];
+  layer.bindTooltip(tipContent, { sticky: true });
+    wireClick(layer, layer);
+  drawnItems.addLayer(layer);
+  applyStyle(layer);
+  makeGhosts(layer);
+}
+// Unnamed islands: first one is "???", then "??? (1)", "??? (2)", ...
+const UNNAMED = /^\?\?\?( \(\d+\))?$/;
+function uniqueUnnamed() {
+  const used = new Set();
+  drawnItems.eachLayer((l) => used.add(String(l.feature?.properties?.name ?? '')));
+  if (!used.has('???')) return '???';
+  let n = 1;
+  while (used.has(`??? (${n})`)) n++;
+  return `??? (${n})`;
+}
+map.on(L.Draw.Event.CREATED, (e) => {
+  let shape = e.layer.toGeoJSON();
+  // A shape drawn on a repeated copy is moved back onto the main map
+  if (mapWidth) {
+    const bb = turf.bbox(shape);
+    const k = Math.floor((bb[0] + bb[2]) / 2 / mapWidth);
+    if (k) shape = { ...shape, geometry: { ...shape.geometry, coordinates: shiftCoords(shape.geometry.coordinates, -k * mapWidth) } };
+  }
+  let covered = false;
+  eachShape((l) => {
+    if (covered) return;
+    try { const r = turf.difference(shape, l.toGeoJSON()); if (!r) covered = true; else shape = r; }
+    catch (err) { console.warn(err); }
+  });
+  if (covered) { setStatus('Rejected: that shape is fully inside existing areas.'); return; }
+  const code = $('areaCode').value.trim() || String(nextIndex());
+  let name = $('areaName').value.trim() || code;
+  const unnamed = UNNAMED.test(name);
+  if (unnamed) name = uniqueUnnamed();
+  addIsland(shape.geometry, { index: code, name, color: randomColor(), owner: '', link: '' });
+  $('areaCode').value = '';
+  $('areaName').value = unnamed ? '???' : '';
+  updatePlaceholder();
+  refreshDuplicates();
+  setStatus(`Area ${code} saved.`);
+});
+
+// ===== Download TSV #1 =====
+const clean = (v) => String(v ?? '').replace(/[\t\r\n]+/g, ' ');
+$('downloadList').addEventListener('click', () => {
+  normalizeToMainMap(); // make sure every polygon is saved on the main map
+  let out = 'index\tname\tcolorData\towner\tlink\tcoordinates\n';
+  let count = 0;
+  drawnItems.eachLayer((l) => {
+    const p = l.feature?.properties; if (!p) return;
+    out += `${clean(p.index)}\t${clean(p.name)}\t${clean(p.color)}\t${clean(resolveOwner(p))}\t${clean(p.link)}\t${JSON.stringify(l.toGeoJSON().geometry.coordinates)}\n`;
+    count++;
+  });
+  if (!count) { setStatus('Nothing to download yet.'); return; }
+  const url = URL.createObjectURL(new Blob([out], { type: 'text/tab-separated-values;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = 'islandslist.tsv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setStatus('Download complete.');
+});
+
+// ===== File loading =====
+// File names looked up automatically in the same folder as this HTML file
+const AUTO_FILES = { islands: '../islandslist.tsv' };
+function findIndexGaps() {
+  const nums = [];
+  drawnItems.eachLayer((l) => {
+    const s = String(l.feature?.properties?.index ?? '').trim();
+    if (/^\d+$/.test(s)) nums.push(parseInt(s, 10));
+  });
+  if (!nums.length) return [];
+
+  const have = new Set(nums);
+  const gaps = [];
+  let start = null;
+  for (let i = Math.min(...nums); i <= Math.max(...nums); i++) {
+    if (!have.has(i)) {
+      if (start === null) start = i;
+    } else if (start !== null) {
+      gaps.push(start === i - 1 ? `${start}` : `${start}-${i - 1}`);
+      start = null;
+    }
+  }
+  return gaps;
+}
+function loadIslands(text) {
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim());
+  const head = lines.shift().split('\t').map((h) => h.trim().toLowerCase());
+  const [iI, iN, iC, iO, iL, iG] = ['index', 'name', 'colordata', 'owner', 'link', 'coordinates'].map((n) => head.indexOf(n));
+  if (iG < 0) { setStatus('TSV #1 has no "coordinates" column.'); return; }
+  drawnItems.clearLayers();
+  ghostItems.clearLayers();
+  let n = 0;
+  lines.forEach((line) => {
+    const c = line.split('\t');
+    try {
+      const coords = JSON.parse(c[iG]);
+      addIsland({ type: Array.isArray(coords[0][0][0]) ? 'MultiPolygon' : 'Polygon', coordinates: coords }, {
+        index: (c[iI] || '').trim(), name: (c[iN] || c[iI] || '').trim(),
+        color: NO_OWNER_COLOR, owner: (c[iO] || '').trim(), link: (c[iL] || '').trim()
+      });
+      n++;
+    } catch (err) { console.warn('Skipped row', line, err); }
+  });
+  updatePlaceholder();
+  rebuildGhosts();
+  let msg = `Loaded ${n} islands. Next index: ${nextIndex()}.`;
+  try {
+    const gaps = findIndexGaps();
+    if (gaps.length) msg = `Warning: missing index numbers: ${gaps.slice(0, 20).join(', ')}${gaps.length > 20 ? ', ...' : ''}. ` + msg + ' Use Auto-arrange in the debug section to fix.';
+  } catch (err) { console.warn('Index check failed', err); }
+  setStatus(msg);
+  try { refreshDuplicates(); } catch (err) { console.warn(err); }
+}
+
+function loadOwners(text) {
+  const skip = CONFIG.statusHeaders.map((h) => h.toLowerCase());
+  const rows = parseSheet(text, CONFIG.islandHeaders, CONFIG.ownerHeaders).filter((r) => !skip.includes(r.h2));
+  ownerMap = new Map(rows.map((r) => [r.a.toLowerCase(), r.b]));
+  refreshAll();
+  setStatus(`Loaded ${ownerMap.size} owner rows.`);
+}
+
+function loadNations(text) {
+  const rows = parseSheet(text, CONFIG.nationHeaders, CONFIG.leaderHeaders);
+  leaderMap = new Map(); nationColor = new Map(); nationFlag = new Map(); leaderLink = new Map();
+  const pick = (r, list) => { const k = list.map((h) => h.toLowerCase()).find((h) => r.cols[h]); return k ? r.cols[k] : ''; };
+  rows.forEach((r) => {
+    const link = pick(r, CONFIG.linkHeaders);
+    ownersOf(r.b).forEach((owner) => {
+      const k = owner.replace(/\?+$/, '').trim().toLowerCase();
+      if (!k) return;
+      if (!leaderMap.has(k)) leaderMap.set(k, []);
+      if (!leaderMap.get(k).includes(r.a)) leaderMap.get(k).push(r.a);
+      if (link && !leaderLink.has(k)) leaderLink.set(k, link);
+    });
+    const c = pick(r, CONFIG.colorHeaders);
+    if (c && !nationColor.has(r.a.toLowerCase())) nationColor.set(r.a.toLowerCase(), normColor(c));
+    const f = pick(r, CONFIG.flagHeaders);
+    if (f && !nationFlag.has(r.a.toLowerCase())) nationFlag.set(r.a.toLowerCase(), f);
+  });
+  refreshAll();
+  setStatus(`Loaded ${rows.length} crew rows, ${nationColor.size} with Team Color.`);
+}
+
+// Manual pickers
+[['tsv1', loadIslands], ['tsv2', loadOwners], ['tsv3', loadNations]].forEach(([id, fn]) => {
+  $(id).addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (f) fn(await f.text());
+  });
+});
+
+// Automatic loading from the same folder
+(async () => {
+  try {
+    const r = await fetch(AUTO_FILES.islands);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    loadIslands(await r.text());
+  } catch (err) { setStatus('Could not auto-load islandslist.tsv (browsers block this for local files). Pick it with the TSV #1 button.'); }
+})();
+// ===== Map image (fixed path) =====
+let tileLayer = null;
+{
+  const image = new Image();
+  image.onload = () => {
+    const width = image.naturalWidth, height = image.naturalHeight;
+    mapWidth = width;
+    const Repeating = L.GridLayer.extend({
+      createTile(coords) {
+        const tile = document.createElement('canvas');
+        const size = this.getTileSize();
+        tile.width = size.x; tile.height = size.y;
+        const ctx = tile.getContext('2d');
+        const scale = Math.pow(2, coords.z);
+        const mod = (n, m) => ((n % m) + m) % m;
+        const pattern = ctx.createPattern(image, 'repeat');
+        if (!pattern) return tile;
+        pattern.setTransform(new DOMMatrix([scale, 0, 0, scale, -mod(coords.x * size.x, width * scale), -mod(coords.y * size.y, height * scale)]));
+        ctx.fillStyle = pattern;
+        ctx.fillRect(0, 0, size.x, size.y);
+        return tile;
+      }
+    });
+    tileLayer = new Repeating({ tileSize: 256, minZoom: -10 }).addTo(map);
+    tileLayer.bringToBack();
+    const fitZoom = Math.log2(map.getSize().y / height);
+    map.setMinZoom(fitZoom);
+    map.setView([height / 2, width / 2], fitZoom);
+    map.setMaxBounds([[0, -1e9], [height, 1e9]]);
+    map.options.maxBoundsViscosity = 1;
+    rebuildGhosts();
+  };
+  image.onerror = () => setStatus(`Could not load image: ${imageUrl}`);
+  image.src = imageUrl;
+}
+
+// ===== Draggable / collapsible panel =====
+// ===== Live data from Google Sheets =====
+function sheetUrl(link) {
+  link = (link || '').trim();
+  if (!link) return '';
+  if (/\/pub/.test(link)) { const u = new URL(link); u.searchParams.set('output', 'tsv'); return u.toString(); }
+  const m = link.match(/\/spreadsheets\/d\/([^/]+)/);
+  if (!m) return link;
+  const g = link.match(/[#&?]gid=(\d+)/);
+  return `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=tsv&gid=${g ? g[1] : 0}`;
+}
+async function sheetText(link) {
+  const r = await fetch(sheetUrl(link));
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.text();
+}
+async function sheetRows(link) {
+  const lines = (await sheetText(link)).replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim());
+  const head = lines.shift().split('\t').map((h) => h.trim().toLowerCase());
+  return lines.map((l) => { const c = l.split('\t'), o = {}; head.forEach((h, i) => { o[h] = (c[i] || '').trim(); }); return o; });
+}
+
+let worldMap = new Map(); // island name (lowercase) -> { link, players }
+const worldOf = (name) => worldMap.get(String(name || '').toLowerCase());
+
+function liveItem(head, sub, href) {
+  const link = /^https?:\/\//i.test(href || '');
+  const el = document.createElement(link ? 'a' : 'div');
+  el.className = 'live-item';
+  if (link) { el.href = href; el.target = '_blank'; el.rel = 'noopener'; }
+  const h = document.createElement('div'); h.className = 'live-head'; h.textContent = head; el.appendChild(h);
+  if (sub) { const s = document.createElement('div'); s.textContent = sub; el.appendChild(s); }
+  return el;
+}
+function liveSection(title, items) {
+  if (!items.length) return;
+  const t = document.createElement('div'); t.className = 'live-title'; t.textContent = title;
+  $('listLive').appendChild(t);
+  items.forEach((i) => $('listLive').appendChild(i));
+}
+async function loadLive() {
+  const box = $('listLive');
+  const pieces = {};
+  for (const key of Object.keys(SHEETS)) {
+    if (!SHEETS[key]) continue;
+    try {
+      if (key === 'owners') loadOwners(await sheetText(SHEETS[key]));
+      else if (key === 'nations') loadNations(await sheetText(SHEETS[key]));
+      else pieces[key] = await sheetRows(SHEETS[key]);
+    } catch (err) { console.warn('Sheet failed:', key, err); }
+  }
+  if (pieces.worlds) worldMap = new Map(pieces.worlds.filter((r) => r.island).map((r) => [r.island.toLowerCase(), { link: r['world link'], players: r.players }]));
+  box.textContent = '';
+  liveSection('Announcements', (pieces.announcements || []).slice(0, 10).map((r) => liveItem(r.title, [r.date, r.text].filter(Boolean).join(' - '), r.link)));
+  liveSection('Events', (pieces.events || []).slice(0, 10).map((r) => liveItem(r.title, [r.start, r.world].filter(Boolean).join(' - '), r.link)));
+}
+loadLive();
+setInterval(loadLive, 300000);
+// ===== Discord hover info (invite code = the part after discord.gg/) =====
+const DISCORD_INVITE = 'bpj4Gu4MX';
+async function loadDiscord() {
+  try {
+    const r = await fetch(`https://discord.com/api/v9/invites/${DISCORD_INVITE}?with_counts=true`);
+    const d = await r.json();
+    const total = d.approximate_member_count, on = d.approximate_presence_count;
+    if (!d.guild || typeof total !== 'number' || typeof on !== 'number') throw new Error('no data');
+    $('dcName').textContent = d.guild.name;
+    $('dcOn').textContent = on.toLocaleString() + ' online';
+    $('dcOff').textContent = Math.max(total - on, 0).toLocaleString() + ' offline';
+    $('dcInfo').hidden = false;
+        if (d.guild.splash) $('dcBg').style.backgroundImage = `url(https://cdn.discordapp.com/splashes/${d.guild.id}/${d.guild.splash}.png?size=512)`;
+    if (d.guild.icon) {
+      const img = $('dcIcon');
+      img.onload = () => img.classList.add('ready');
+      img.src = `https://cdn.discordapp.com/icons/${d.guild.id}/${d.guild.icon}.png?size=128`;
+    }
+  } catch (err) { $('dcInfo').hidden = true; }
+}
+loadDiscord();
+setInterval(loadDiscord, 300000);
+// ===== Search frame: islands (by name) / groups / owners =====
+// Owner spellings that mean the same person. 'Name shown in the list': ['other spellings']. Example: 'Lincoln': ['thelincoln65']
+const OWNER_ALIASES = {};
+const norm = (s) => String(s || '').toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]/g, '');
+// Shared owners are split on these (change here if needed): "/"  ","  "&"  and the word "and"
+const OWNER_SPLIT = /\s*(?:\/|,|&|\band\b)\s*/i;
+const ownersOf = (raw) => String(raw || '').split(OWNER_SPLIT).map((s) => s.trim()).filter(Boolean);
+function aliasOf(raw) {
+  const k = norm(raw);
+  for (const canon of Object.keys(OWNER_ALIASES)) {
+    if (norm(canon) === k || OWNER_ALIASES[canon].some((a) => norm(a) === k)) return canon;
+  }
+  return null;
+}
+const ownerKey = (raw) => { const a = aliasOf(raw); return a ? norm(a) : norm(raw); };
+function nationsOf(raw) {
+  const exact = leaderMap.get(raw.toLowerCase());
+  if (exact) return exact;
+  const k = ownerKey(raw);
+  for (const [leader, nations] of leaderMap) if (ownerKey(leader) === k) return nations;
+  return [];
+}
+
+function wireClick(target, layer) {
+  target.on('click', (e) => {
+    if (map.getContainer().classList.contains('drawing')) return;
+    const p = layer.feature.properties, raw = resolveOwner(p);
+    const box = document.createElement('div');
+    const add = (href, text) => {
+      if (!/^https?:\/\//i.test(href || '')) return;
+      const a = document.createElement('a');
+      a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.className = 'owner-link'; a.style.display = 'block'; a.textContent = text;
+      box.appendChild(a);
+    };
+    add(linkOf(raw), ownerLabel(raw));
+    const w = worldOf(p.name);
+    if (w) add(w.link, 'Open world in VRChat');
+    if (box.childNodes.length) L.popup().setLatLng(e.latlng).setContent(box).openOn(map);
+  });
+}
+
+function collect() {
+  const islands = [], orgs = new Map(), owners = new Map();
+  drawnItems.eachLayer((l) => {
+    const p = l.feature && l.feature.properties;
+    if (!p) return;
+    islands.push({ label: String(p.name), layers: [l] });
+    ownersOf(resolveOwner(p)).forEach((raw) => {
+      const key = ownerKey(raw);
+      if (!owners.has(key)) owners.set(key, { label: aliasOf(raw) || raw, layers: new Set() });
+      const o = owners.get(key);
+      o.layers.add(l);
+      if (!aliasOf(raw) && raw.length < o.label.length) o.label = raw;
+      groupsOf(raw).forEach((n) => {
+        const k = n.toLowerCase();
+        if (!orgs.has(k)) orgs.set(k, { label: n, flag: flagFor(n), layers: new Set() });
+        orgs.get(k).layers.add(l);
+      });
+    });
+  });
+  const list = (m) => [...m.values()].map((o) => ({ label: o.label, flag: o.flag, layers: [...o.layers] }));
+  return { islands, orgs: list(orgs), owners: list(owners) };
+}
+
+let searchAF = 0, pickedIsland = null;
+function flashLayers(layers) {
+  cancelAnimationFrame(searchAF);
+  restyleAll();
+  const t0 = performance.now();
+  const step = (now) => {
+    const t = Math.min((now - t0) / 1000, 1);
+    layers.forEach((l) => setLayerStyle(l, { fillOpacity: 1 + (POLYGON_FILL_OPACITY - 1) * t }));
+    if (t < 1) searchAF = requestAnimationFrame(step);
+  };
+  searchAF = requestAnimationFrame(step);
+}
+function showLayers(layers) {
+  if (!layers.length) return;
+  map.flyToBounds(L.latLngBounds(layers.map((l) => l.getBounds())), { duration: 1 });
+  flashLayers(layers);
+}
+function fillList(listEl, items, filter, onPick) {
+  const q = filter.trim().toLowerCase();
+  listEl.textContent = '';
+  items.filter((i) => i.label.toLowerCase().includes(q))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+    .forEach((i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'sitem';
+      if (i.flag) {
+        const img = document.createElement('img');
+        img.className = 'flag'; img.alt = ''; img.src = i.flag;
+        img.onerror = () => { img.remove(); b.classList.remove('hasflag'); };
+        b.classList.add('hasflag'); b.appendChild(img);
+      }
+      b.appendChild(document.createTextNode(i.label));
+      b.addEventListener('click', () => onPick(i));
+      listEl.appendChild(b);
+    });
+  listEl.classList.add('open');
+}
+const closeLists = () => document.querySelectorAll('.slist').forEach((l) => l.classList.remove('open'));
+[
+  ['sIsland', 'lIsland', 'islands', (i) => { pickedIsland = i; $('sIsland').value = i.label; }],
+  ['sOrg', 'lOrg', 'orgs', (i) => { $('sOrg').value = i.label; showLayers(i.layers); }],
+  ['sOwner', 'lOwner', 'owners', (i) => { $('sOwner').value = i.label; showLayers(i.layers); }]
+].forEach(([inId, listId, key, pick]) => {
+  const input = $(inId), list = $(listId);
+  const open = (filter) => { closeLists(); fillList(list, collect()[key], filter, (i) => { pick(i); closeLists(); }); };
+  input.addEventListener('focus', () => open(''));
+  input.addEventListener('input', () => { if (inId === 'sIsland') pickedIsland = null; open(input.value); });
+});
+function zoomIsland() {
+  let t = pickedIsland;
+  if (!t) {
+    const v = $('sIsland').value.trim();
+    const all = collect().islands;
+    t = all.find((i) => i.label === v) || all.find((i) => i.label.toLowerCase() === v.toLowerCase());
+  }
+  if (t) showLayers(t.layers); else setStatus('No island with that name.');
+}
+$('sZoom').addEventListener('click', zoomIsland);
+$('sIsland').addEventListener('keydown', (e) => { if (e.key === 'Enter') { closeLists(); zoomIsland(); } });
+$('searchBtn').addEventListener('click', () => { $('searchFrame').classList.toggle('open'); closeLists(); });
+document.addEventListener('pointerdown', (e) => { if (!$('searchFrame').contains(e.target)) closeLists(); });
+const panel = $('panel'), header = $('panelHeader');
+let offX = 0, offY = 0;
+['toggle', 'themeBtn'].forEach((id) => $(id).addEventListener('pointerdown', (e) => e.stopPropagation()));
+$('toggle').addEventListener('click', () => panel.classList.toggle('collapsed'));
+header.addEventListener('pointerdown', (e) => {
+  const r = panel.getBoundingClientRect();
+  offX = e.clientX - r.left; offY = e.clientY - r.top;
+  panel.style.right = 'auto'; panel.style.left = r.left + 'px'; panel.style.top = r.top + 'px';
+  header.setPointerCapture(e.pointerId);
+});
+header.addEventListener('pointermove', (e) => {
+  if (!header.hasPointerCapture(e.pointerId)) return;
+  panel.style.left = (e.clientX - offX) + 'px';
+  panel.style.top = (e.clientY - offY) + 'px';
+});
+updatePlaceholder();
+</script>
+</body>
+</html>
