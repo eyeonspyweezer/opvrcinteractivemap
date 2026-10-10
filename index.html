@@ -523,7 +523,7 @@ function groupColorsOf(raw) {
   for (const g of crews) {
     if (!g) continue;
     anyCrew = true;
-    const c = nationColor.get(g.toLowerCase()) || GROUP_COLORS[norm(g)] || DEFAULT_GROUP_COLOR;
+    const c = GROUP_COLORS[norm(g)] || DEFAULT_GROUP_COLOR;   // black unless Marines / World Government / Revolutionary Army
     if (!seen.has(c)) {
       seen.add(c);
       colors.push(c);
@@ -578,7 +578,7 @@ function groupColorsOf(raw) {
     if (!crews.length) continue;
     anyCrew = true;
     for (const g of crews) {
-      const c = nationColor.get(g.toLowerCase()) || GROUP_COLORS[norm(g)] || DEFAULT_GROUP_COLOR;
+      const c = GROUP_COLORS[norm(g)] || DEFAULT_GROUP_COLOR;   // black unless Marines / World Government / Revolutionary Army
       if (!seen.has(c)) {
         seen.add(c);
         colors.push(c);
