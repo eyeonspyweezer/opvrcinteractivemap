@@ -192,7 +192,7 @@ body { background: var(--bg); }
   <div class="slist" id="lOwner"></div>
 </div>
 <div id="settingsFrame">
-  <label><input type="checkbox" id="optColors" checked> Island colors</label>
+  <label><input type="checkbox" id="optColors"> Island colors</label>
   <label><input type="checkbox" id="optFlags" checked> Flags on the map</label>
   <label><input type="checkbox" id="optNames" checked> Island names on the map</label>
   <label>Polygon opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
@@ -229,7 +229,7 @@ const VRC_WORLDS = {
 // Settings defaults. Flags are skipped automatically on data saver, 2G or low-memory devices (where the browser reports it).
 const conn = navigator.connection || {};
 const lowResources = !!(conn.saveData || /2g/.test(conn.effectiveType || '') || (navigator.deviceMemory && navigator.deviceMemory <= 2));
-const OPT = { colors: true, flags: !lowResources, names: true };
+const OPT = { colors: false, flags: !lowResources, names: true };
 // Paste Google Sheets links here (see the steps above). Leave '' to skip one.
 const SHEETS = { worlds: '', announcements: '', events: '',
   owners: 'https://docs.google.com/spreadsheets/d/14I31HO_9qbplW8LWP63-itFL1eAjL0O-ecEAxxCOJpM/',
@@ -341,8 +341,11 @@ function flagPattern(url) {
   return id;
 }
 function applyFlagFill(layer) {
+  if (layer._stripeFill) return; // multi-crew stripes win over a single flag
   if (!layer._flagFill) return;
-  [layer, ...(layer._ghosts || [])].forEach((x) => { if (x._path) x._path.setAttribute('fill', `url(#${layer._flagFill})`); });
+  [layer, ...(layer._ghosts || [])].forEach((x) => {
+    if (x._path) x._path.setAttribute('fill', `url(#${layer._flagFill})`);
+  });
 }
 function applyHidden(layer) {
   [layer, ...(layer._ghosts || [])].forEach((x) => { if (x._path) x._path.style.display = layer._hidden ? 'none' : ''; });
@@ -460,7 +463,7 @@ function ownerLabel(raw) {
 
 
 function teamColor(raw) {
-  if (!ownerMap.size && !leaderMap.size) return '';            // nothing loaded yet: keep saved colors
+  if (!ownerMap.size && !leaderMap.size) return '';
   const owners = ownersOf(raw);
   if (!owners.length) return NO_OWNER_COLOR;
   for (const g of owners.flatMap(groupsOf)) {
@@ -469,6 +472,59 @@ function teamColor(raw) {
   }
   return DEFAULT_GROUP_COLOR;
 }
+
+// All distinct group colors for an island (for multi-crew stripes)
+function groupColorsOf(raw) {
+  const colors = [];
+  const seen = new Set();
+  for (const g of ownersOf(raw).flatMap(groupsOf)) {
+    const c = nationColor.get(g.toLowerCase()) || GROUP_COLORS[norm(g)] || DEFAULT_GROUP_COLOR;
+    if (!seen.has(c)) {
+      seen.add(c);
+      colors.push(c);
+    }
+  }
+  return colors;
+}
+
+const stripePatterns = new Map();
+function stripePattern(colors) {
+  if (colors.length <= 1) return null;
+  const key = colors.join('|');
+  if (stripePatterns.has(key)) return stripePatterns.get(key);
+
+  const id = 'stripe-' + stripePatterns.size;
+  const NS = 'http://www.w3.org/2000/svg';
+  let defs = document.querySelector('#map svg defs');
+  if (!defs) {
+    const svg = document.querySelector('#map svg');
+    if (!svg) return null;
+    defs = document.createElementNS(NS, 'defs');
+    svg.prepend(defs);
+  }
+
+  const n = colors.length;
+  const pat = document.createElementNS(NS, 'pattern');
+  pat.setAttribute('id', id);
+  pat.setAttribute('patternUnits', 'objectBoundingBox');
+  pat.setAttribute('width', '1');
+  pat.setAttribute('height', '1');
+
+  colors.forEach((c, i) => {
+    const rect = document.createElementNS(NS, 'rect');
+    rect.setAttribute('x', String(i / n));
+    rect.setAttribute('y', '0');
+    rect.setAttribute('width', String(1 / n));
+    rect.setAttribute('height', '1');
+    rect.setAttribute('fill', c);
+    pat.appendChild(rect);
+  });
+
+  defs.appendChild(pat);
+  stripePatterns.set(key, id);
+  return id;
+}
+
 function linkOf(raw) {
   for (const o of ownersOf(raw)) {
     const k = ownerKey(o);
@@ -476,16 +532,41 @@ function linkOf(raw) {
   }
   return '';
 }
+
 function applyStyle(layer) {
   const p = layer.feature.properties;
   const owner = resolveOwner(p);
-  const crewColor = ownersOf(owner).length ? teamColor(owner) : '';
-  const col = crewColor || (OPT.colors ? p.color : NO_OWNER_COLOR);   // colors off: islands without an owner are white
-  setLayerStyle(layer, { color: col, fillColor: col, fillOpacity: POLYGON_FILL_OPACITY, weight: 2 });
+  const colors = groupColorsOf(owner);
 
+  let col = NO_OWNER_COLOR;
+  let stripeId = null;
+
+  if (colors.length >= 2) {
+    stripeId = stripePattern(colors);
+    col = colors[0];
+  } else if (colors.length === 1) {
+    col = colors[0];
+  } else if (OPT.colors) {
+    col = p.color; // random hash only when toggle is ON and no owner
+  }
+
+  setLayerStyle(layer, {
+    color: col,
+    fillColor: col,
+    fillOpacity: POLYGON_FILL_OPACITY,
+    weight: 2
+  });
+
+  if (stripeId) {
+    layer._stripeFill = stripeId;
+    [layer, ...(layer._ghosts || [])].forEach((x) => {
+      if (x._path) x._path.setAttribute('fill', `url(#${stripeId})`);
+    });
+  } else {
+    layer._stripeFill = null;
+  }
 }
 const restyleAll = () => drawnItems.eachLayer(applyStyle);
-
 
 
 
