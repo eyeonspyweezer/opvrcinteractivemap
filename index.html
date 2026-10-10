@@ -403,7 +403,7 @@ function parseSheet(text, aHeads, bHeads) {
     lastA = r[0];
     const cols = {};
     head.forEach((h, k) => { cols[h] = r[k] || ''; });
-    out.push({ a: r[0], b: r[1] || '', h2: head[1], cols });
+    out.push({ a: r[0], b: r[1] || '', h2: head[1], cols, cells: r });
   });
   return out;
 }
@@ -581,7 +581,7 @@ function loadNations(text) {
     });
     const c = pick(r, CONFIG.colorHeaders);
     if (c && !nationColor.has(r.a.toLowerCase())) nationColor.set(r.a.toLowerCase(), normColor(c));
-    const f = pick(r, CONFIG.flagHeaders);
+    const f = pick(r, CONFIG.flagHeaders) || r.cells[CONFIG.flagColumn] || '';
     if (f && !nationFlag.has(r.a.toLowerCase())) nationFlag.set(r.a.toLowerCase(), f);
   });
   refreshAll();
