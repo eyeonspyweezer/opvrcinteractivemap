@@ -129,6 +129,27 @@ html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay
 .sitem.hasflag { padding-left: 48px; }
 .sitem img.flag { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 30px; height: auto; max-height: 80%; }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--bg); color: var(--sfg); border-radius: 0; }
+/* Link color for island names (popup). Change the two colors here if you prefer black. */
+:root { --link: rgb(0, 70, 200); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --link: #6aa6ff; } }
+:root[data-theme="dark"] { --link: #6aa6ff; }
+:root { --sidew: clamp(150px, 22vw, 260px); }
+@media (pointer: coarse) { :root { --sidew: clamp(140px, 40vw, 220px); } }
+.pop-name { display: block; font-weight: 700; margin-bottom: 4px; }
+a.pop-name { color: var(--link); text-decoration: underline; }
+.pop-more { margin-top: 6px; opacity: .75; }
+.list-btn[hidden] { display: none; }
+button.list-btn { font: inherit; text-transform: uppercase; cursor: pointer; }
+#bountyPanel { position: fixed; z-index: 1000; top: 10px; left: calc(var(--sidew) + 8px); width: min(380px, calc(100vw - var(--sidew) - 16px)); max-height: 80dvh; overflow: auto; box-sizing: border-box; padding: 8px; background: var(--bg); color: var(--fg); border: 1px solid var(--fg); border-radius: 6px; font-size: 14px; }
+#bountyPanel[hidden] { display: none; }
+#bountyPanel table { width: 100%; border-collapse: collapse; }
+#bountyPanel th, #bountyPanel td { padding: 5px 6px; border-bottom: 1px solid var(--fg); text-align: left; vertical-align: middle; }
+#bountyPanel td.bnum, #bountyPanel th.bnum { text-align: right; white-space: nowrap; }
+.bname { display: flex; align-items: center; gap: 8px; }
+.bthumb { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; cursor: zoom-in; flex: none; }
+#imgOverlay { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.8); display: flex; align-items: center; justify-content: center; touch-action: none; overflow: hidden; }
+#imgOverlay[hidden] { display: none; }
+#imgBig { max-width: 90vw; max-height: 90vh; transform-origin: center; user-select: none; -webkit-user-drag: none; cursor: grab; }
 a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-color: var(--sfg); }
 
 
@@ -184,8 +205,13 @@ body { background: var(--bg); }
  
   <img class="list-icon" src="VRCTitle.PNG" alt="">
   <div id="listButtons"></div>
+  <button id="bountyBtn" class="list-btn" type="button" hidden>Bounty List</button>
   <div id="listLive"></div>
 </div>
+<div id="bountyPanel" hidden>
+  <table><thead><tr><th>Name</th><th class="bnum">Bounty</th></tr></thead><tbody id="bountyBody"></tbody></table>
+</div>
+<div id="imgOverlay" hidden><img id="imgBig" alt="" draggable="false"></div>
 <button id="listToggle" class="round-btn" type="button" aria-label="Show or hide list">☰</button>
 
 <button id="themeBtn" class="round-btn" type="button" aria-label="Light or dark mode">◐</button>
@@ -239,12 +265,14 @@ const CONFIG = {
   leaderHeaders: ['Owner(s)', 'Owner', 'Leaders(s)', 'Leader(s)', 'Leaders', 'Leader'], // TSV #3 second column
   colorHeaders:  ['Team Color', 'Team Colour'],                    // TSV #3 optional extra column
   flagHeaders:   ['Flag', 'Flag URL'],                             // TSV #3 optional: flag image path/URL for the group
+  linksHeaders:  ['Links', 'Link'],                                // 3rd sheet: column with the VRChat / other links
   linkHeaders:   ['Website', 'Link', 'More Info']                  // TSV #3 optional: link for the leader's name                    // TSV #3 optional extra column
 };
 // Left-list buttons. Empty = none shown. Example: { label: 'Rules', url: 'https://example.com' }
 const LIST_BUTTONS = [
   { label: 'Island Tracker List (VRGoofy)', url: 'https://docs.google.com/spreadsheets/d/14I31HO_9qbplW8LWP63-itFL1eAjL0O-ecEAxxCOJpM/' },
-  { label: 'Crew Tracker List (Dave)', url: 'https://docs.google.com/spreadsheets/d/1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk/' }
+  { label: 'Crew Tracker List (Dave)', url: 'https://docs.google.com/spreadsheets/d/1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk/' },
+  { label: 'Island Links List (Daniel)', url: 'https://docs.google.com/spreadsheets/d/127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE/' }
 ];
 const imageUrl = 'TargetedMap.PNG';
 // URLs of your white icon images (for example the files you upload to GitHub). Empty = the emoji shows instead.
@@ -264,7 +292,11 @@ const OPT = { colors: false, flags: !lowResources, names: true, hideUnnamed: fal
 // Paste Google Sheets links here (see the steps above). Leave '' to skip one.
 const SHEETS = { worlds: '', announcements: '', events: '',
   owners: 'https://docs.google.com/spreadsheets/d/14I31HO_9qbplW8LWP63-itFL1eAjL0O-ecEAxxCOJpM/',
-  nations: 'https://docs.google.com/spreadsheets/d/1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk/' };
+  nations: 'https://docs.google.com/spreadsheets/d/1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk/',
+  // 3rd link: same layout as the first (Island / Location, Owner(s), Links). Used only for islands the first sheet has no owner for; its links are used for ALL islands.
+  extra: 'https://docs.google.com/spreadsheets/d/127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE/edit?gid=0#gid=0',
+  // 4th link: Owner(s), Bounty, Image URL  ->  "Bounty List" button in the left list
+  bounty: 'https://docs.google.com/spreadsheets/d/17N7e8tQkzWsbGQdD1wDuNvj3eYkPyl_anvkrbRBOV5I/edit?gid=0#gid=0' };
   // Island colors. Keys are the group name in lowercase with no spaces/symbols and no leading "the".
 const GROUP_COLORS = {
   marines: 'rgb(0, 90, 255)',
@@ -286,7 +318,11 @@ $('themeBtn').addEventListener('click', () => {
   const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   root.dataset.theme = dark ? 'light' : 'dark';
 });
-$('listToggle').addEventListener('click', () => $('sideList').classList.toggle('open'));
+$('listToggle').addEventListener('click', () => {
+  $('sideList').classList.toggle('open');
+  if (!$('sideList').classList.contains('open')) $('bountyPanel').hidden = true;
+});
+$('bountyBtn').addEventListener('click', () => { $('bountyPanel').hidden = !$('bountyPanel').hidden; });
 LIST_BUTTONS.forEach((b) => {
   const a = document.createElement('a');
   a.className = 'list-btn'; a.textContent = b.label; a.href = b.url; a.target = '_blank'; a.rel = 'noopener';
@@ -448,9 +484,9 @@ let nationColor = new Map(); // nation (lowercase) -> color
 let nationFlag = new Map();  // nation (lowercase) -> flag image
 let leaderLink = new Map();  // leader (lowercase) -> website
 
-function parseSheet(text, aHeads, bHeads) {
+function parseSheet(text, aHeads, bHeads, loose) {
   const rows = text.replace(/^\uFEFF/, '').split(/\r?\n/)
-    .map((l) => l.split('\t').map((c) => c.trim())).filter((r) => r[0] || r[1]);
+    .map((l) => l.split('\t').map((c) => c.trim())).filter((r) => r[0] || r[1] || (loose && r[2]));
   const a = aHeads.map((s) => s.toLowerCase()), b = bHeads.map((s) => s.toLowerCase());
   const isHead = (r) => a.includes(r[0].toLowerCase()) && b.includes((r[1] || '').toLowerCase());
   const out = [];
@@ -693,6 +729,16 @@ const restyleAll = () => drawnItems.eachLayer(applyStyle);
 
 
 
+// Owner text colors in the polygon info: contains "Revolutionary Army" = red, "Marines" / "World Government" = blue
+const OWNER_TEXT_COLORS = [
+  [/revolutionary\s*army/i, 'rgb(215, 30, 30)'],
+  [/marines|world\s*government/i, 'rgb(30, 110, 255)']
+];
+function ownerTextColor(owner) {
+  const text = owner + ' ' + ownersOf(owner).flatMap((o) => nationsOf(cleanOwner(o))).join(' ');
+  for (const [re, c] of OWNER_TEXT_COLORS) if (re.test(text)) return c;
+  return '';
+}
 function tipContent(layer) {
   const p = layer.feature.properties;
   const raw = resolveOwner(p); // exact string from the island owner sheet
@@ -724,7 +770,26 @@ function tipContent(layer) {
 
   // Owner = sheet text for THIS island only (no crew leaders expansion)
   const ownerOnly = String(raw || '').trim();
-  if (ownerOnly) line('Owner:', ownerOnly, { underline: !!linkOf(raw) });
+  if (ownerOnly) {
+    const row = document.createElement('div');
+    row.className = 'tip-line';
+    const lab = document.createElement('span');
+    lab.className = 'tip-label';
+    lab.textContent = 'Owner:';
+    row.appendChild(lab);
+    const val = document.createElement('span');
+    if (linkOf(raw)) { val.style.textDecoration = 'underline'; val.style.textDecorationColor = 'rgb(62, 44, 42)'; }
+    ownersOf(ownerOnly).forEach((o, i) => {
+      if (i) val.appendChild(document.createTextNode(' / '));
+      const sp = document.createElement('span');
+      sp.textContent = o;
+      const c = ownerTextColor(o);
+      if (c) sp.style.color = c;
+      val.appendChild(sp);
+    });
+    row.appendChild(val);
+    el.appendChild(row);
+  }
 
   // Crews/groups derived from those owners — separate line
   const crews = preferMarines([
@@ -807,6 +872,39 @@ function loadOwners(text) {
   window.__islandDupKeys = dupKeys;
   refreshAll();
   setStatus(`Loaded ${ownerMap.size} owner rows.`);
+}
+
+// ===== 3rd sheet: links per island + "World ID" (hidden) =====
+let linkMap = new Map();     // island key -> [links] (first = used on the island name)
+let worldIdMap = new Map();  // island key -> World ID (wrld_..., from .../world/<id>/info)
+const linksOf = (name) => linkMap.get(islandKey(name)) || [];
+const worldIdOf = (name) => worldIdMap.get(islandKey(name)) || '';   // "World ID", for future use
+function loadExtra(text) {
+  const skip = CONFIG.statusHeaders.map((h) => h.toLowerCase());
+  const rows = parseSheet(text, CONFIG.islandHeaders, CONFIG.ownerHeaders, true).filter((r) => !skip.includes(r.h2));
+  const linkHeads = CONFIG.linksHeaders.map((h) => h.toLowerCase());
+  linkMap = new Map(); worldIdMap = new Map();
+  const hits = new Map(); // key -> { label, owners: [] }
+  rows.forEach((r) => {
+    const k = islandKey(r.a);
+    if (!k) return;
+    if (!hits.has(k)) hits.set(k, { label: displayName(r.a), owners: [] });
+    if (r.b) hits.get(k).owners.push(r.b);
+    const hk = linkHeads.find((h) => r.cols[h]);
+    const cell = hk ? r.cols[hk] : (r.cells[2] || '');
+    cell.split(/[\s,]+/).filter((u) => /^https?:\/\//i.test(u)).forEach((u) => {
+      if (!linkMap.has(k)) linkMap.set(k, []);
+      if (!linkMap.get(k).includes(u)) linkMap.get(k).push(u);
+      const m = u.match(/world\/(wrld_.*?[A-Za-z0-9])\/info/i);
+      if (m && !worldIdMap.has(k)) worldIdMap.set(k, m[1]);
+    });
+  });
+  hits.forEach((v, k) => {
+    if (!ownerMap.get(k)) ownerMap.set(k, v.owners.join(' / '));   // only islands the 1st sheet has no owner for
+    if (!ownerIslandLabels.has(k)) ownerIslandLabels.set(k, v.label);
+  });
+  refreshAll();
+  setStatus(`Loaded ${hits.size} islands, ${linkMap.size} with links, ${worldIdMap.size} World IDs.`);
 }
 
 function loadNations(text) {
@@ -918,6 +1016,65 @@ function liveSection(title, items) {
   $('listLive').appendChild(t);
   items.forEach((i) => $('listLive').appendChild(i));
 }
+// ===== Bounty List (4th sheet: Owner(s), Bounty, Image URL) =====
+function formatBounty(v) {
+  const t = String(v || '').trim(), n = t.replace(/[,\s]/g, '');
+  return /^\d+(\.0+)?$/.test(n) ? BigInt(n.split('.')[0]).toLocaleString('en-US') : t;   // 100000000 -> 100,000,000
+}
+function renderBounty(rows) {
+  const body = $('bountyBody');
+  body.textContent = '';
+  const list = rows.map((o) => ({ name: o['owner(s)'] || o.owner || o.name || '', bounty: o.bounty || '', img: imgUrl(o['image url'] || o.image || '') }))
+    .filter((r) => r.name || r.bounty);
+  $('bountyBtn').hidden = !list.length;
+  if (!list.length) { $('bountyPanel').hidden = true; return; }
+  list.forEach((r) => {
+    const tr = document.createElement('tr');
+    const td1 = document.createElement('td'), wrap = document.createElement('div');
+    wrap.className = 'bname';
+    if (r.img) {
+      const im = document.createElement('img');
+      im.className = 'bthumb'; im.alt = ''; im.src = r.img;
+      im.onerror = () => im.remove();
+      im.addEventListener('click', () => openImage(r.img));
+      wrap.appendChild(im);
+    }
+    wrap.appendChild(document.createTextNode(r.name));
+    td1.appendChild(wrap);
+    const td2 = document.createElement('td');
+    td2.className = 'bnum'; td2.textContent = formatBounty(r.bounty);
+    tr.appendChild(td1); tr.appendChild(td2);
+    body.appendChild(tr);
+  });
+}
+// Enlarged image: dark background, mouse wheel / pinch to zoom, drag to move, click outside the image (or Esc) to close
+const big = $('imgBig'), ov = $('imgOverlay'), ptrs = new Map();
+let zs = 1, zx = 0, zy = 0, pinch0 = 0, zs0 = 1, downOnBg = false;
+const applyZ = () => { big.style.transform = `translate(${zx}px, ${zy}px) scale(${zs})`; };
+const setZoom = (v) => { zs = Math.min(8, Math.max(1, v)); if (zs === 1) { zx = 0; zy = 0; } applyZ(); };
+function openImage(url) { ptrs.clear(); zs = 1; zx = 0; zy = 0; applyZ(); big.src = url; ov.hidden = false; }
+function closeImage() { ov.hidden = true; big.removeAttribute('src'); }
+ov.addEventListener('pointerdown', (e) => { downOnBg = e.target === ov; });
+ov.addEventListener('click', (e) => { if (e.target === ov && downOnBg) closeImage(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !ov.hidden) closeImage(); });
+ov.addEventListener('wheel', (e) => { e.preventDefault(); setZoom(zs * (e.deltaY < 0 ? 1.15 : 1 / 1.15)); }, { passive: false });
+big.addEventListener('pointerdown', (e) => {
+  big.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); zs0 = zs; }
+});
+big.addEventListener('pointermove', (e) => {
+  const p = ptrs.get(e.pointerId);
+  if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  p.x = e.clientX; p.y = e.clientY;
+  if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; if (pinch0) setZoom(zs0 * Math.hypot(a.x - b.x, a.y - b.y) / pinch0); }
+  else if (zs > 1) { zx += dx; zy += dy; applyZ(); }
+});
+const endPtr = (e) => { ptrs.delete(e.pointerId); pinch0 = 0; };
+big.addEventListener('pointerup', endPtr);
+big.addEventListener('pointercancel', endPtr);
+
 async function loadLive() {
   const box = $('listLive');
   const pieces = {};
@@ -926,10 +1083,12 @@ async function loadLive() {
     try {
       if (key === 'owners') loadOwners(await sheetText(SHEETS[key]));
       else if (key === 'nations') loadNations(await sheetText(SHEETS[key]));
+      else if (key === 'extra') loadExtra(await sheetText(SHEETS[key]));
       else pieces[key] = await sheetRows(SHEETS[key]);
     } catch (err) { console.warn('Sheet failed:', key, err); }
   }
   if (pieces.worlds) worldMap = new Map(pieces.worlds.filter((r) => r.island).map((r) => [r.island.toLowerCase(), { link: r['world link'], players: r.players }]));
+  renderBounty(pieces.bounty || []);
   box.textContent = '';
   liveSection('Announcements', (pieces.announcements || []).slice(0, 10).map((r) => liveItem(r.title, [r.date, r.text].filter(Boolean).join(' - '), r.link)));
   liveSection('Events', (pieces.events || []).slice(0, 10).map((r) => liveItem(r.title, [r.start, r.world].filter(Boolean).join(' - '), r.link)));
@@ -1011,17 +1170,37 @@ function wireClick(target, layer) {
   target.on('click', (e) => {
     if (map.getContainer().classList.contains('drawing')) return;
     const p = layer.feature.properties, raw = resolveOwner(p);
+    const isUrl = (u) => /^https?:\/\//i.test(u || '');
+    const links = linksOf(p.name);
+    const w = links.length ? null : worldOf(p.name);
+    const nameHref = links[0] || (w && w.link) || '';
+    const ownerHref = linkOf(raw);
+    if (!isUrl(nameHref) && !isUrl(ownerHref)) return;
     const box = document.createElement('div');
-    const add = (href, text) => {
-      if (!/^https?:\/\//i.test(href || '')) return;
-      const a = document.createElement('a');
-      a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.className = 'owner-link'; a.style.display = 'block'; a.textContent = text;
-      box.appendChild(a);
-    };
-    add(linkOf(raw), ownerLabel(raw));
-    const w = worldOf(p.name);
-    if (w) add(w.link, 'Open world in VRChat');
-    if (box.childNodes.length) L.popup().setLatLng(e.latlng).setContent(box).openOn(map);
+    // Island name: first link, underlined
+    const nm = document.createElement(isUrl(nameHref) ? 'a' : 'div');
+    nm.className = 'pop-name'; nm.textContent = String(p.name || '');
+    if (isUrl(nameHref)) { nm.href = nameHref; nm.target = '_blank'; nm.rel = 'noopener'; }
+    box.appendChild(nm);
+    // Owner (red / blue by group), linked if the crew sheet has a website
+    if (raw) {
+      const ol = document.createElement(isUrl(ownerHref) ? 'a' : 'div');
+      ol.textContent = ownerLabel(raw);
+      if (isUrl(ownerHref)) { ol.href = ownerHref; ol.target = '_blank'; ol.rel = 'noopener'; ol.className = 'owner-link'; ol.style.display = 'block'; }
+      const c = ownerTextColor(raw);
+      if (c) { ol.style.color = c; ol.style.textDecorationColor = c; }
+      box.appendChild(ol);
+    }
+    // Every link after the first one
+    if (links.length > 1) {
+      const t = document.createElement('div'); t.className = 'pop-more'; t.textContent = 'More links:'; box.appendChild(t);
+      links.slice(1).forEach((u, i) => {
+        const a = document.createElement('a');
+        a.href = u; a.target = '_blank'; a.rel = 'noopener'; a.className = 'owner-link'; a.style.display = 'block'; a.textContent = 'Link ' + (i + 2);
+        box.appendChild(a);
+      });
+    }
+    L.popup().setLatLng(e.latlng).setContent(box).openOn(map);
   });
 }
 
