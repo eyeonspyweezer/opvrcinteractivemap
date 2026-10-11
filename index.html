@@ -1021,14 +1021,14 @@ function formatBounty(v) {
   const t = String(v || '').trim(), n = t.replace(/[,\s]/g, '');
   return /^\d+(\.0+)?$/.test(n) ? BigInt(n.split('.')[0]).toLocaleString('en-US') : t;   // 100000000 -> 100,000,000
 }
-function renderBounty(rows) {
+function renderBounty(rows, loadErr) {
   const body = $('bountyBody');
   body.textContent = '';
   const list = rows.map((o) => ({ name: o['owner(s)'] || o.owner || o.name || '', bounty: o.bounty || '', img: imgUrl(o['image url'] || o.image || '') }))
     .filter((r) => r.name || r.bounty);
   if (!list.length) {
     const tr = document.createElement('tr'), td = document.createElement('td');
-    td.colSpan = 2; td.textContent = 'No bounties yet';
+    td.colSpan = 2; td.textContent = loadErr ? 'Could not load the bounty sheet (' + loadErr + '). It must be shared as "Anyone with the link can view".' : 'No bounties yet';
     tr.appendChild(td); body.appendChild(tr);
     return;
   }
@@ -1089,10 +1089,10 @@ async function loadLive() {
       else if (key === 'nations') loadNations(await sheetText(SHEETS[key]));
       else if (key === 'extra') loadExtra(await sheetText(SHEETS[key]));
       else pieces[key] = await sheetRows(SHEETS[key]);
-    } catch (err) { console.warn('Sheet failed:', key, err); }
+    } catch (err) { console.warn('Sheet failed:', key, err); if (key === 'bounty') pieces.bountyError = String(err && err.message || err); }
   }
   if (pieces.worlds) worldMap = new Map(pieces.worlds.filter((r) => r.island).map((r) => [r.island.toLowerCase(), { link: r['world link'], players: r.players }]));
-  renderBounty(pieces.bounty || []);
+  renderBounty(pieces.bounty || [], pieces.bountyError);
   box.textContent = '';
   liveSection('Announcements', (pieces.announcements || []).slice(0, 10).map((r) => liveItem(r.title, [r.date, r.text].filter(Boolean).join(' - '), r.link)));
   liveSection('Events', (pieces.events || []).slice(0, 10).map((r) => liveItem(r.title, [r.start, r.world].filter(Boolean).join(' - '), r.link)));
