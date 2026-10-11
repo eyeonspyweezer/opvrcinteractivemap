@@ -215,7 +215,7 @@ body { background: var(--bg); }
 <button id="listToggle" class="round-btn" type="button" aria-label="Show or hide list">☰</button>
 
 <button id="themeBtn" class="round-btn" type="button" aria-label="Light or dark mode">◐</button>
-<div id="loadError" hidden>The island data (islandslist.tsv) could not be loaded. Please contact the website owner, Daniel.</div>
+<div id="loadError" hidden>The island data (islandslist.tsv) could not be loaded. Please contact the website owner, comrade_dave</div>
 
 <!-- NOTE: the icons are set with the ICONS list at the top of the script (URLs of your white images). The emoji below show until then. -->
 <div class="fab-col">
@@ -272,7 +272,7 @@ const CONFIG = {
 const LIST_BUTTONS = [
   { label: 'Island Tracker List (VRGoofy)', url: 'https://docs.google.com/spreadsheets/d/14I31HO_9qbplW8LWP63-itFL1eAjL0O-ecEAxxCOJpM/' },
   { label: 'Crew Tracker List (Dave)', url: 'https://docs.google.com/spreadsheets/d/1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk/' },
-  { label: 'Island Links List (Daniel)', url: 'https://docs.google.com/spreadsheets/d/127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE/' }
+  { label: 'Unlisted Island Tracker List (Dave)', url: 'https://docs.google.com/spreadsheets/d/127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE/' }
 ];
 const imageUrl = 'TargetedMap.PNG';
 // URLs of your white icon images (for example the files you upload to GitHub). Empty = the emoji shows instead.
@@ -294,9 +294,9 @@ const SHEETS = { worlds: '', announcements: '', events: '',
   owners: 'https://docs.google.com/spreadsheets/d/14I31HO_9qbplW8LWP63-itFL1eAjL0O-ecEAxxCOJpM/',
   nations: 'https://docs.google.com/spreadsheets/d/1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk/',
   // 3rd link: same layout as the first (Island / Location, Owner(s), Links). Used only for islands the first sheet has no owner for; its links are used for ALL islands.
-  extra: 'https://docs.google.com/spreadsheets/d/127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE/edit?gid=0#gid=0',
+  extra: 'https://docs.google.com/spreadsheets/d/127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE',
   // 4th link: Owner(s), Bounty, Image URL  ->  "Bounty List" button in the left list
-  bounty: 'https://docs.google.com/spreadsheets/d/17N7e8tQkzWsbGQdD1wDuNvj3eYkPyl_anvkrbRBOV5I/edit?gid=0#gid=0' };
+  bounty: 'https://docs.google.com/spreadsheets/d/17N7e8tQkzWsbGQdD1wDuNvj3eYkPyl_anvkrbRBOV5I' };
   // Island colors. Keys are the group name in lowercase with no spaces/symbols and no leading "the".
 const GROUP_COLORS = {
   marines: 'rgb(0, 90, 255)',
