@@ -209,7 +209,7 @@ body { background: var(--bg); }
   <div id="listLive"></div>
 </div>
 <div id="bountyPanel" hidden>
-  <table><thead><tr><th>Name</th><th class="bnum">Bounty</th></tr></thead><tbody id="bountyBody"></tbody></table>
+  <table><thead><tr><th id="bSortName" style="cursor:pointer">Name</th><th id="bSortNum" class="bnum" style="cursor:pointer">Bounty</th></tr></thead><tbody id="bountyBody"></tbody></table>
 </div>
 <div id="imgOverlay" hidden><img id="imgBig" alt="" draggable="false"></div>
 <button id="listToggle" class="round-btn" type="button" aria-label="Show or hide list">☰</button>
@@ -1021,6 +1021,7 @@ function formatBounty(v) {
   const t = String(v || '').trim(), n = t.replace(/[,\s]/g, '');
   return /^\d+(\.0+)?$/.test(n) ? BigInt(n.split('.')[0]).toLocaleString('en-US') : t;   // 100000000 -> 100,000,000
 }
+// Finds the header row (Owner(s) + Bounty) wherever it is in the sheet, then reads every row under it
 function parseBounty(text) {
   const rows = text.replace(/^\uFEFF/, '').split(/\r?\n/).map((l) => l.split('\t').map((c) => c.trim()));
   const hi = rows.findIndex((r) => r.some((c) => /^owner/i.test(c)) && r.some((c) => /^bounty$/i.test(c)));
@@ -1032,18 +1033,26 @@ function parseBounty(text) {
     return o;
   });
 }
-function renderBounty(rows, loadErr) {
-  const body = $('bountyBody');
+let bountyList = [], bountyMsg = 'No bounties yet', bountySort = { col: 'bounty', dir: 'desc' };   // default: greatest to smallest
+const bountyNum = (v) => { const n = String(v || '').replace(/[,\s]/g, ''); return /^\d+(\.0+)?$/.test(n) ? BigInt(n.split('.')[0]) : -1n; };
+function drawBounty() {
+  const body = $('bountyBody'), { col, dir } = bountySort;
   body.textContent = '';
-  const list = rows.map((o) => ({ name: o['owner(s)'] || o.owner || o.name || '', bounty: o.bounty || '', img: imgUrl(o['image url'] || o.image || '') }))
-    .filter((r) => r.name || r.bounty);
-  if (!list.length) {
+  $('bSortName').textContent = 'Name' + (col === 'name' ? (dir === 'asc' ? ' ▲' : ' ▼') : '');
+  $('bSortNum').textContent = 'Bounty' + (col === 'bounty' ? (dir === 'asc' ? ' ▲' : ' ▼') : '');
+  if (!bountyList.length) {
     const tr = document.createElement('tr'), td = document.createElement('td');
-    td.colSpan = 2; td.textContent = loadErr ? 'Could not load the bounty sheet (' + loadErr + '). It must be shared as "Anyone with the link can view".' : 'No bounties yet';
+    td.colSpan = 2; td.textContent = bountyMsg;
     tr.appendChild(td); body.appendChild(tr);
     return;
   }
-  list.forEach((r) => {
+  const sorted = bountyList.slice().sort((a, b) => {
+    let c;
+    if (col === 'name') c = a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+    else { const x = bountyNum(a.bounty), y = bountyNum(b.bounty); c = x < y ? -1 : x > y ? 1 : 0; }
+    return dir === 'asc' ? c : -c;
+  });
+  sorted.forEach((r) => {
     const tr = document.createElement('tr');
     const td1 = document.createElement('td'), wrap = document.createElement('div');
     wrap.className = 'bname';
@@ -1061,6 +1070,32 @@ function renderBounty(rows, loadErr) {
     tr.appendChild(td1); tr.appendChild(td2);
     body.appendChild(tr);
   });
+}
+$('bSortName').addEventListener('click', () => { bountySort = { col: 'name', dir: bountySort.col === 'name' && bountySort.dir === 'asc' ? 'desc' : 'asc' }; drawBounty(); });   // A-Z / Z-A
+$('bSortNum').addEventListener('click', () => { bountySort = { col: 'bounty', dir: bountySort.col === 'bounty' && bountySort.dir === 'desc' ? 'asc' : 'desc' }; drawBounty(); });   // highest / lowest first
+function renderBounty(rows, loadErr) {
+  bountyList = rows.map((o) => ({ name: o['owner(s)'] || o.owner || o.name || '', bounty: o.bounty || '', img: imgUrl(o['image url'] || o.image || '') })).filter((r) => r.name || r.bounty);
+  bountyMsg = loadErr ? 'Could not load the bounty sheet (' + loadErr + '). It must be shared as "Anyone with the link can view".' : 'No bounties yet (the sheet was read but no rows were found under the Owner(s) / Bounty header)';
+  drawBounty();
+}
+// Loads the 4th sheet as a TSV file and logs every step to the console (filter the console by: bounty)
+async function loadBounty() {
+  const url = sheetUrl(SHEETS.bounty);
+  console.log('[bounty] 1. fetching TSV:', url);
+  try {
+    const r = await fetch(url);
+    console.log('[bounty] 2. response: status', r.status, '| ok', r.ok, '| type', r.headers.get('content-type'), '| final url', r.url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const t = await r.text();
+    console.log('[bounty] 3. text length', t.length, '| first 300 characters:', JSON.stringify(t.slice(0, 300)));
+    const rows = parseBounty(t);
+    console.log('[bounty] 4. rows found under the header:', rows.length, rows);
+    renderBounty(rows);
+    console.log('[bounty] 5. drawn:', bountyList.length, 'entries');
+  } catch (err) {
+    console.error('[bounty] FAILED at fetch/read:', err);
+    renderBounty([], String(err && err.message || err));
+  }
 }
 // Enlarged image: dark background, mouse wheel / pinch to zoom, drag to move, click outside the image (or Esc) to close
 const big = $('imgBig'), ov = $('imgOverlay'), ptrs = new Map();
@@ -1091,6 +1126,7 @@ big.addEventListener('pointerup', endPtr);
 big.addEventListener('pointercancel', endPtr);
 
 async function loadLive() {
+  console.log('[map] loadLive running, version bounty-v5');
   const box = $('listLive');
   const pieces = {};
   for (const key of Object.keys(SHEETS)) {
@@ -1099,12 +1135,11 @@ async function loadLive() {
       if (key === 'owners') loadOwners(await sheetText(SHEETS[key]));
       else if (key === 'nations') loadNations(await sheetText(SHEETS[key]));
       else if (key === 'extra') loadExtra(await sheetText(SHEETS[key]));
-      else if (key === 'bounty') pieces[key] = parseBounty(await sheetText(SHEETS[key]));
+      else if (key === 'bounty') await loadBounty();
       else pieces[key] = await sheetRows(SHEETS[key]);
-    } catch (err) { console.warn('Sheet failed:', key, err); if (key === 'bounty') pieces.bountyError = String(err && err.message || err); }
+    } catch (err) { console.warn('Sheet failed:', key, err); }
   }
   if (pieces.worlds) worldMap = new Map(pieces.worlds.filter((r) => r.island).map((r) => [r.island.toLowerCase(), { link: r['world link'], players: r.players }]));
-  renderBounty(pieces.bounty || [], pieces.bountyError);
   box.textContent = '';
   liveSection('Announcements', (pieces.announcements || []).slice(0, 10).map((r) => liveItem(r.title, [r.date, r.text].filter(Boolean).join(' - '), r.link)));
   liveSection('Events', (pieces.events || []).slice(0, 10).map((r) => liveItem(r.title, [r.start, r.world].filter(Boolean).join(' - '), r.link)));
