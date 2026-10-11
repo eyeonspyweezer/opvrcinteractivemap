@@ -1021,6 +1021,17 @@ function formatBounty(v) {
   const t = String(v || '').trim(), n = t.replace(/[,\s]/g, '');
   return /^\d+(\.0+)?$/.test(n) ? BigInt(n.split('.')[0]).toLocaleString('en-US') : t;   // 100000000 -> 100,000,000
 }
+function parseBounty(text) {
+  const rows = text.replace(/^\uFEFF/, '').split(/\r?\n/).map((l) => l.split('\t').map((c) => c.trim()));
+  const hi = rows.findIndex((r) => r.some((c) => /^owner/i.test(c)) && r.some((c) => /^bounty$/i.test(c)));
+  if (hi < 0) return [];
+  const head = rows[hi].map((h) => h.toLowerCase());
+  return rows.slice(hi + 1).filter((r) => r.some(Boolean)).map((r) => {
+    const o = {};
+    head.forEach((h, i) => { if (h) o[h] = r[i] || ''; });
+    return o;
+  });
+}
 function renderBounty(rows, loadErr) {
   const body = $('bountyBody');
   body.textContent = '';
@@ -1088,6 +1099,7 @@ async function loadLive() {
       if (key === 'owners') loadOwners(await sheetText(SHEETS[key]));
       else if (key === 'nations') loadNations(await sheetText(SHEETS[key]));
       else if (key === 'extra') loadExtra(await sheetText(SHEETS[key]));
+      else if (key === 'bounty') pieces[key] = parseBounty(await sheetText(SHEETS[key]));
       else pieces[key] = await sheetRows(SHEETS[key]);
     } catch (err) { console.warn('Sheet failed:', key, err); if (key === 'bounty') pieces.bountyError = String(err && err.message || err); }
   }
