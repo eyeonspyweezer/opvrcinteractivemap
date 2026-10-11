@@ -205,7 +205,7 @@ body { background: var(--bg); }
  
   <img class="list-icon" src="VRCTitle.PNG" alt="">
   <div id="listButtons"></div>
-  <button id="bountyBtn" class="list-btn" type="button" hidden>Bounty List</button>
+  <button id="bountyBtn" class="list-btn" type="button">Bounty List</button>
   <div id="listLive"></div>
 </div>
 <div id="bountyPanel" hidden>
@@ -1026,8 +1026,12 @@ function renderBounty(rows) {
   body.textContent = '';
   const list = rows.map((o) => ({ name: o['owner(s)'] || o.owner || o.name || '', bounty: o.bounty || '', img: imgUrl(o['image url'] || o.image || '') }))
     .filter((r) => r.name || r.bounty);
-  $('bountyBtn').hidden = !list.length;
-  if (!list.length) { $('bountyPanel').hidden = true; return; }
+  if (!list.length) {
+    const tr = document.createElement('tr'), td = document.createElement('td');
+    td.colSpan = 2; td.textContent = 'No bounties yet';
+    tr.appendChild(td); body.appendChild(tr);
+    return;
+  }
   list.forEach((r) => {
     const tr = document.createElement('tr');
     const td1 = document.createElement('td'), wrap = document.createElement('div');
