@@ -31,7 +31,7 @@
 :root { --sfg: rgb(62,44,42); --inv: 0; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sfg: #fff; --inv: 1; } }
 :root[data-theme="dark"] { --sfg: #fff; --inv: 1; }
-
+/* Left list: light mode = dark background with light buttons; dark mode = same dark color for both */
 :root { --lbg: var(--fg); --ltx: var(--bg); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --lbg: var(--bg); --ltx: var(--fg); } }
 :root[data-theme="dark"] { --lbg: var(--bg); --ltx: var(--fg); }
@@ -166,7 +166,7 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 .dc-dot.off { background: rgb(128, 132, 142); }
 :root { --dc-splash-opacity: .15; --dc-icon-opacity: .4; }
 
-.live-title { margin: 12px 0 4px; font-weight: 700; border-bottom: 1px solid var(--ltx);
+.live-title { margin: 12px 0 4px; font-weight: 700; border-bottom: 1px solid var(--ltx); }
 .live-item { display: block; margin-bottom: 8px; padding: 6px; font-size: 13px; color: var(--ltx); text-decoration: none; border: 1px solid var(--ltx); }
 .live-head { font-weight: 700; }
 .map-flag { object-fit: contain; }
@@ -328,6 +328,7 @@ $('listToggle').addEventListener('click', () => {
   if (!$('sideList').classList.contains('open')) $('bountyPanel').hidden = true;
 });
 $('bountyBtn').addEventListener('click', () => { $('bountyPanel').hidden = !$('bountyPanel').hidden; });
+// Right-click the Bounty List button or panel = open the bounty Google Sheet
 const openBountySheet = (e) => { e.preventDefault(); window.open(SHEETS.bounty, '_blank', 'noopener'); };
 $('bountyBtn').addEventListener('contextmenu', openBountySheet);
 $('bountyPanel').addEventListener('contextmenu', openBountySheet);
