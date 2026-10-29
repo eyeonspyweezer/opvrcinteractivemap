@@ -1506,7 +1506,6 @@ $('optOpacity').addEventListener('input', (e) => {
   restyleAll(); // updates colors, stripes, and flags together
 });
 if (lowResources) { $('optFlags').checked = false; $('optFlags').title = 'Turned off automatically (data saver / low memory)'; }
-</script>
 
 // ===== Export: Island Name <tab> Link (links separated by a space; "???" skipped) =====
 function linksTsv() {
@@ -1549,6 +1548,8 @@ function loadLinks(text) {
   });
   refreshAll();
 }
+  
+</script>
 
   
 </body>
