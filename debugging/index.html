@@ -208,7 +208,7 @@ body { background: var(--bg); }
 
 <div id="sideList">
  
-  <img class="list-icon" src="VRCTitle.PNG" alt="">
+  <img class="list-icon" src="../VRCTitle.PNG" alt="">
   <div id="listButtons"></div>
   <button id="bountyBtn" class="list-btn" type="button">Bounty List</button>
   <div id="listLive"></div>
@@ -281,9 +281,9 @@ const LIST_BUTTONS = [
   { label: 'Crew Tracker List (Dave)', url: 'https://docs.google.com/spreadsheets/d/1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk/' },
   { label: 'Unlisted Island Tracker List (Dave)', url: 'https://docs.google.com/spreadsheets/d/127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE/' }
 ];
-const imageUrl = 'TargetedMap.PNG';
+const imageUrl = '../TargetedMap.PNG';
 // URLs of your white icon images (for example the files you upload to GitHub). Empty = the emoji shows instead.
-const ICONS = { search: '', discord: 'DiscordIcon.PNG', vrchat: 'VRCIcon.PNG', settings: '' };
+const ICONS = { search: '', discord: '../DiscordIcon.PNG', vrchat: '../VRCIcon.PNG', settings: '' };
 
 // VRChat world pages for islands/ships. Keys are polygon names in lowercase.
 const VRC_WORLDS = {
@@ -837,7 +837,7 @@ function addIsland(geometry, props) {
 
 // ===== File loading =====
 // File names looked up automatically in the same folder as this HTML file
-const AUTO_FILES = { islands: 'islandslist.tsv' };
+const AUTO_FILES = { islands: '../islandslist.tsv' };
 
 // A steady "random-looking" color from the island name (the same every reload)
 const hashColor = (str) => { let h = 0; for (const ch of String(str)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360}, 65%, 55%)`; };
