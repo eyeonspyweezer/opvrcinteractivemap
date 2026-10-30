@@ -261,7 +261,6 @@ body { background: var(--bg); }
   <button id="copyLinks" type="button">Copy island links</button>
   <button id="dlLinks" type="button">Download TSV</button>
   <button id="idMapBtn" type="button">Download ID map PNG</button>
-  <button id="colorsBtn" type="button">Download colors TSV</button>
 </div>
 
 <script>
@@ -1631,7 +1630,6 @@ async function exportIdMap() {
   const blob = await new Promise((r) => out.toBlob(r, 'image/png'));
   saveBlob(blob, 'island-idmap.png');
 }
-$('colorsBtn').addEventListener('click', () => saveBlob(new Blob([colorsTsv()], { type: 'text/tab-separated-values' }), 'island-colors.tsv'));
 $('idMapBtn').addEventListener('click', async () => {
   const b = $('idMapBtn');
   b.textContent = 'Working...';
