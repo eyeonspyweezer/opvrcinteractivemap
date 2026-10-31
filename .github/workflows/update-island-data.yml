@@ -1,0 +1,40 @@
+name: Update island data
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6 hours
+  workflow_dispatch:       # lets you press "Run workflow" by hand
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install tools
+        run: |
+          npm init -y
+          npm install playwright sharp
+          npx playwright install --with-deps chromium
+
+      - name: Build island data
+        env:
+          PAGE_PATH: debugging/index.html   # the debug page that has the export code (change if yours is named differently)
+        run: node tools/build-island-data.js
+
+      - name: Save changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add island-colors.tsv island-flags.png
+          if ! git diff --cached --quiet; then
+            git commit -m "Update island data"
+            git push
+          fi
