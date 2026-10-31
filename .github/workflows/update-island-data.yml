@@ -2,7 +2,7 @@ name: Update island data
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # every 6 hours
+    - cron: '0 * * * *'   # every hour
   workflow_dispatch:       # lets you press "Run workflow" by hand
 
 permissions:
@@ -33,7 +33,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add island-colors.tsv island-flags.png
+          git add island-colors.tsv island-flags.png island-groups.tsv
           if ! git diff --cached --quiet; then
             git commit -m "Update island data"
             git push
