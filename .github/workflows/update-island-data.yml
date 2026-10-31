@@ -1,9 +1,18 @@
 name: Update island data
 
 on:
+  push:                    # runs whenever you update the repo
+    paths-ignore:          # ...but not when only the generated files changed
+      - 'island-colors.tsv'
+      - 'island-groups.tsv'
+      - 'island-flags.png'
   schedule:
-    - cron: '0 * * * *'   # every hour
+    - cron: '0 */6 * * *'   # every 6 hours (picks up Google Sheets changes)
   workflow_dispatch:       # lets you press "Run workflow" by hand
+
+concurrency:
+  group: island-data
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -36,5 +45,6 @@ jobs:
           git add island-colors.tsv island-flags.png island-groups.tsv
           if ! git diff --cached --quiet; then
             git commit -m "Update island data"
+            git pull --rebase
             git push
           fi
