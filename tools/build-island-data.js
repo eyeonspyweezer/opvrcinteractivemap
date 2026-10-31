@@ -28,14 +28,35 @@ const clean = (s) => String(s || '').replace(/[\t\r\n]+/g, ' ').trim();
   try {
     const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
     page.on('pageerror', (e) => console.log('page error:', e.message));
-    await page.goto(`${base}/${PAGE}`, { waitUntil: 'load' });
+    page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log('page ' + m.type() + ':', m.text()); });
+    page.on('requestfailed', (r) => console.log('request failed:', r.url(), r.failure() && r.failure().errorText));
+    page.on('response', (r) => { if (r.status() >= 400) console.log('HTTP', r.status(), r.url()); });
+    const resp = await page.goto(`${base}/${PAGE}`, { waitUntil: 'load' });
+    console.log('Page status:', resp && resp.status(), '-', PAGE);
+    if (!resp || resp.status() !== 200) throw new Error('Page not found at "' + PAGE + '". Fix PAGE_PATH in the workflow file.');
 
-    // wait until the polygons, owners and crew colors have loaded
-    await page.waitForFunction(() => {
-      try { return drawnItems.getLayers().length > 0 && ownerMap.size > 0 && nationColor.size > 0; }
-      catch (e) { return false; }
-    }, null, { timeout: 120000 });
-    await page.waitForTimeout(10000); // let the 3rd sheet (links) finish too
+    // wait until the polygons and owners have loaded
+    try {
+      await page.waitForFunction(() => {
+        try { return drawnItems.getLayers().length > 0 && ownerMap.size > 0; }
+        catch (e) { return false; }
+      }, null, { timeout: 90000 });
+    } catch (e) {
+      const state = await page.evaluate(() => {
+        const g = (f) => { try { return f(); } catch (err) { return 'n/a'; } };
+        return {
+          islandsOnMap: g(() => drawnItems.getLayers().length),
+          ownerRows: g(() => ownerMap.size),
+          crewColors: g(() => nationColor.size),
+          status: g(() => document.getElementById('status').textContent),
+          islandFileError: g(() => !document.getElementById('loadError').hidden)
+        };
+      });
+      console.log('State at timeout:', JSON.stringify(state));
+      throw e;
+    }
+    await page.waitForTimeout(15000); // let the crew sheet (colors/flags) and 3rd sheet (links) finish
+    console.log('Crew colors loaded:', await page.evaluate(() => nationColor.size));
 
     const rows = await page.evaluate(() => polygonList().map(({ id, layer, name }) => {
       const p = layer.feature.properties;
