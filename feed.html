@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feed</title>
+<style>
+  body { margin:0; background:#1e1f22; color:#dcddde; font:15px sans-serif; }
+  #feed { max-width:700px; margin:0 auto; padding:12px; }
+  .post { display:flex; gap:10px; padding:12px; margin-bottom:10px; background:#2b2d31; border-radius:8px; }
+  .post img.av { width:40px; height:40px; border-radius:50%; flex:none; }
+  .name { font-weight:bold; color:#fff; }
+  .time { font-size:12px; color:#949ba4; margin-left:6px; }
+  .line { margin-top:6px; }
+  .big { font-size:18px; font-weight:bold; }
+  .thumb { max-width:100%; border-radius:6px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div id="feed">Loading...</div>
+<script>
+const URL_TXT = 'https://raw.githubusercontent.com/eyeonspyweezer/goofymarinenewspb/refs/heads/main/vrc-feed.txt';
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function fmt(s) {
+  return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+}
+
+async function load() {
+  try {
+    const r = await fetch(URL_TXT + '?t=' + Date.now());
+    const txt = await r.text();
+    const out = txt.split('\n').filter(l => l.trim()).map(l => {
+      const p = l.split('|');
+      const time = p[0], name = p[1], av = p[2], thumb = p[3];
+      const msg = p.slice(4).join('|').trim();
+      const parts = msg.split(/(?:^|\s)#\s+/);
+      let body = '';
+      parts.forEach((t, i) => {
+        if (!t.trim()) return;
+        const big = (i > 0) ? ' big' : '';
+        body += '<div class="line' + big + '">' + fmt(t.trim()) + '</div>';
+      });
+      return '<div class="post">' +
+        (av ? '<img class="av" src="' + esc(av) + '">' : '') +
+        '<div><span class="name">' + esc(name) + '</span><span class="time">' + esc(time) + '</span>' +
+        body +
+        (thumb ? '<img class="thumb" src="' + esc(thumb) + '">' : '') +
+        '</div></div>';
+    }).join('');
+    document.getElementById('feed').innerHTML = out || 'No posts.';
+  } catch (e) {
+    document.getElementById('feed').textContent = 'Could not load feed.';
+  }
+}
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
