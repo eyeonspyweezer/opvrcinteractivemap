@@ -6,6 +6,9 @@ on:
       - 'island-colors.tsv'
       - 'island-groups.tsv'
       - 'island-flags.png'
+      - 'island-labels.png'
+      - 'island-map.png'
+      - 'history/**'
   schedule:
     - cron: '0 */6 * * *'   # every 6 hours (picks up Google Sheets changes)
   workflow_dispatch:       # lets you press "Run workflow" by hand
@@ -42,7 +45,9 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add island-colors.tsv island-flags.png island-groups.tsv
+          git add island-colors.tsv island-flags.png island-groups.tsv history
+          [ -f island-labels.png ] && git add island-labels.png || true
+          [ -f island-map.png ] && git add island-map.png || true
           if ! git diff --cached --quiet; then
             git commit -m "Update island data"
             git pull --rebase
