@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: screenshot
+  cancel-in-progress: false
 jobs:
   shot:
     runs-on: ubuntu-latest
@@ -47,5 +50,5 @@ jobs:
           git config user.email "actions@github.com"
           git add preview.png
           git commit -m "Update preview" || exit 0
-          git pull --rebase
+          git pull --rebase -X theirs
           git push
