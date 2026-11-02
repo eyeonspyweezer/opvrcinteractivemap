@@ -1,1 +1,49 @@
--
+name: Screenshot
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  shot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install playwright
+      - run: npx playwright install --with-deps chromium
+      - run: |
+          cat > shot.js <<'EOF'
+          const { chromium } = require('playwright');
+          (async () => {
+            const b = await chromium.launch();
+            const p = await b.newPage({ viewport: { width: 1200, height: 630 } });
+            await p.goto('https://eyeonspyweezer.github.io/opvrcinteractivemap/', { waitUntil: 'networkidle' });
+            await p.waitForTimeout(3000);
+            await p.addStyleTag({ content: 'button, .leaflet-control-container { display: none !important; }' });
+            await p.evaluate(() => {
+              const m = document.querySelector('.leaflet-container');
+              let el = m;
+              while (el && el !== document.body) {
+                [...el.parentElement.children].forEach(c => { if (c !== el) c.style.display = 'none'; });
+                el = el.parentElement;
+              }
+              m.style.cssText += ';position:fixed;inset:0;width:100vw;height:100vh;';
+              window.dispatchEvent(new Event('resize'));
+            });
+            await p.waitForTimeout(2000);
+            await p.screenshot({ path: 'preview.png' });
+            await b.close();
+          })();
+          EOF
+          node shot.js
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add preview.png
+          git commit -m "Update preview" || exit 0
+          git pull --rebase
+          git push
