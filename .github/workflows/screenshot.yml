@@ -76,7 +76,24 @@ jobs:
               await shot(`botimg/groups/${g.ID}.jpg`);
             }
 
+            // 3) six regions (everything shown). [left, top, right, bottom] as fractions of the map.
+            //    Change these numbers if you want different cuts.
+            const REGIONS = {
+              nw: [0, 0, 0.5, 0.5],
+              ne: [0.5, 0, 1, 0.5],
+              sw: [0, 0.5, 0.5, 1],
+              se: [0.5, 0.5, 1, 1],
+              mw: [0, 0.25, 0.5, 0.75],
+              me: [0.5, 0.25, 1, 0.75],
+            };
             await p.evaluate(() => window.applyFilter(null, null));
+            fs.mkdirSync('botimg/regions', { recursive: true });
+            for (const [id, r] of Object.entries(REGIONS)) {
+              await p.evaluate((box) => window.applyRegion(box), r);
+              await p.waitForTimeout(1500);
+              await p.screenshot({ path: `botimg/regions/${id}.jpg`, type: 'jpeg', quality: 80 });
+            }
+
             await b.close();
           })();
           EOF
