@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 * * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 permissions:
   contents: write
@@ -23,10 +23,12 @@ jobs:
       - run: |
           cat > shot.js <<'EOF'
           const { chromium } = require('playwright');
+          const fs = require('fs');
+          const BASE = 'https://eyeonspyweezer.github.io/opvrcinteractivemap/';
           (async () => {
             const b = await chromium.launch();
             const p = await b.newPage({ viewport: { width: 1200, height: 630 } });
-            await p.goto('https://eyeonspyweezer.github.io/opvrcinteractivemap/', { waitUntil: 'networkidle' });
+            await p.goto(BASE, { waitUntil: 'networkidle' });
             await p.waitForTimeout(3000);
             await p.addStyleTag({ content: 'button, .leaflet-control-container { display: none !important; }' });
             await p.evaluate(() => {
@@ -41,6 +43,40 @@ jobs:
             });
             await p.waitForTimeout(2000);
             await p.screenshot({ path: 'preview.png' });
+
+            // The page must have the filter code. If not deployed yet, stop after preview.png.
+            const ready = await p.evaluate(() => typeof window.applyFilter === 'function');
+            if (!ready) { console.log('Page has no applyFilter yet, preview only.'); await b.close(); return; }
+
+            fs.mkdirSync('botimg/maps', { recursive: true });
+            fs.mkdirSync('botimg/groups', { recursive: true });
+            const shot = async (path) => {
+              await p.waitForTimeout(500);
+              await p.screenshot({ path, type: 'jpeg', quality: 80 });
+            };
+
+            // 1) every button combo. Digit order: Marines, Unknown, Unowned, Pirates, Revolutionaries, Kingdoms
+            const KINDS = ['marines', 'unknown', 'unowned', 'pirates', 'revolutionaries', 'kingdoms'];
+            for (let n = 0; n < 64; n++) {
+              const bits = n.toString(2).padStart(6, '0');
+              const show = KINDS.filter((_, i) => bits[i] === '1');
+              await p.evaluate((s) => window.applyFilter(s, null), show);
+              await shot(`botimg/maps/${bits}.jpg`);
+            }
+
+            // 2) one picture per group that owns islands
+            const txt = await (await fetch(BASE + 'island-groups.tsv')).text();
+            const [head, ...rows] = txt.trim().split(/\r?\n/);
+            const cols = head.split('\t');
+            for (const line of rows) {
+              const v = line.split('\t');
+              const g = Object.fromEntries(cols.map((c, i) => [c, v[i]]));
+              if ((parseInt(g.Islands, 10) || 0) === 0) continue;
+              await p.evaluate((name) => window.applyFilter(null, name), g.Group);
+              await shot(`botimg/groups/${g.ID}.jpg`);
+            }
+
+            await p.evaluate(() => window.applyFilter(null, null));
             await b.close();
           })();
           EOF
@@ -52,3 +88,14 @@ jobs:
           git commit -m "Update preview" || exit 0
           git pull --rebase -X theirs
           git push
+      - name: Publish bot images (one commit, history wiped every run)
+        run: |
+          if [ -d botimg ]; then
+            cd botimg
+            git init -q -b bot-images
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git add -A
+            git commit -q -m "Bot images"
+            git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" bot-images
+          fi
