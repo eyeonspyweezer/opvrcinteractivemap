@@ -301,6 +301,29 @@ const VRC_WORLDS = {
 const conn = navigator.connection || {};
 const lowResources = !!(conn.saveData || /2g/.test(conn.effectiveType || '') || (navigator.deviceMemory && navigator.deviceMemory <= 2));
 const OPT = { colors: false, flags: !lowResources, names: true, hideUnnamed: false, hideUnowned: false };
+// ===== Link/bot filters: ?show=pirates,marines  (no ?show = everything) =====
+let SHOW = null, SHOW_CREW = null;
+{
+  const q = new URLSearchParams(location.search);
+  if (q.has('show')) SHOW = new Set(q.get('show').toLowerCase().split(',').map((s) => s.trim()).filter(Boolean));
+  if (q.get('crew')) SHOW_CREW = q.get('crew');
+}
+const KIND_BY_COLOR = { 'rgb(0, 90, 255)': 'marines', 'rgb(0, 0, 0)': 'pirates', 'rgb(180, 0, 0)': 'revolutionaries', 'rgb(128, 0, 128)': 'kingdoms' };
+function layerKinds(layer) {
+  const p = layer.feature.properties;
+  if (String(p.name || '').includes('???')) return ['unknown'];
+  const owner = resolveOwner(p);
+  if (!ownersOf(owner).length) return ['unowned'];
+  return groupColorsOf(owner).map((c) => KIND_BY_COLOR[c]).filter(Boolean);
+}
+function layerCrews(layer) {
+  return ownersOf(resolveOwner(layer.feature.properties)).flatMap(groupsOf).map(norm);
+}
+window.applyFilter = (show, crew) => {
+  SHOW = show ? new Set(show) : null;
+  SHOW_CREW = crew || null;
+  rebuildVisibility();
+};
 // Paste Google Sheets links here (see the steps above). Leave '' to skip one.
 const SHEETS = { worlds: '', announcements: '', events: '',
   owners: 'https://docs.google.com/spreadsheets/d/14I31HO_9qbplW8LWP63-itFL1eAjL0O-ecEAxxCOJpM/',
@@ -442,6 +465,8 @@ function applyHidden(layer) {
 
 function shouldHide(layer) {
   const name = String(layer.feature.properties.name || '');
+  if (SHOW && !layerKinds(layer).some((k) => SHOW.has(k))) return true;
+  if (SHOW_CREW && !layerCrews(layer).includes(norm(SHOW_CREW))) return true;
   if (OPT.hideUnnamed && name.includes('???')) return true;
   if (OPT.hideUnowned) {
     const owner = resolveOwner(layer.feature.properties);
