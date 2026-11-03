@@ -301,6 +301,7 @@ const VRC_WORLDS = {
 const conn = navigator.connection || {};
 const lowResources = !!(conn.saveData || /2g/.test(conn.effectiveType || '') || (navigator.deviceMemory && navigator.deviceMemory <= 2));
 const OPT = { colors: false, flags: !lowResources, names: true, hideUnnamed: false, hideUnowned: false };
+
 // ===== Link/bot filters: ?show=pirates,marines  (no ?show = everything) =====
 let SHOW = null, SHOW_CREW = null;
 {
@@ -319,10 +320,16 @@ function layerKinds(layer) {
 function layerCrews(layer) {
   return ownersOf(resolveOwner(layer.feature.properties)).flatMap(groupsOf).map(norm);
 }
+// used by the screenshot robot
 window.applyFilter = (show, crew) => {
   SHOW = show ? new Set(show) : null;
   SHOW_CREW = crew || null;
   rebuildVisibility();
+};
+// zoom to a part of the map: [left, top, right, bottom] as fractions 0..1 of the picture
+window.applyRegion = (r) => {
+  const H = map.getMaxBounds().getNorth(), W = mapWidth;
+  map.fitBounds([[H - r[3] * H, r[0] * W], [H - r[1] * H, r[2] * W]], { animate: false });
 };
 // Paste Google Sheets links here (see the steps above). Leave '' to skip one.
 const SHEETS = { worlds: '', announcements: '', events: '',
