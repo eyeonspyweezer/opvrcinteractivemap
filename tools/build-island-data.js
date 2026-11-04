@@ -184,6 +184,8 @@ function signature(tsv) {
         const meta = await sharp(buf).metadata();
         aspectOf.set(u, Math.max(1, Math.min(255, Math.round((meta.width / meta.height) * 50))));
         const img = await sharp(buf).resize(CELL, CELL, { fit: 'fill' }).png().toBuffer();
+        fs.mkdirSync('flags', { recursive: true });
+        await sharp(buf).resize({ height: 128, fit: 'inside' }).png().toFile(`flags/${i}.png`);
         parts.push({ input: img, left: (i % COLS) * CELL, top: Math.floor(i / COLS) * CELL });
       } catch (e) { console.log('flag failed:', u, e.message); cellOf.delete(u); }
     }
