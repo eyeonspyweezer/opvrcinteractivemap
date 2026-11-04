@@ -25,9 +25,9 @@ jobs:
           const { chromium } = require('playwright');
           const fs = require('fs');
           const BASE = 'https://eyeonspyweezer.github.io/opvrcinteractivemap/';
-          (async () => {
-            const b = await chromium.launch();
-            const p = await b.newPage({ viewport: { width: 1200, height: 630 } });
+
+          // Open the page and hide everything except the map itself.
+          async function prepare(p) {
             await p.goto(BASE, { waitUntil: 'networkidle' });
             await p.waitForTimeout(3000);
             await p.addStyleTag({ content: 'button, .leaflet-control-container { display: none !important; }' });
@@ -42,9 +42,19 @@ jobs:
               window.dispatchEvent(new Event('resize'));
             });
             await p.waitForTimeout(2000);
+          }
+
+          // A failing part is logged and skipped, so the other parts still get published.
+          async function step(name, fn) {
+            try { await fn(); } catch (e) { console.log(name + ' failed: ' + e.message); }
+          }
+
+          (async () => {
+            const b = await chromium.launch();
+            const p = await b.newPage({ viewport: { width: 1200, height: 630 } });
+            await prepare(p);
             await p.screenshot({ path: 'preview.png' });
 
-            // The page must have the filter code. If not deployed yet, stop after preview.png.
             const ready = await p.evaluate(() => typeof window.applyFilter === 'function');
             if (!ready) { console.log('Page has no applyFilter yet, preview only.'); await b.close(); return; }
 
@@ -56,43 +66,65 @@ jobs:
             };
 
             // 1) every button combo. Digit order: Marines, Unknown, Unowned, Pirates, Revolutionaries, Kingdoms
-            const KINDS = ['marines', 'unknown', 'unowned', 'pirates', 'revolutionaries', 'kingdoms'];
-            for (let n = 0; n < 64; n++) {
-              const bits = n.toString(2).padStart(6, '0');
-              const show = KINDS.filter((_, i) => bits[i] === '1');
-              await p.evaluate((s) => window.applyFilter(s, null), show);
-              await shot(`botimg/maps/${bits}.jpg`);
-            }
+            await step('button combos', async () => {
+              const KINDS = ['marines', 'unknown', 'unowned', 'pirates', 'revolutionaries', 'kingdoms'];
+              for (let n = 0; n < 64; n++) {
+                const bits = n.toString(2).padStart(6, '0');
+                const show = KINDS.filter((_, i) => bits[i] === '1');
+                await p.evaluate((s) => window.applyFilter(s, null), show);
+                await shot(`botimg/maps/${bits}.jpg`);
+              }
+            });
 
             // 2) one picture per group that owns islands
-            const txt = await (await fetch(BASE + 'island-groups.tsv')).text();
-            const [head, ...rows] = txt.trim().split(/\r?\n/);
-            const cols = head.split('\t');
-            for (const line of rows) {
-              const v = line.split('\t');
-              const g = Object.fromEntries(cols.map((c, i) => [c, v[i]]));
-              if ((parseInt(g.Islands, 10) || 0) === 0) continue;
-              await p.evaluate((name) => window.applyFilter(null, name), g.Group);
-              await shot(`botimg/groups/${g.ID}.jpg`);
-            }
-
-            // 3) six regions (everything shown). [left, top, right, bottom] as fractions of the map.
-            //    Change these numbers if you want different cuts.
-            const REGIONS = {
-              nw: [0, 0, 0.5, 0.5],
-              ne: [0.5, 0, 1, 0.5],
-              sw: [0, 0.5, 0.5, 1],
-              se: [0.5, 0.5, 1, 1],
-              mw: [0, 0.25, 0.5, 0.75],
-              me: [0.5, 0.25, 1, 0.75],
-            };
+            await step('groups', async () => {
+              const txt = await (await fetch(BASE + 'island-groups.tsv')).text();
+              const [head, ...rows] = txt.trim().split(/\r?\n/);
+              const cols = head.split('\t');
+              for (const line of rows) {
+                const v = line.split('\t');
+                const g = Object.fromEntries(cols.map((c, i) => [c, v[i]]));
+                if ((parseInt(g.Islands, 10) || 0) === 0) continue;
+                await p.evaluate((name) => window.applyFilter(null, name), g.Group);
+                await shot(`botimg/groups/${g.ID}.jpg`);
+              }
+            });
             await p.evaluate(() => window.applyFilter(null, null));
-            fs.mkdirSync('botimg/regions', { recursive: true });
-            for (const [id, r] of Object.entries(REGIONS)) {
-              await p.evaluate((box) => window.applyRegion(box), r);
-              await p.waitForTimeout(1500);
-              await p.screenshot({ path: `botimg/regions/${id}.jpg`, type: 'jpeg', quality: 80 });
-            }
+
+            // 3) six regions, cut by the real pixels of the map picture.
+            //    New World + Paradise = a centered band MID pixels tall.
+            //    The rest of the height is split between the top row and the bottom row.
+            //    If a size is odd, the bottom row / right half gets the extra pixel.
+            await step('regions', async () => {
+              const size = await p.evaluate(() => (window.mapSize ? window.mapSize() : null));
+              const hasRegion = await p.evaluate(() => typeof window.applyRegion === 'function');
+              if (!size || !hasRegion) { console.log('Page has no applyRegion/mapSize yet, skipping regions.'); return; }
+              console.log('map picture size: ' + size.w + 'x' + size.h);
+              const MID = 105;
+              const w = size.w, h = size.h;
+              const topH = Math.floor((h - MID) / 2);
+              const midTop = topH, midBottom = topH + MID;
+              const half = Math.floor(w / 2);
+              const REGIONS = {
+                nblue:    [0, 0, half, topH],
+                eblue:    [half, 0, w, topH],
+                newworld: [0, midTop, half, midBottom],
+                paradise: [half, midTop, w, midBottom],
+                wblue:    [0, midBottom, half, h],
+                sblue:    [half, midBottom, w, h],
+              };
+              fs.mkdirSync('botimg/regions', { recursive: true });
+              for (const [id, [x0, y0, x1, y1]] of Object.entries(REGIONS)) {
+                const rw = x1 - x0, rh = y1 - y0;
+                const f = Math.min(3, 3000 / rw);
+                const rp = await b.newPage({ viewport: { width: rw, height: rh }, deviceScaleFactor: f });
+                await prepare(rp);
+                await rp.evaluate((r) => window.applyRegion(r), [x0, y0, x1, y1]);
+                await rp.waitForTimeout(1500);
+                await rp.screenshot({ path: `botimg/regions/${id}.jpg`, type: 'jpeg', quality: 85 });
+                await rp.close();
+              }
+            });
 
             await b.close();
           })();
@@ -106,6 +138,7 @@ jobs:
           git pull --rebase -X theirs
           git push
       - name: Publish bot images (one commit, history wiped every run)
+        if: always()
         run: |
           if [ -d botimg ]; then
             cd botimg
