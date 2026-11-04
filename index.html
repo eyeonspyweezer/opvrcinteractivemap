@@ -328,7 +328,7 @@ window.applyFilter = (show, crew) => {
 };
 // zoom to a part of the map: [left, top, right, bottom] as fractions 0..1 of the picture
 window.applyRegion = (r) => {
-  const H = map.getMaxBounds().getNorth(), W = mapWidth;
+  const H = map.options.maxBounds.getNorth(), W = mapWidth;
   map.fitBounds([[H - r[3] * H, r[0] * W], [H - r[1] * H, r[2] * W]], { animate: false });
 };
 // Paste Google Sheets links here (see the steps above). Leave '' to skip one.
