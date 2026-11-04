@@ -45,7 +45,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add island-colors.tsv island-flags.png island-groups.tsv history
+          git add island-colors.tsv island-flags.png island-groups.tsv history flags
           [ -f island-labels.png ] && git add island-labels.png || true
           [ -f island-map.png ] && git add island-map.png || true
           if ! git diff --cached --quiet; then
