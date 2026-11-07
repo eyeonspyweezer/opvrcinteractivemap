@@ -12,15 +12,20 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 FONT_DIR = Path(__file__).parent
+DEFAULT_FONT = FONT_DIR / "one piece font.ttf"
+FALLBACK_FONT = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 
-FONT_BOLD = os.environ.get(
-    "CARD_FONT_BOLD",
-    str(FONT_DIR / "one piece font.ttf"),
-)
-FONT_REGULAR = os.environ.get(
-    "CARD_FONT_REGULAR",
-    str(FONT_DIR / "one piece font.ttf"),
-)
+if not DEFAULT_FONT.exists():
+    if FALLBACK_FONT.exists():
+        DEFAULT_FONT = FALLBACK_FONT
+    else:
+        raise FileNotFoundError(
+            f"Font not found: {DEFAULT_FONT} (fallback {FALLBACK_FONT} also missing)"
+        )
+
+FONT_BOLD = os.environ.get("CARD_FONT_BOLD", str(DEFAULT_FONT))
+FONT_REGULAR = os.environ.get("CARD_FONT_REGULAR", str(DEFAULT_FONT))
+
 
 CARD_W, CARD_H = 900, 300
 BG = (30, 31, 34)
