@@ -1,0 +1,37 @@
+# Put at: .github/workflows/island-cards-test.yml   (opvrcinteractivemap repo)
+# TEST ONLY - used by /islandtest. Delete this file when the test is approved or dropped.
+name: Island cards (test)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '45 */6 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: island-cards-test
+  cancel-in-progress: false
+
+jobs:
+  cards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow
+      - run: python tools/build_island_cards.py
+      - name: Publish test cards (one commit, history wiped every run)
+        run: |
+          if [ -d botimg-test ]; then
+            cd botimg-test
+            git init -q -b bot-images-test
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git add -A
+            git commit -q -m "Island cards (test)"
+            git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" bot-images-test
+          fi
