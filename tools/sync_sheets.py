@@ -85,14 +85,14 @@ def sync_backgrounds():
             skipped += 1
             continue
 
-        fname = f"{slug(name)}.jpg"
+        fname = f"{slug(name)}.webp"
         try:
             img = Image.open(io.BytesIO(download_bytes(url)))
             img.seek(0)
             img = img.convert("RGB")
             img.thumbnail((BG_MAX_SIDE, BG_MAX_SIDE))
             BG_DIR.mkdir(exist_ok=True)
-            img.save(BG_DIR / fname, "JPEG", quality=82, optimize=True)
+            img.save(BG_DIR / fname, "WEBP", quality=80)
             manifest[key] = {"name": name, "url": base, "file": fname}
             saved += 1
             print(f"  saved background: {fname}")
