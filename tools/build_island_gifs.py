@@ -149,8 +149,22 @@ def create_gif(flag_img: Image.Image, island_name: str, out_path: Path):
         bg_path = BG_DIR / f"{base_slug}{ext}"
         if bg_path.exists():
             try:
-                print(f"    -> Using custom background: {bg_path.name}")
-                bg_image = Image.open(bg_path).convert("RGBA").resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
+                bg = Image.open(bg_path).convert("RGBA")
+                
+                # --- PROPORTIONAL CROP & FIT (Prevents Stretching) ---
+                img_w, img_h = bg.size
+                target_w, target_h = CANVAS_W, CANVAS_H
+                
+                # Calculate scale to cover the whole box without distorting
+                scale = max(target_w / img_w, target_h / img_h)
+                new_w, new_h = int(img_w * scale), int(img_h * scale)
+                bg = bg.resize((new_w, new_h), Image.LANCZOS)
+                
+                # Crop the center if it overflows
+                left = (new_w - target_w) // 2
+                top = (new_h - target_h) // 2
+                bg_image = bg.crop((left, top, left + target_w, top + target_h))
+                
                 # Darken slightly for readability
                 dark = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 110))
                 bg_image = Image.alpha_composite(bg_image, dark)
