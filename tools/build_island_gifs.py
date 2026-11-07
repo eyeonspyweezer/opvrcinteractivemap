@@ -141,14 +141,19 @@ def archive_if_exists(dest: Path, crew_slug: str, island_slug: str):
 def create_gif(flag_img: Image.Image, island_name: str, out_path: Path):
     raw = flag_img.convert("RGBA")
     
-    # Check if a custom background exists from sync_sheets.py
-    bg_path = BG_DIR / f"{slug(island_name)}.jpg"
+    # Check for custom background (.png, .jpg, .jpeg, .webp)
     bg_image = None
-    if bg_path.exists():
-        bg_image = Image.open(bg_path).convert("RGBA").resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
-        # Darken slightly for readability
-        dark = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 110))
-        bg_image = Image.alpha_composite(bg_image, dark)
+    base_slug = slug(island_name)
+    for ext in (".png", ".jpg", ".jpeg", ".webp"):
+        bg_path = BG_DIR / f"{base_slug}{ext}"
+        if bg_path.exists():
+            try:
+                bg_image = Image.open(bg_path).convert("RGBA").resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
+                dark = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 110))
+                bg_image = Image.alpha_composite(bg_image, dark)
+                break
+            except Exception as e:
+                print(f"Warning loading background {bg_path}: {e}")
 
     flag = prepare_flag(raw, max_w=FLAG_AREA_W - 20, max_h=CANVAS_H - 28)
     rgba_frames = []
