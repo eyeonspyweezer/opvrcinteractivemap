@@ -224,30 +224,86 @@ def read_tsv(path: Path) -> list[dict]:
 
 
 def load_flag_for_island(island: dict, groups: dict, atlas: Image.Image | None, crew_flag_dirs: list) -> Image.Image | None:
-    for key in ("Group1", "Group2", "Group3"):
-        g = groups.get(island.get(key, ""))
+    # Gather all valid group IDs for this island
+    g_ids = [island.get(k) for k in ("Group1", "Group2", "Group3") if island.get(k) and island.get(k) != "0"]
+    
+    found_flags = []
+    
+    for gid in g_ids:
+        g = groups.get(gid)
         if not g:
             continue
         name = g.get("Group", "")
+        flag_img = None
+        
+        # 1. Check custom crew flag folder
         for folder in crew_flag_dirs:
             for ext in (".webp", ".png", ".jpg", ".gif"):
                 for candidate in (folder / f"{slug(name)}{ext}", folder / f"{name.lower().replace(' ', '')}{ext}"):
                     if candidate.exists():
-                        return Image.open(candidate)
+                        flag_img = Image.open(candidate).convert("RGBA")
+                        break
+                if flag_img:
+                    break
+            if flag_img:
+                break
+                
+        # 2. Fallback to Atlas if no custom file exists
+        if flag_img is None and atlas is not None:
+            try:
+                cell = int(g.get("Flag", -1))
+                if cell >= 0:
+                    ATLAS_CELL, ATLAS_COLS = 128, 16
+                    x = (cell % ATLAS_COLS) * ATLAS_CELL
+                    y = (cell // ATLAS_COLS) * ATLAS_CELL
+                    flag_img = atlas.crop((x, y, x + ATLAS_CELL, y + ATLAS_CELL)).convert("RGBA")
+            except ValueError:
+                pass
+                
+        if flag_img:
+            found_flags.append(flag_img)
 
-    if atlas is None:
+    # If no group flags, check direct island flag
+    if not found_flags and atlas is not None:
+        try:
+            cell = int(island.get("Flag", -1))
+            if cell >= 0:
+                ATLAS_CELL, ATLAS_COLS = 128, 16
+                x = (cell % ATLAS_COLS) * ATLAS_CELL
+                y = (cell // ATLAS_COLS) * ATLAS_CELL
+                found_flags.append(atlas.crop((x, y, x + ATLAS_CELL, y + ATLAS_CELL)).convert("RGBA"))
+        except ValueError:
+            pass
+
+    if not found_flags:
         return None
-    ATLAS_CELL, ATLAS_COLS = 128, 16
-    candidates = []
-    try:
-        candidates.append(int(island.get("Flag", -1)))
-    except ValueError:
-        pass
-    for cell in candidates:
-        if cell >= 0:
-            x, y = (cell % ATLAS_COLS) * ATLAS_CELL, (cell // ATLAS_COLS) * ATLAS_CELL
-            return atlas.crop((x, y, x + ATLAS_CELL, y + ATLAS_CELL))
-    return None
+
+    # --- METHOD 1: MOUNT MULTIPLE FLAGS SIDE-BY-SIDE ON THE POLE ---
+    if len(found_flags) == 1:
+        return found_flags[0]
+    
+    # Resize flags to a clean uniform height, then place them side-by-side with a tiny 4px gap
+    target_h = 140
+    gap = 4
+    resized_flags = []
+    total_w = 0
+    
+    for f in found_flags:
+        fw, fh = f.size
+        new_w = max(40, int(target_h * (fw / fh)))
+        rf = f.resize((new_w, target_h), Image.LANCZOS)
+        resized_flags.append(rf)
+        total_w += new_w + gap
+
+    total_w -= gap # remove trailing gap
+    combined = Image.new("RGBA", (total_w, target_h), (0, 0, 0, 0))
+    
+    current_x = 0
+    for rf in resized_flags:
+        combined.paste(rf, (current_x, 0), rf)
+        current_x += rf.width + gap
+
+    return combined
 
 
 def main():
