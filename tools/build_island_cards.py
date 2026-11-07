@@ -10,8 +10,17 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-FONT_BOLD = os.environ.get("CARD_FONT_BOLD", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
-FONT_REGULAR = os.environ.get("CARD_FONT_REGULAR", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+
+FONT_DIR = Path(__file__).parent
+
+FONT_BOLD = os.environ.get(
+    "CARD_FONT_BOLD",
+    str(FONT_DIR / "one piece font.ttf"),
+)
+FONT_REGULAR = os.environ.get(
+    "CARD_FONT_REGULAR",
+    str(FONT_DIR / "one piece font.ttf"),
+)
 
 CARD_W, CARD_H = 900, 300
 BG = (30, 31, 34)
