@@ -45,6 +45,9 @@ jobs:
       - name: Build island cards (PNG)
         run: python tools/build_island_cards.py
 
+      - name: Build map regions
+        run: python tools/build_map_regions.py
+
       - name: Build island GIFs
         run: |
           if [ "${{ inputs.force }}" = "true" ]; then
