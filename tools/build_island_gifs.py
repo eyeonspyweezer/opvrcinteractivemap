@@ -207,10 +207,16 @@ def create_gif(flag_img: Image.Image, island_name: str, out_path: Path):
             text_max_w = CANVAS_W - text_left - PAD
             lbl = island_name.upper()
             font = fit_text(draw, lbl, FONT_PATH, max_width=text_max_w)
+            
+            # Precise optical bounding box
             bbox = draw.textbbox((0, 0), lbl, font=font)
-            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-            tx = text_left + max(0, (text_max_w - tw) // 2)
-            ty = (CANVAS_H - th) // 2 - 4
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+            
+            # True center calculation (subtracting top offset to remove font font-metric bias)
+            tx = text_left + (text_max_w - tw) // 2 - bbox[0]
+            ty = (CANVAS_H - th) // 2 - bbox[1]
+            
             draw_outlined_text(draw, (tx, ty), lbl, font)
 
         rgba_frames.append(frame)
