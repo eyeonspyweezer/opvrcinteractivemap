@@ -1,6 +1,3 @@
-# Put at: .github/workflows/sync-sheets.yml   (opvrcinteractivemap repo)
-# Copies the island pictures ("Visual" column) and the owner links out of the Google Sheets
-# into the repo, so they never expire. Runs every 6 hours and when you click Run workflow.
 name: Sync sheets
 
 on:
