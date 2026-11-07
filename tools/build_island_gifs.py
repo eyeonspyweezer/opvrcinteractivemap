@@ -145,7 +145,7 @@ def create_gif(flag_img: Image.Image, island_name: str, out_path: Path):
     bg_image = None
     base_slug = slug(island_name)
     
-    for ext in (".png", ".jpg", ".jpeg", ".webp"):
+    for ext in (".webp", ".png", ".jpg", ".jpeg"):
         bg_path = BG_DIR / f"{base_slug}{ext}"
         if bg_path.exists():
             try:
