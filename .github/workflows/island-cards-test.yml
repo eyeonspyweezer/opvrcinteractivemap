@@ -1,12 +1,3 @@
-# Put at: .github/workflows/island-cards-test.yml   (opvrcinteractivemap repo)
-# REPLACES the older file with the same name.
-# TEST ONLY - used by /islandtest. Delete this file when the test is approved or dropped.
-#
-# What it does:
-#   - runs by itself every 6 hours (45 minutes after the island data update), and when you click Run workflow
-#   - builds the PNG cards and the waving-flag GIFs
-#   - only rebuilds a GIF when its crew, flag or name changed (the first run builds all of them)
-#   - publishes everything to the bot-images-test branch (history wiped every run)
 name: Island cards and GIFs (test)
 
 on:
@@ -44,7 +35,7 @@ jobs:
 
       - run: pip install pillow
 
-      - name: Get the pictures from the last run (so only changes get rebuilt)
+      - name: Get the pictures from the last run (so only changes get rebuilt/archived)
         run: |
           git clone -q --depth 1 --branch bot-images-test \
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" botimg-test \
@@ -62,7 +53,7 @@ jobs:
             python tools/build_island_gifs.py
           fi
 
-      - name: Publish (one commit, history wiped every run)
+      - name: Publish (saves current and archive folders)
         run: |
           cd botimg-test
           git init -q -b bot-images-test
