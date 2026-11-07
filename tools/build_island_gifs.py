@@ -158,8 +158,6 @@ def create_gif(flag_img: Image.Image, island_name: str, out_path: Path):
             except Exception as e:
                 print(f"Warning: Failed to load background {bg_path}: {e}")
                 break
-            except Exception as e:
-                print(f"Warning loading background {bg_path}: {e}")
 
     flag = prepare_flag(raw, max_w=FLAG_AREA_W - 20, max_h=CANVAS_H - 28)
     rgba_frames = []
