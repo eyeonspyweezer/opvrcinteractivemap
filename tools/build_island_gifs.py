@@ -27,19 +27,28 @@ WAVE_LENGTH = 0.55
 FLAG_AREA_W = 260
 PAD = 28
 
-FONT_PATH = Path(__file__).parent / "one piece font.ttf"
+# --- DEBUG FONT LOADER ---
+ROOT_DIR = Path(__file__).parent.parent
+FONT_PATH = ROOT_DIR / "one piece font.ttf"  # Update this string if your filename uses hyphens instead of spaces (e.g. "one-piece-font.ttf")
 FALLBACK_FONT = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+
+print(f"DEBUG: Looking for custom font at: {FONT_PATH.absolute()}")
+if FONT_PATH.exists():
+    print(f"SUCCESS: Found custom font! File size: {FONT_PATH.stat().st_size} bytes")
+else:
+    print(f"ERROR: Custom font NOT found at {FONT_PATH.absolute()}")
+    print("Files currently in root folder:")
+    for f in ROOT_DIR.iterdir():
+        print(f" - {f.name}")
 
 if not FONT_PATH.exists():
     if FALLBACK_FONT.exists():
+        print("Falling back to system font.")
         FONT_PATH = FALLBACK_FONT
     else:
-        raise FileNotFoundError(
-            f"Font not found: {FONT_PATH} (fallback {FALLBACK_FONT} also missing)"
-        )
+        raise FileNotFoundError(f"Custom font not found at {FONT_PATH} and fallback is missing!")
 
-USING_ONE_PIECE_FONT = FONT_PATH.name == "one piece font.ttf"
-
+USING_CUSTOM_FONT = FONT_PATH.name in ("one piece font.ttf", "one-piece-font.ttf")
 
 
 OUT_ROOT = Path("botimg-test/islandgifs")
