@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
 tools/build_map_regions.py
-Splits the full map image into 6 region images:
-- 2 Top Regions (Left/Right)
-- 2 Middle Regions (Left/Right) - Exactly 105px tall & vertically centered
-- 2 Bottom Regions (Left/Right)
+--------------------------
+Splits the full map image (map.png) into 6 region images for the /map command.
 """
 
 from pathlib import Path
 from PIL import Image
 
-MAP_IMAGE_PATH = Path("map.png")  # Path to your master map image
+MAP_IMAGE_PATH = Path("map.png")
 OUT_DIR = Path("botimg-test/regions")
 
 def generate_regions():
@@ -29,14 +27,14 @@ def generate_regions():
     # --- Horizontal Math ---
     mid_x = int(W / 2)
 
-    # 6 Region Coordinates (left, upper, right, lower)
+    # Coordinates match your Cloudflare Worker Region IDs perfectly
     regions = {
-        "top-left":     (0,     0,          mid_x, mid_top),
-        "top-right":    (mid_x, 0,          W,     mid_top),
-        "mid-left":     (0,     mid_top,    mid_x, mid_bottom),
-        "mid-right":    (mid_x, mid_top,    W,     mid_bottom),
-        "bot-left":     (0,     mid_bottom, mid_x, H),
-        "bot-right":    (mid_x, mid_bottom, W,     H),
+        "nblue":    (0,     0,          mid_x, mid_top),     # North Blue (Top-Left)
+        "eblue":    (mid_x, 0,          W,     mid_top),     # East Blue (Top-Right)
+        "paradise": (0,     mid_top,    mid_x, mid_bottom),  # Paradise (Mid-Left)
+        "newworld": (mid_x, mid_top,    W,     mid_bottom),  # New World (Mid-Right)
+        "wblue":    (0,     mid_bottom, mid_x, H),          # West Blue (Bot-Left)
+        "sblue":    (mid_x, mid_bottom, W,     H),          # South Blue (Bot-Right)
     }
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
