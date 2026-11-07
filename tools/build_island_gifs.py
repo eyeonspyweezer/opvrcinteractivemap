@@ -2,20 +2,8 @@
 """
 tools/build_island_gifs.py
 --------------------------
-Waving-flag island cards for /islandtest.
-
-Layout:
-  [ waving flag LEFT ]  |  [ large island name RIGHT ]
-
-Output:
-  botimg-test/islandgifs/
-    current/<crew-slug>/<island-slug>.gif
-    archive/YYYY-MM/<crew>__<island>__YYYY-MM-DD.gif
-
-Run from repo root:
-  python tools/build_island_gifs.py
-  python tools/build_island_gifs.py --only marineford
-  python tools/build_island_gifs.py --force
+Waving-flag island cards with optional custom island backgrounds.
+Archives old versions to preserve map history when ownership or flags change.
 """
 
 from __future__ import annotations
@@ -26,19 +14,16 @@ import hashlib
 import json
 import math
 import shutil
-from collections import Counter
 from datetime import date
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-# ───────────── settings ─────────────
 CANVAS_W, CANVAS_H = 720, 180
 FRAMES = 24
 DURATION_MS = 70
 WAVE_AMPLITUDE = 9.0
 WAVE_LENGTH = 0.55
-WORK_MAX = 380
 FLAG_AREA_W = 260
 PAD = 28
 
@@ -46,11 +31,13 @@ FONT_PATH = Path("PlayfairDisplay-Bold.ttf")
 FALLBACK_FONT = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 if not FONT_PATH.exists() and FALLBACK_FONT.exists():
     FONT_PATH = FALLBACK_FONT
-USING_PLAYFAIR = FONT_PATH.name == "PlayfairDisplay-Bold.ttf"   # this font only has A-Z and 0-9
+USING_PLAYFAIR = FONT_PATH.name == "PlayfairDisplay-Bold.ttf"
+
 OUT_ROOT = Path("botimg-test/islandgifs")
 CURRENT = OUT_ROOT / "current"
 ARCHIVE = OUT_ROOT / "archive"
-MANIFEST = OUT_ROOT / "manifest.json"   # remembers crew + flag of each island, so only changes get rebuilt
+BG_DIR = Path("island-backgrounds")
+MANIFEST = OUT_ROOT / "manifest.json"
 
 
 def slug(s: str) -> str:
@@ -67,15 +54,9 @@ def sample_bg_color(img: Image.Image) -> tuple[int, int, int]:
             p = img.getpixel((x, y))
             if p[3] > 180:
                 samples.append(p[:3])
-    for y in range(0, h, max(1, h // 30)):
-        for x in list(range(0, border)) + list(range(w - border, w)):
-            p = img.getpixel((x, y))
-            if p[3] > 180:
-                samples.append(p[:3])
     if not samples:
         return (28, 30, 34)
-    most, count = Counter(samples).most_common(1)[0]
-    return most if count / len(samples) >= 0.35 else (28, 30, 34)
+    return max(set(samples), key=samples.count)
 
 
 def prepare_flag(flag: Image.Image, max_w: int, max_h: int) -> Image.Image:
@@ -86,14 +67,11 @@ def prepare_flag(flag: Image.Image, max_w: int, max_h: int) -> Image.Image:
 
 
 def wave_offset(u: float, v: float, phase: float) -> tuple[float, float]:
-    """Realistic left-anchored cloth wave."""
     edge = u ** 1.25
     weight = max(0.12, edge)
     dx = math.sin(phase + u * (2.2 * WAVE_LENGTH) + v * 1.1) * WAVE_AMPLITUDE * weight
     dx += math.sin(phase * 1.6 + u * (4.0 * WAVE_LENGTH) + v * 2.4) * (WAVE_AMPLITUDE * 0.28 * weight)
-    dx += math.sin(phase * 2.3 + u * 6.5 + v * 3.5) * (WAVE_AMPLITUDE * 0.12 * weight)
     dy = math.sin(phase * 0.85 + u * 1.6 + v * 2.8) * (WAVE_AMPLITUDE * 0.32 * weight)
-    dy += math.sin(phase * 1.4 + u * 3.2 + v * 1.5) * (WAVE_AMPLITUDE * 0.12 * weight)
     return dx, dy
 
 
@@ -135,6 +113,7 @@ def fit_text(draw, text, font_path, max_width, start=72, minimum=24):
 
 
 def archive_if_exists(dest: Path, crew_slug: str, island_slug: str):
+    """Moves existing GIF into the archive folder to preserve map history."""
     if not dest.exists():
         return
     month = date.today().strftime("%Y-%m")
@@ -147,71 +126,63 @@ def archive_if_exists(dest: Path, crew_slug: str, island_slug: str):
         target = arch_dir / f"{crew_slug}__{island_slug}__{day}_{n}.gif"
         n += 1
     shutil.move(str(dest), str(target))
-    print(f"    archived → {target}")
-
-
-def label_text(name: str) -> str:
-    text = name.upper()
-    if USING_PLAYFAIR:
-        text = "".join(c for c in text if c.isascii() and (c.isalnum() or c == " "))
-    return " ".join(text.split())
+    print(f"    archived old map state → {target}")
 
 
 def create_gif(flag_img: Image.Image, island_name: str, out_path: Path):
-    island_name = label_text(island_name)
     raw = flag_img.convert("RGBA")
-    bg_rgb = sample_bg_color(raw)
-    flag = prepare_flag(raw, max_w=FLAG_AREA_W - 20, max_h=CANVAS_H - 28)
+    
+    # Check if a custom background exists from sync_sheets.py
+    bg_path = BG_DIR / f"{slug(island_name)}.jpg"
+    bg_image = None
+    if bg_path.exists():
+        bg_image = Image.open(bg_path).convert("RGBA").resize((CANVAS_W, CANVAS_H), Image.LANCZOS)
+        # Darken slightly for readability
+        dark = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 110))
+        bg_image = Image.alpha_composite(bg_image, dark)
 
+    flag = prepare_flag(raw, max_w=FLAG_AREA_W - 20, max_h=CANVAS_H - 28)
     rgba_frames = []
+
     for i in range(FRAMES):
         phase = (i / FRAMES) * 2 * math.pi
-
-        card_bg = (
-            max(18, min(50, bg_rgb[0] // 5 + 22)),
-            max(18, min(50, bg_rgb[1] // 5 + 22)),
-            max(20, min(55, bg_rgb[2] // 5 + 26)),
-        )
-        frame = Image.new("RGBA", (CANVAS_W, CANVAS_H), (*card_bg, 255))
+        if bg_image:
+            frame = bg_image.copy()
+        else:
+            bg_rgb = sample_bg_color(raw)
+            card_bg = (max(18, min(50, bg_rgb[0] // 5 + 22)), max(18, min(50, bg_rgb[1] // 5 + 22)), max(20, min(55, bg_rgb[2] // 5 + 26)))
+            frame = Image.new("RGBA", (CANVAS_W, CANVAS_H), (*card_bg, 255))
+        
         draw = ImageDraw.Draw(frame)
-
-        accent = tuple(min(255, c + 40) for c in bg_rgb) if sum(bg_rgb) > 80 else (90, 110, 180)
-        draw.rectangle([0, 0, 10, CANVAS_H], fill=accent)
-
         waved = make_waved_flag(flag, phase)
-        fx = PAD + 6
-        fy = (CANVAS_H - waved.height) // 2
+        fx, fy = PAD + 6, (CANVAS_H - waved.height) // 2
         frame.paste(waved, (fx, fy), waved)
 
         div_x = fx + waved.width + 18
-        draw.line([(div_x, 24), (div_x, CANVAS_H - 24)], fill=(70, 74, 82), width=2)
+        draw.line([(div_x, 24), (div_x, CANVAS_H - 24)], fill=(200, 200, 200, 150), width=2)
 
-        if island_name and FONT_PATH.exists():
+        if FONT_PATH.exists():
             text_left = div_x + 22
             text_max_w = CANVAS_W - text_left - PAD
-            font = fit_text(draw, island_name, FONT_PATH, max_width=text_max_w)
-            bbox = draw.textbbox((0, 0), island_name, font=font)
+            lbl = island_name.upper()
+            font = fit_text(draw, lbl, FONT_PATH, max_width=text_max_w)
+            bbox = draw.textbbox((0, 0), lbl, font=font)
             tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
             tx = text_left + max(0, (text_max_w - tw) // 2)
             ty = (CANVAS_H - th) // 2 - 4
-            draw_outlined_text(draw, (tx, ty), island_name, font)
+            draw_outlined_text(draw, (tx, ty), lbl, font)
 
         rgba_frames.append(frame)
 
-    rgba_frames.append(rgba_frames[0].copy())  # perfect loop
-
+    rgba_frames.append(rgba_frames[0].copy())
     palette_src = Image.new("RGBA", (CANVAS_W, CANVAS_H * 2))
     palette_src.paste(rgba_frames[0], (0, 0))
     palette_src.paste(rgba_frames[FRAMES // 2], (0, CANVAS_H))
     palette_src = palette_src.convert("RGB").quantize(colors=256)
 
     quantized = [fr.convert("RGB").quantize(palette=palette_src, dither=Image.Dither.NONE) for fr in rgba_frames]
-
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    quantized[0].save(
-        out_path, save_all=True, append_images=quantized[1:],
-        duration=DURATION_MS, loop=0, optimize=True, disposal=2,
-    )
+    quantized[0].save(out_path, save_all=True, append_images=quantized[1:], duration=DURATION_MS, loop=0, optimize=True, disposal=2)
 
 
 def read_tsv(path: Path) -> list[dict]:
@@ -220,20 +191,15 @@ def read_tsv(path: Path) -> list[dict]:
     return list(csv.DictReader(path.open(encoding="utf-8"), delimiter="\t"))
 
 
-def load_flag_for_island(island: dict, groups: dict, atlas: Image.Image | None,
-                         crew_flag_dirs: list) -> Image.Image | None:
+def load_flag_for_island(island: dict, groups: dict, atlas: Image.Image | None, crew_flag_dirs: list) -> Image.Image | None:
     for key in ("Group1", "Group2", "Group3"):
-        gid = island.get(key, "")
-        g = groups.get(gid)
+        g = groups.get(island.get(key, ""))
         if not g:
             continue
         name = g.get("Group", "")
         for folder in crew_flag_dirs:
             for ext in (".webp", ".png", ".jpg", ".gif"):
-                for candidate in (
-                    folder / f"{slug(name)}{ext}",
-                    folder / f"{name.lower().replace(' ', '')}{ext}",
-                ):
+                for candidate in (folder / f"{slug(name)}{ext}", folder / f"{name.lower().replace(' ', '')}{ext}"):
                     if candidate.exists():
                         return Image.open(candidate)
 
@@ -245,17 +211,9 @@ def load_flag_for_island(island: dict, groups: dict, atlas: Image.Image | None,
         candidates.append(int(island.get("Flag", -1)))
     except ValueError:
         pass
-    for key in ("Group1", "Group2", "Group3"):
-        g = groups.get(island.get(key, ""))
-        if g:
-            try:
-                candidates.append(int(g.get("Flag", -1)))
-            except ValueError:
-                pass
     for cell in candidates:
         if cell >= 0:
-            x = (cell % ATLAS_COLS) * ATLAS_CELL
-            y = (cell // ATLAS_COLS) * ATLAS_CELL
+            x, y = (cell % ATLAS_COLS) * ATLAS_CELL, (cell // ATLAS_COLS) * ATLAS_CELL
             return atlas.crop((x, y, x + ATLAS_CELL, y + ATLAS_CELL))
     return None
 
@@ -266,13 +224,10 @@ def main():
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
-    if not FONT_PATH.exists():
-        print(f"WARNING: font not found at {FONT_PATH}")
-
     islands = read_tsv(Path("island-colors.tsv"))
     groups = {g["ID"]: g for g in read_tsv(Path("island-groups.tsv"))}
     atlas = Image.open("island-flags.png").convert("RGBA") if Path("island-flags.png").exists() else None
-    crew_flag_dirs = [Path("crew-flags"), Path("crewflags")]
+    crew_flag_dirs = [Path("crewflags"), Path("crew-flags")]
 
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
     made = 0
@@ -294,26 +249,25 @@ def main():
 
         flag = load_flag_for_island(isl, groups, atlas, crew_flag_dirs)
         if flag is None:
-            print(f"  skip {name} – no flag")
             continue
 
-        # Rebuild only when the crew, the flag or the name changed (or --force)
         sig = hashlib.sha1((name + "|" + crew_s).encode() + flag.convert("RGBA").tobytes()).hexdigest()[:20]
         old = manifest.get(island_s)
         if old and old.get("sig") == sig and dest.exists() and not args.force:
             continue
 
-        if old and old.get("crew") != crew_s:           # new owner: the old crew's picture is out of date
+        if old and old.get("crew") != crew_s:
             archive_if_exists(CURRENT / old["crew"] / f"{island_s}.gif", old["crew"], island_s)
         archive_if_exists(dest, crew_s, island_s)
-        print(f"  building {crew_s}/{island_s}.gif  ({name})")
+        
+        print(f"  building {crew_s}/{island_s}.gif")
         create_gif(flag, name, dest)
         manifest[island_s] = {"crew": crew_s, "sig": sig}
         made += 1
 
     OUT_ROOT.mkdir(parents=True, exist_ok=True)
     MANIFEST.write_text(json.dumps(manifest, indent=1, sort_keys=True))
-    print(f"\nDone – {made} GIF(s) under {CURRENT}")
+    print(f"\nDone – {made} GIF(s) processed in {CURRENT}")
 
 
 if __name__ == "__main__":
