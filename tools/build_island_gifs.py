@@ -30,10 +30,16 @@ PAD = 28
 FONT_PATH = Path(__file__).parent / "one piece font.ttf"
 FALLBACK_FONT = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
 
-if not FONT_PATH.exists() and FALLBACK_FONT.exists():
-    FONT_PATH = FALLBACK_FONT
+if not FONT_PATH.exists():
+    if FALLBACK_FONT.exists():
+        FONT_PATH = FALLBACK_FONT
+    else:
+        raise FileNotFoundError(
+            f"Font not found: {FONT_PATH} (fallback {FALLBACK_FONT} also missing)"
+        )
 
-USING_PLAYFAIR = FONT_PATH.name == "one piece font.ttf"
+USING_ONE_PIECE_FONT = FONT_PATH.name == "one piece font.ttf"
+
 
 
 OUT_ROOT = Path("botimg-test/islandgifs")
