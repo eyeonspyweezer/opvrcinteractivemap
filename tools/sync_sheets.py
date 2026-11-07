@@ -2,18 +2,9 @@
 """
 tools/sync_sheets.py
 --------------------
-Copies things out of the two Google Sheets into the repo, so they never expire and
-keep working even if the sheets change or disappear.
-
-1) Island sheet (127a13...), column "Visual"  ->  island-backgrounds/<island-name>.jpg
-   - one picture per island, named after the island
-   - a picture is only downloaded again when its link changed (island-backgrounds/manifest.json)
-   - if a link has expired but the picture is already saved, the saved one is kept
-
-2) Owner sheet (17N7e8...), columns "Owner(s)", "Profile Link", "Discord ID"  ->  owner-links.tsv
-   - the Discord bot uses it to show owner names as clickable links
-
-Run from the repo root:   python tools/sync_sheets.py
+Copies background pictures and owner links from Google Sheets into the repo.
+1) Island pictures ("Visual" column) -> island-backgrounds/<island-name>.jpg
+2) Owner info ("Owner(s)", "Profile Link", "Discord ID") -> owner-links.tsv
 """
 
 import csv
@@ -22,7 +13,6 @@ import json
 import re
 import urllib.request
 from pathlib import Path
-
 from PIL import Image
 
 ISLAND_SHEET = "127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE"
@@ -67,8 +57,6 @@ def fetch_tsv(sheet_id):
     return list(csv.reader(io.StringIO(text), delimiter="\t"))
 
 
-# ---------- 1) island pictures ----------
-
 def sync_backgrounds():
     rows = fetch_tsv(ISLAND_SHEET)
     manifest = json.loads(BG_MANIFEST.read_text()) if BG_MANIFEST.exists() else {}
@@ -78,7 +66,7 @@ def sync_backgrounds():
     for row in rows:
         cells = [c.strip() for c in row]
         low = [c.lower() for c in cells]
-        if "visual" in low:                       # a header row (the sheet can have several)
+        if "visual" in low:
             vis_col = low.index("visual")
             name_col = next((i for i, c in enumerate(low) if c in NAME_HEADERS), 0)
             continue
@@ -107,10 +95,10 @@ def sync_backgrounds():
             img.save(BG_DIR / fname, "JPEG", quality=82, optimize=True)
             manifest[key] = {"name": name, "url": base, "file": fname}
             saved += 1
-            print(f"  saved  {fname}")
+            print(f"  saved background: {fname}")
         except Exception as e:
             failed += 1
-            kept = " (kept the saved picture)" if entry and (BG_DIR / entry["file"]).exists() else ""
+            kept = " (kept existing picture)" if entry and (BG_DIR / entry["file"]).exists() else ""
             print(f"  FAILED {name}: {e}{kept}")
 
     if manifest:
@@ -119,8 +107,6 @@ def sync_backgrounds():
     print(f"Island pictures: {saved} saved, {skipped} already saved, {failed} failed")
 
 
-# ---------- 2) owner links ----------
-
 def sync_owner_links():
     rows = fetch_tsv(OWNER_SHEET)
     cols = None
@@ -128,7 +114,7 @@ def sync_owner_links():
 
     for row in rows:
         low = [c.strip().lower() for c in row]
-        if "profile link" in low or "discord id" in low:      # header row
+        if "profile link" in low or "discord id" in low:
             cols = {
                 "owner": next((i for i, c in enumerate(low) if c in OWNER_HEADERS), 0),
                 "link": low.index("profile link") if "profile link" in low else None,
@@ -171,7 +157,7 @@ def main():
     for step in (sync_backgrounds, sync_owner_links):
         try:
             step()
-        except Exception as e:                 # one sheet failing must not stop the other
+        except Exception as e:
             print(f"{step.__name__} failed: {e}")
 
 
