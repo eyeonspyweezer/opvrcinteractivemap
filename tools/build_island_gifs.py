@@ -147,89 +147,135 @@ def archive_if_exists(dest: Path, crew_slug: str, island_slug: str):
     print(f"    archived old map state → {target}")
 
 
-def create_gif(flag_img: Image.Image, island_name: str, out_path: Path):
-    raw = flag_img.convert("RGBA")
-    
-    # Check if a custom background exists (.png, .jpg, .jpeg, or .webp)
+def create_gif(flag_imgs: list[Image.Image], island_name: str, out_path: Path):
+    raw_flags = [f.convert("RGBA") for f in flag_imgs]
+    flag_count = len(raw_flags)
+
+    # Reserve a separate space for every organization's flag.
+    flag_gap = 8
+    flag_region_width = FLAG_AREA_W + 26
+    slot_width = (flag_region_width - flag_gap * (flag_count - 1)) // flag_count
+
+    flags = [
+        prepare_flag(
+            f,
+            max_w=max(1, slot_width - 26),
+            max_h=CANVAS_H - 28
+        )
+        for f in raw_flags
+    ]
+
+    # Check if a custom background exists.
     bg_image = None
     base_slug = slug(island_name)
-    
+
     for ext in (".webp", ".png", ".jpg", ".jpeg"):
         bg_path = BG_DIR / f"{base_slug}{ext}"
         if bg_path.exists():
             try:
                 bg = Image.open(bg_path).convert("RGBA")
-                
-                # --- PROPORTIONAL CROP & FIT (Prevents Stretching) ---
+
                 img_w, img_h = bg.size
-                target_w, target_h = CANVAS_W, CANVAS_H
-                
-                # Calculate scale to cover the whole box without distorting
-                scale = max(target_w / img_w, target_h / img_h)
+                scale = max(CANVAS_W / img_w, CANVAS_H / img_h)
                 new_w, new_h = int(img_w * scale), int(img_h * scale)
                 bg = bg.resize((new_w, new_h), Image.LANCZOS)
-                
-                # Crop the center if it overflows
-                left = (new_w - target_w) // 2
-                top = (new_h - target_h) // 2
-                bg_image = bg.crop((left, top, left + target_w, top + target_h))
-                
-                # Darken slightly for readability
-                dark = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 110))
+
+                left = (new_w - CANVAS_W) // 2
+                top = (new_h - CANVAS_H) // 2
+                bg_image = bg.crop(
+                    (left, top, left + CANVAS_W, top + CANVAS_H)
+                )
+
+                dark = Image.new(
+                    "RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 110)
+                )
                 bg_image = Image.alpha_composite(bg_image, dark)
                 break
             except Exception as e:
                 print(f"Warning: Failed to load background {bg_path}: {e}")
                 break
 
-    flag = prepare_flag(raw, max_w=FLAG_AREA_W - 20, max_h=CANVAS_H - 28)
     rgba_frames = []
 
     for i in range(FRAMES):
         phase = (i / FRAMES) * 2 * math.pi
+
         if bg_image:
             frame = bg_image.copy()
         else:
-            bg_rgb = sample_bg_color(raw)
-            card_bg = (max(18, min(50, bg_rgb[0] // 5 + 22)), max(18, min(50, bg_rgb[1] // 5 + 22)), max(20, min(55, bg_rgb[2] // 5 + 26)))
-            frame = Image.new("RGBA", (CANVAS_W, CANVAS_H), (*card_bg, 255))
-        
-        draw = ImageDraw.Draw(frame)
-        waved = make_waved_flag(flag, phase)
-        fx, fy = PAD + 6, (CANVAS_H - waved.height) // 2
-        frame.paste(waved, (fx, fy), waved)
+            bg_rgb = sample_bg_color(raw_flags[0])
+            card_bg = (
+                max(18, min(50, bg_rgb[0] // 5 + 22)),
+                max(18, min(50, bg_rgb[1] // 5 + 22)),
+                max(20, min(55, bg_rgb[2] // 5 + 26))
+            )
+            frame = Image.new(
+                "RGBA", (CANVAS_W, CANVAS_H), (*card_bg, 255)
+            )
 
-        div_x = fx + waved.width + 18
-        draw.line([(div_x, 24), (div_x, CANVAS_H - 24)], fill=(200, 200, 200, 150), width=2)
+        draw = ImageDraw.Draw(frame)
+
+        fx = PAD + 6
+
+        # Animate every flag independently.
+        for flag_index, flag in enumerate(flags):
+            waved = make_waved_flag(flag, phase)
+
+            slot_x = fx + flag_index * (slot_width + flag_gap)
+            flag_x = slot_x + (slot_width - waved.width) // 2
+            flag_y = (CANVAS_H - waved.height) // 2
+
+            frame.paste(waved, (flag_x, flag_y), waved)
+
+        div_x = fx + flag_region_width + 18
+        draw.line(
+            [(div_x, 24), (div_x, CANVAS_H - 24)],
+            fill=(200, 200, 200, 150),
+            width=2
+        )
 
         if FONT_PATH.exists():
             text_left = div_x + 22
             text_max_w = CANVAS_W - text_left - PAD
             lbl = island_name.upper()
             font = fit_text(draw, lbl, FONT_PATH, max_width=text_max_w)
-            
-            # Precise optical bounding box
+
             bbox = draw.textbbox((0, 0), lbl, font=font)
             tw = bbox[2] - bbox[0]
             th = bbox[3] - bbox[1]
-            
-            # True center calculation (subtracting top offset to remove font font-metric bias)
+
             tx = text_left + (text_max_w - tw) // 2 - bbox[0]
             ty = (CANVAS_H - th) // 2 - bbox[1]
-            
+
             draw_outlined_text(draw, (tx, ty), lbl, font)
 
         rgba_frames.append(frame)
 
     rgba_frames.append(rgba_frames[0].copy())
+
     palette_src = Image.new("RGBA", (CANVAS_W, CANVAS_H * 2))
     palette_src.paste(rgba_frames[0], (0, 0))
     palette_src.paste(rgba_frames[FRAMES // 2], (0, CANVAS_H))
     palette_src = palette_src.convert("RGB").quantize(colors=256)
 
-    quantized = [fr.convert("RGB").quantize(palette=palette_src, dither=Image.Dither.NONE) for fr in rgba_frames]
+    quantized = [
+        fr.convert("RGB").quantize(
+            palette=palette_src,
+            dither=Image.Dither.NONE
+        )
+        for fr in rgba_frames
+    ]
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    quantized[0].save(out_path, save_all=True, append_images=quantized[1:], duration=DURATION_MS, loop=0, optimize=True, disposal=2)
+    quantized[0].save(
+        out_path,
+        save_all=True,
+        append_images=quantized[1:],
+        duration=DURATION_MS,
+        loop=0,
+        optimize=True,
+        disposal=2
+    )
 
 
 def read_tsv(path: Path) -> list[dict]:
@@ -238,23 +284,36 @@ def read_tsv(path: Path) -> list[dict]:
     return list(csv.DictReader(path.open(encoding="utf-8"), delimiter="\t"))
 
 
-def load_flag_for_island(island: dict, groups: dict, atlas: Image.Image | None, crew_flag_dirs: list) -> Image.Image | None:
-    # Gather all valid group IDs for this island
-    g_ids = [island.get(k) for k in ("Group1", "Group2", "Group3") if island.get(k) and island.get(k) != "0"]
-    
+def load_flag_for_island(
+    island: dict,
+    groups: dict,
+    atlas: Image.Image | None,
+    crew_flag_dirs: list
+) -> list[Image.Image]:
+
+    g_ids = [
+        island.get(k)
+        for k in ("Group1", "Group2", "Group3")
+        if island.get(k) and island.get(k) != "0"
+    ]
+
     found_flags = []
-    
+
     for gid in g_ids:
         g = groups.get(gid)
         if not g:
             continue
+
         name = g.get("Group", "")
         flag_img = None
-        
-        # 1. Check custom crew flag folder
+
+        # Check custom crew flag folder.
         for folder in crew_flag_dirs:
             for ext in (".webp", ".png", ".jpg", ".gif"):
-                for candidate in (folder / f"{slug(name)}{ext}", folder / f"{name.lower().replace(' ', '')}{ext}"):
+                for candidate in (
+                    folder / f"{slug(name)}{ext}",
+                    folder / f"{name.lower().replace(' ', '')}{ext}"
+                ):
                     if candidate.exists():
                         flag_img = Image.open(candidate).convert("RGBA")
                         break
@@ -262,8 +321,8 @@ def load_flag_for_island(island: dict, groups: dict, atlas: Image.Image | None, 
                     break
             if flag_img:
                 break
-                
-        # 2. Fallback to Atlas if no custom file exists
+
+        # Fall back to atlas.
         if flag_img is None and atlas is not None:
             try:
                 cell = int(g.get("Flag", -1))
@@ -271,14 +330,16 @@ def load_flag_for_island(island: dict, groups: dict, atlas: Image.Image | None, 
                     ATLAS_CELL, ATLAS_COLS = 128, 16
                     x = (cell % ATLAS_COLS) * ATLAS_CELL
                     y = (cell // ATLAS_COLS) * ATLAS_CELL
-                    flag_img = atlas.crop((x, y, x + ATLAS_CELL, y + ATLAS_CELL)).convert("RGBA")
-            except ValueError:
+                    flag_img = atlas.crop(
+                        (x, y, x + ATLAS_CELL, y + ATLAS_CELL)
+                    ).convert("RGBA")
+            except (ValueError, TypeError):
                 pass
-                
+
         if flag_img:
             found_flags.append(flag_img)
 
-    # If no group flags, check direct island flag
+    # Use the island's own flag only if no organization flags were found.
     if not found_flags and atlas is not None:
         try:
             cell = int(island.get("Flag", -1))
@@ -286,39 +347,15 @@ def load_flag_for_island(island: dict, groups: dict, atlas: Image.Image | None, 
                 ATLAS_CELL, ATLAS_COLS = 128, 16
                 x = (cell % ATLAS_COLS) * ATLAS_CELL
                 y = (cell // ATLAS_COLS) * ATLAS_CELL
-                found_flags.append(atlas.crop((x, y, x + ATLAS_CELL, y + ATLAS_CELL)).convert("RGBA"))
-        except ValueError:
+                found_flags.append(
+                    atlas.crop(
+                        (x, y, x + ATLAS_CELL, y + ATLAS_CELL)
+                    ).convert("RGBA")
+                )
+        except (ValueError, TypeError):
             pass
 
-    if not found_flags:
-        return None
-
-    # --- METHOD 1: MOUNT MULTIPLE FLAGS SIDE-BY-SIDE ON THE POLE ---
-    if len(found_flags) == 1:
-        return found_flags[0]
-    
-    # Resize flags to a clean uniform height, then place them side-by-side with a tiny 4px gap
-    target_h = 140
-    gap = 4
-    resized_flags = []
-    total_w = 0
-    
-    for f in found_flags:
-        fw, fh = f.size
-        new_w = max(40, int(target_h * (fw / fh)))
-        rf = f.resize((new_w, target_h), Image.LANCZOS)
-        resized_flags.append(rf)
-        total_w += new_w + gap
-
-    total_w -= gap # remove trailing gap
-    combined = Image.new("RGBA", (total_w, target_h), (0, 0, 0, 0))
-    
-    current_x = 0
-    for rf in resized_flags:
-        combined.paste(rf, (current_x, 0), rf)
-        current_x += rf.width + gap
-
-    return combined
+    return found_flags
 
 
 def main():
@@ -350,11 +387,18 @@ def main():
         crew_s, island_s = slug(crew_name), slug(name)
         dest = CURRENT / crew_s / f"{island_s}.gif"
 
-        flag = load_flag_for_island(isl, groups, atlas, crew_flag_dirs)
-        if flag is None:
+        flags = load_flag_for_island(isl, groups, atlas, crew_flag_dirs)
+        if not flags:
             continue
-
-        sig = hashlib.sha1((name + "|" + crew_s).encode() + flag.convert("RGBA").tobytes()).hexdigest()[:20]
+        
+        flag_data = b"".join(
+            str(f.size).encode() + b":" + f.convert("RGBA").tobytes()
+            for f in flags
+        )
+        
+        sig = hashlib.sha1(
+            (name + "|" + crew_s).encode() + flag_data
+        ).hexdigest()[:20]
         old = manifest.get(island_s)
         if old and old.get("sig") == sig and dest.exists() and not args.force:
             continue
@@ -364,7 +408,7 @@ def main():
         archive_if_exists(dest, crew_s, island_s)
         
         print(f"  building {crew_s}/{island_s}.gif")
-        create_gif(flag, name, dest)
+        create_gif(flags, name, dest)
         manifest[island_s] = {"crew": crew_s, "sig": sig}
         made += 1
 
