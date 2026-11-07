@@ -1,0 +1,202 @@
+{
+ "alabasta": {
+  "file": "alabasta.jpg",
+  "name": "Alabasta",
+  "url": "https://static1.cbrimages.com/wordpress/wp-content/uploads/2019/10/Alabasta-Cropped.jpg"
+ },
+ "amazonlily": {
+  "file": "amazon-lily.jpg",
+  "name": "Amazon Lily",
+  "url": "https://static.wikia.nocookie.net/onepiecegreek/images/8/88/Amazon_Lily_Infobox.png/revision/latest"
+ },
+ "ballywood": {
+  "file": "ballywood.jpg",
+  "name": "Ballywood",
+  "url": "https://monovisions.com/wp-content/uploads/2017/08/vintage-washington-dc-in-the-mid-19th-century-1840s-1960s-10.jpg"
+ },
+ "baratie": {
+  "file": "baratie.jpg",
+  "name": "Baratie",
+  "url": "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/4862cebc-a29e-43c8-a9df-5b0889d30ed4/dhc15wo-26000df0-5f2d-4f15-8d3a-462d2502b1ae.png"
+ },
+ "birka": {
+  "file": "birka.jpg",
+  "name": "Birka",
+  "url": "https://api.duniagames.co.id/api/content/upload/file/6518012581564481884.jpg"
+ },
+ "cactus": {
+  "file": "cactus.jpg",
+  "name": "Cactus",
+  "url": "https://www.themarysue.com/wp-content/uploads/2024/08/Whiskey-Town-One-Piece.jpg"
+ },
+ "conomiislands": {
+  "file": "conomi-islands.jpg",
+  "name": "Conomi Islands",
+  "url": "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/i/238264eb-7dc6-4916-a142-3b558473da6c/df0wuch-b11547d9-4ac0-48d1-a5c2-d0118a3059d1.jpg"
+ },
+ "dawn": {
+  "file": "dawn.jpg",
+  "name": "Dawn",
+  "url": "https://static1.cbrimages.com/wordpress/wp-content/uploads/2019/10/Dawn-island-Cropped.jpg"
+ },
+ "dressrosa": {
+  "file": "dressrosa.jpg",
+  "name": "Dressrosa",
+  "url": "https://www.dexerto.com/cdn-cgi/image/width=3840,quality=75,format=auto/https://editors.dexerto.com/wp-content/uploads/2023/04/18/dressrosa-kingdom-in-one-piece.jpeg"
+ },
+ "drumisland": {
+  "file": "drum-island.jpg",
+  "name": "Drum Island",
+  "url": "https://i.pinimg.com/736x/f7/63/96/f76396ae8946eeee5c5e66cc50fc0dbb.jpg"
+ },
+ "egghead": {
+  "file": "egghead.jpg",
+  "name": "Egghead",
+  "url": "https://static1.srcdn.com/wordpress/wp-content/uploads/2024/01/luffy-dives-into-egghead-island-in-one-piece.jpg"
+ },
+ "fishmanisland": {
+  "file": "fishman-island.jpg",
+  "name": "Fishman Island",
+  "url": "https://static0.gamerantimages.com/wordpress/wp-content/uploads/2025/07/screenshot-2025-07-29-at-15-52-42-cropped.png"
+ },
+ "geckoislands": {
+  "file": "gecko-islands.jpg",
+  "name": "Gecko Islands",
+  "url": "https://images2.wikia.nocookie.net/__cb20130127100141/onepiece/images/2/2f/Syrup_Village_Infobox.png"
+ },
+ "germa": {
+  "file": "germa.jpg",
+  "name": "Germa",
+  "url": "https://vignette2.wikia.nocookie.net/onepiece/images/0/01/Germa_Kingdom_Infobox.png/revision/latest"
+ },
+ "godvalley": {
+  "file": "god-valley.jpg",
+  "name": "God Valley",
+  "url": "https://www.comicbasics.com/wp-content/uploads/2026/08/God-Valley-One-Piece.webp"
+ },
+ "greenbit": {
+  "file": "green-bit.jpg",
+  "name": "Green Bit",
+  "url": "https://lh3.googleusercontent.com/cJkT_8SBVITDURF7siQpN3HaIWX4877WQYbLBUD7IOkDgXEdavgRbbDvwe8agmq1V2bOzXAYUNj7ClKf9NFgN398Jn7OjIDMqQahlNl_WW1FrlfVXHNpJaV29cgjZ3-yWCg2wMnNMsZqY05TmHc_iIjpIYQvPJzykAfUWvbYMg5FTvrqlPFEd5sx_9SRHg"
+ },
+ "hachinosu": {
+  "file": "hachinosu.jpg",
+  "name": "Hachinosu",
+  "url": "https://img.game-news24.com/2023/10/How-does-Hachinosu-the-Pirate-Island-come-to-be.png"
+ },
+ "impeldown": {
+  "file": "impel-down.jpg",
+  "name": "Impel Down",
+  "url": "https://static0.gamerantimages.com/wordpress/wp-content/uploads/2024/03/main-qimg-a14ed011fb64b712564af8aab546ce7b-pjlq.jpg"
+ },
+ "kuraigana": {
+  "file": "kuraigana.jpg",
+  "name": "Kuraigana",
+  "url": "https://img2.wikia.nocookie.net/__cb20141126201121/onepiece/fr/images/7/77/Kuraigana_Mihawk.png"
+ },
+ "lascampregion": {
+  "file": "las-camp-region.jpg",
+  "name": "Las Camp Region",
+  "url": "https://lh4.googleusercontent.com/iJOas4ZcrusGjFHh910xaXSZVr45GB41G7z5HVBhHdeFlS9BYHu34ewTwrNTYAsO3WgV_9bOqsEcWd42zZr5uIurZT2PT4kyMKtRPTodQPPwe2IDcnrZccojhhQ79puwzk32QwYNsGUtosvbGGsJ7-U"
+ },
+ "littlegarden": {
+  "file": "little-garden.jpg",
+  "name": "Little Garden",
+  "url": "https://vignette.wikia.nocookie.net/onepiece-cat/images/a/a2/Little_Garden.png/revision/latest"
+ },
+ "loguetown": {
+  "file": "loguetown.jpg",
+  "name": "Loguetown",
+  "url": "https://one-piece-shop.fr/wp-content/uploads/2021/12/logue-town-1210x642-1-1024x543.png"
+ },
+ "marineford": {
+  "file": "marineford.jpg",
+  "name": "Marineford",
+  "url": "https://fwmedia.fandomwire.com/wp-content/uploads/2025/09/15064159/wb_arrives_at_marineford.webp"
+ },
+ "marygeoise": {
+  "file": "mary-geoise.jpg",
+  "name": "Mary Geoise",
+  "url": "https://static0.cbrimages.com/wordpress/wp-content/uploads/2025/03/one-piece-s-mary-geoise.jpg"
+ },
+ "ohara": {
+  "file": "ohara.jpg",
+  "name": "Ohara",
+  "url": "https://lh3.googleusercontent.com/DhO4ixHtW3Q88-QyXQfDgvFexbJrI1rbEoNJZdtZIYR6wk0f8psTGoMK4k263VJ4yBcG7SiCJ2dd4TBF_KvcQqmTWa0HkYkd02DdboRVz-347Twd6jV84jdI1KmfrDi2h3_TfMiNx84eWYLuH5ND139mnvZO6NkFxb-NRn14R0Q5dDhmQAharTV3NFtePQ"
+ },
+ "onigashima": {
+  "file": "onigashima.jpg",
+  "name": "Onigashima",
+  "url": "https://vignette.wikia.nocookie.net/onepiece/images/3/3c/Onigashima.png/revision/latest"
+ },
+ "punkhazard": {
+  "file": "punk-hazard.jpg",
+  "name": "Punk Hazard",
+  "url": "https://images4.wikia.nocookie.net/__cb20130331152454/onepiece/es/images/4/46/Punk_Hazard_hace_cuatro_a%C3%B1os.png"
+ },
+ "reversemountain": {
+  "file": "reverse-mountain.jpg",
+  "name": "Reverse Mountain",
+  "url": "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/i/238264eb-7dc6-4916-a142-3b558473da6c/dg2n1kc-e41d6dc7-0108-4c46-9b4d-d11855231d00.png/v1/fill/w_1192,h_670,q_70,strp/opfp___reverse_mountain_xps_obj_blend_by_o_dv89_o_dg2n1kc-pre.jpg"
+ },
+ "rommel": {
+  "file": "rommel.jpg",
+  "name": "Rommel",
+  "url": "https://lh5.googleusercontent.com/JyZvEPNRpIaRe5_02DZb-pyZX5w54Cv0eY8_yvXIUCFR2eCL9yCLzJhebL9YonDfQgqtMrEqpvZ4dgniIVmGcsdlim3eU6KxsGyLC7TSue3dmJP7nqzkbd3--g6F0P1eCJVdDx0hXe5AJrZ6VezhJ-w"
+ },
+ "sabaody": {
+  "file": "sabaody.jpg",
+  "name": "Sabaody",
+  "url": "https://i.pinimg.com/736x/d0/4f/c7/d04fc75556ca25bf2250a24abc2ea3ea.jpg"
+ },
+ "shellstowng153": {
+  "file": "shells-town--g-153.jpg",
+  "name": "Shells Town (G-153)",
+  "url": "https://img4.wikia.nocookie.net/__cb20130126073115/onepiece/images/d/db/Shells_Town_Infobox.png"
+ },
+ "shiftstation": {
+  "file": "shift-station.jpg",
+  "name": "Shift Station",
+  "url": "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/i/238264eb-7dc6-4916-a142-3b558473da6c/dik281t-d23a717a-b559-42fa-8305-c0d3dd10a4c5.png/v1/fill/w_1192,h_670,q_70,strp/opfp___shift_station__water_7__by_o_dv89_o_dik281t-pre.jpg"
+ },
+ "skypiea": {
+  "file": "skypiea.jpg",
+  "name": "Skypiea",
+  "url": "https://img3.wikia.nocookie.net/__cb20121231223052/onepiece/images/4/44/Skypiea_Infobox.png"
+ },
+ "therestofwano": {
+  "file": "the-rest-of-wano.jpg",
+  "name": "The rest of Wano",
+  "url": "https://vignette1.wikia.nocookie.net/onepiece/images/c/ca/Wano_Country_Infobox.png/revision/latest"
+ },
+ "thrillerbark": {
+  "file": "thriller-bark.jpg",
+  "name": "Thriller Bark",
+  "url": "https://vignette.wikia.nocookie.net/onepiece/images/7/7e/Thriller_Bark_im_Nebel.jpg/revision/latest"
+ },
+ "tottoland": {
+  "file": "totto-land.jpg",
+  "name": "Totto Land",
+  "url": "https://vignette.wikia.nocookie.net/onepiece/images/b/b8/Totto_Land_Infobox.png/revision/latest"
+ },
+ "wanocapital": {
+  "file": "wano-capital.jpg",
+  "name": "Wano Capital",
+  "url": "https://wallpapers.com/images/hd/one-piece-wano-4k-temple-daytime-nxznpz3omqzsc5yk.jpg"
+ },
+ "water7": {
+  "file": "water-7.jpg",
+  "name": "Water 7",
+  "url": "https://ichef.bbci.co.uk/images/ic/1200x675/p0jv2j46.jpg"
+ },
+ "wholecakeisland": {
+  "file": "whole-cake-island.jpg",
+  "name": "Whole Cake Island",
+  "url": "https://wallpaperaccess.com/full/10829427.jpg"
+ },
+ "zou": {
+  "file": "zou.jpg",
+  "name": "Zou",
+  "url": "https://lh6.googleusercontent.com/kQATbt1AWFVqsnW3liIGDCVKAguWdImeuMgmv9-3cQkKZjj7aLG_v5v4on54ir7niDpey0RLhtB8ImwoSb77VvFytU0QLrpqwS5rUuAK9CGqPirppr94d1kLVKghGqSv9ycyulqr-WoFMC2BGsg0t44CkznZ77gK0CdtPUDbwgJIqr7eXq1zMMR9LtW3AQ"
+ }
+}
