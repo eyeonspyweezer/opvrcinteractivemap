@@ -1,0 +1,46 @@
+name: Track VRChat world visits
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+  push:
+    paths:
+      - "island-colors.tsv"
+      - "tools/track_vrchat_visits.py"
+      - ".github/workflows/track-vrchat-visits.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vrchat-world-visits
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch public VRChat visit counters
+        run: python tools/track_vrchat_visits.py
+
+      - name: Commit visit statistics
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add island-world-visits.tsv island-world-visit-history.tsv island-visits.tsv
+          if ! git diff --cached --quiet; then
+            git commit -m "Update VRChat world visit statistics [skip ci]"
+            git push
+          else
+            echo "No visit-stat changes to commit."
+          fi
