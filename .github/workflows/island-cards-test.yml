@@ -1,11 +1,28 @@
 # Put at: .github/workflows/island-cards-test.yml   (opvrcinteractivemap repo)
+# REPLACES the older file with the same name.
 # TEST ONLY - used by /islandtest. Delete this file when the test is approved or dropped.
-name: Island cards (test)
+#
+# What it does:
+#   - runs by itself every 6 hours (45 minutes after the island data update), and when you click Run workflow
+#   - builds the PNG cards and the waving-flag GIFs
+#   - only rebuilds a GIF when its crew, flag or name changed (the first run builds all of them)
+#   - publishes everything to the bot-images-test branch (history wiped every run)
+name: Island cards and GIFs (test)
 
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild every GIF, even unchanged ones"
+        type: boolean
+        default: false
   schedule:
     - cron: '45 */6 * * *'
+  push:
+    paths:
+      - 'tools/build_island_gifs.py'
+      - 'tools/build_island_cards.py'
+      - '.github/workflows/island-cards-test.yml'
 
 permissions:
   contents: write
@@ -15,23 +32,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  cards:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - run: pip install pillow
-      - run: python tools/build_island_cards.py
-      - name: Publish test cards (one commit, history wiped every run)
+
+      - name: Get the pictures from the last run (so only changes get rebuilt)
         run: |
-          if [ -d botimg-test ]; then
-            cd botimg-test
-            git init -q -b bot-images-test
-            git config user.name "github-actions"
-            git config user.email "actions@github.com"
-            git add -A
-            git commit -q -m "Island cards (test)"
-            git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" bot-images-test
+          git clone -q --depth 1 --branch bot-images-test \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" botimg-test \
+            || mkdir -p botimg-test
+          rm -rf botimg-test/.git
+
+      - name: Build island cards (PNG)
+        run: python tools/build_island_cards.py
+
+      - name: Build island GIFs
+        run: |
+          if [ "${{ inputs.force }}" = "true" ]; then
+            python tools/build_island_gifs.py --force
+          else
+            python tools/build_island_gifs.py
           fi
+
+      - name: Publish (one commit, history wiped every run)
+        run: |
+          cd botimg-test
+          git init -q -b bot-images-test
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -q -m "Island cards and GIFs (test)"
+          git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" bot-images-test

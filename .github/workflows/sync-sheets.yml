@@ -1,0 +1,42 @@
+# Put at: .github/workflows/sync-sheets.yml   (opvrcinteractivemap repo)
+# Copies the island pictures ("Visual" column) and the owner links out of the Google Sheets
+# into the repo, so they never expire. Runs every 6 hours and when you click Run workflow.
+name: Sync sheets
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 */6 * * *'
+  push:
+    paths:
+      - 'tools/sync_sheets.py'
+      - '.github/workflows/sync-sheets.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-sheets
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow
+      - run: python tools/sync_sheets.py
+      - name: Save to the repo
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add island-backgrounds owner-links.tsv
+          if ! git diff --cached --quiet; then
+            git commit -m "Sync island pictures and owner links"
+            git pull --rebase -X theirs
+            git push
+          fi
