@@ -367,7 +367,7 @@ def main():
     islands = read_tsv(Path("island-colors.tsv"))
     groups = {g["ID"]: g for g in read_tsv(Path("island-groups.tsv"))}
     atlas = Image.open("island-flags.png").convert("RGBA") if Path("island-flags.png").exists() else None
-    crew_flag_dirs = [Path("crewflags"), Path("crew-flags")]
+    crew_flag_dirs = [Path("crewflags")]
 
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
     made = 0
