@@ -231,7 +231,6 @@ async function islandChoices(query) {
   const q = query.toLowerCase();
   const islands = await tsv("island-colors.tsv");
   const hits = islands.filter((r) =>
-    r["Island Name"].toLowerCase().includes(q) ||
     islandDisplayName(r).toLowerCase().includes(q)
   );
   // real names first, ??? islands last
@@ -308,8 +307,8 @@ async function islandMessage(query) {
   const q = query.toLowerCase();
   const isl =
     islands.find((r) => r.ID === query) ||
-    islands.find((r) => r["Island Name"].toLowerCase() === q) ||
-    islands.find((r) => r["Island Name"].toLowerCase().includes(q));
+    islands.find((r) => islandDisplayName(r).toLowerCase() === q) ||
+    islands.find((r) => islandDisplayName(r).toLowerCase().includes(q));
 
   if (!isl) return { content: `I couldn't find an island called "${query}".` };
 
