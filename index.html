@@ -206,9 +206,9 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #settingsFrame label { display: block; margin: 8px 0; }
 #settingsFrame input[type=range] { width: 100%; }
 .map-label div { transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none; font-family: inherit; font-size: 12px; color: #fff; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000; }
-@keyframes islandSink { 0% { opacity:1; transform:scale(1) translateY(0) rotate(0deg); } 18% { opacity:1; transform:scale(1.02,.98) translateY(0) rotate(-.4deg); } 55% { opacity:.72; transform:scale(.82,.62) translateY(8px) rotate(.7deg); } 82% { opacity:.28; transform:scale(.38,.22) translateY(24px) rotate(-1deg); } 100% { opacity:0; transform:scale(.06,.03) translateY(42px) rotate(0deg); } }
+@keyframes islandSink { 0% { opacity:1; transform:scale(1) translateY(0) rotate(0deg); } 18% { opacity:1; transform:scale(1.02,.98) translateY(0) rotate(-.4deg); } 55% { opacity:1; transform:scale(.82,.62) translateY(8px) rotate(.7deg); } 82% { opacity:1; transform:scale(.38,.22) translateY(24px) rotate(-1deg); } 100% { opacity:1; transform:scale(.06,.03) translateY(42px) rotate(0deg); } }
 .leaflet-interactive.sinking-island { transform-box:fill-box; transform-origin:center; animation:islandSink 1.8s cubic-bezier(.2,.7,.25,1) forwards; pointer-events:none !important; }
-@keyframes islandDestroy { 0% { opacity:1; transform:scale(1) rotate(0); clip-path:polygon(0 0,25% 0,50% 0,75% 0,100% 0,100% 25%,100% 50%,100% 75%,100% 100%,0 100%); } 25% { opacity:1; transform:scale(1.02) rotate(1deg); clip-path:polygon(0 0,25% 3%,50% 0,75% 5%,100% 8%,96% 30%,92% 55%,100% 78%,92% 100%,8% 92%); } 55% { opacity:.8; transform:translate(5px,8px) rotate(-3deg) scale(.82); clip-path:polygon(0 12%,35% 0,48% 22%,70% 0,100% 18%,85% 48%,100% 76%,62% 100%,38% 78%,8% 100%); } 82% { opacity:.35; transform:translate(-8px,18px) rotate(8deg) scale(.55); clip-path:polygon(18% 22%,42% 5%,58% 30%,82% 12%,70% 55%,92% 82%,48% 72%,25% 100%,5% 65%,10% 40%); } 100% { opacity:0; transform:translate(12px,32px) rotate(14deg) scale(.12); clip-path:polygon(48% 46%,52% 45%,56% 48%,58% 52%,55% 56%,51% 58%,47% 56%,44% 52%,45% 48%,47% 46%); } }
+@keyframes islandDestroy { 0% { opacity:1; transform:scale(1) rotate(0); clip-path:polygon(0 0,25% 0,50% 0,75% 0,100% 0,100% 25%,100% 50%,100% 75%,100% 100%,0 100%); } 25% { opacity:1; transform:scale(1.02) rotate(1deg); clip-path:polygon(0 0,25% 3%,50% 0,75% 5%,100% 8%,96% 30%,92% 55%,100% 78%,92% 100%,8% 92%); } 55% { opacity:1; transform:translate(5px,8px) rotate(-3deg) scale(.82); clip-path:polygon(0 12%,35% 0,48% 22%,70% 0,100% 18%,85% 48%,100% 76%,62% 100%,38% 78%,8% 100%); } 82% { opacity:1; transform:translate(-8px,18px) rotate(8deg) scale(.55); clip-path:polygon(18% 22%,42% 5%,58% 30%,82% 12%,70% 55%,92% 82%,48% 72%,25% 100%,5% 65%,10% 40%); } 100% { opacity:1; transform:translate(12px,32px) rotate(14deg) scale(.12); clip-path:polygon(48% 46%,52% 45%,56% 48%,58% 52%,55% 56%,51% 58%,47% 56%,44% 52%,45% 48%,47% 46%); } }
 .leaflet-interactive.destroying-island { transform-box:fill-box; transform-origin:center; animation:islandDestroy 2s cubic-bezier(.3,.65,.35,1) forwards; pointer-events:none !important; }
 @media (prefers-reduced-motion: reduce) { .leaflet-interactive.sinking-island { animation:none; opacity:0; transform:scale(.06); pointer-events:none !important; } .leaflet-interactive.destroying-island { animation:none; opacity:0; transform:scale(.12); pointer-events:none !important; } }
 body { background: var(--bg); }
@@ -485,33 +485,38 @@ function isDestroyedName(name) {
 function isGoneName(name) {
   return isSunkName(name) || isDestroyedName(name);
 }
-const SEA_LIGHT = '#d1e3ff';
-const SEA_MIDDLE = '#618ed2';
-const SEA_BETWEEN = '#81d2ff';
-function mixHex(a, b, t) {
-  const ah = a.slice(1), bh = b.slice(1);
-  const ar = parseInt(ah.slice(0,2),16), ag = parseInt(ah.slice(2,4),16), ab = parseInt(ah.slice(4,6),16);
-  const br = parseInt(bh.slice(0,2),16), bg = parseInt(bh.slice(2,4),16), bb = parseInt(bh.slice(4,6),16);
-  const f = Math.max(0, Math.min(1, t)), h = n => Math.round(n).toString(16).padStart(2,'0');
-  return '#' + h(ar+(br-ar)*f) + h(ag+(bg-ag)*f) + h(ab+(bb-ab)*f);
+let mapPixelCanvas = null, mapPixelContext = null;
+function mapPixelColor(layer) {
+  if (!mapPixelContext || !mapWidth || !mapHeight) return '#618ed2';
+  try {
+    // Use a point guaranteed to be inside the polygon, then sample the original map image.
+    const point = turf.pointOnFeature(layer.toGeoJSON()).geometry.coordinates;
+    const x = ((Math.floor(point[0]) % mapWidth) + mapWidth) % mapWidth;
+    const y = Math.max(0, Math.min(mapHeight - 1, Math.floor(point[1])));
+    const pixel = mapPixelContext.getImageData(x, y, 1, 1).data;
+    return 'rgb(' + pixel[0] + ',' + pixel[1] + ',' + pixel[2] + ')';
+  } catch (err) {
+    console.warn('[island status] Could not sample map image color:', err);
+    return '#618ed2';
+  }
 }
-function sunkSeaColor(layer) {
-  if (!mapHeight) return SEA_BETWEEN;
-  const d = Math.abs(layer.getBounds().getCenter().lat - mapHeight / 2);
-  if (d <= 105) return mixHex(SEA_MIDDLE, SEA_BETWEEN, d / 105);
-  return mixHex(SEA_BETWEEN, SEA_LIGHT, Math.min(1, (d - 105) / Math.max(105, mapHeight / 2 - 105)));
+function paintStatusColor(layer) {
+  const color = mapPixelColor(layer);
+  [layer, ...(layer._ghosts || [])].forEach(x => {
+    if (!x._path) return;
+    x._path.style.fill = color;
+    x._path.style.stroke = color;
+    x._path.style.fillOpacity = '1';
+    x._path.style.strokeOpacity = '1';
+    x._path.style.opacity = '1';
+  });
 }
 function sinkLayer(layer) {
   if (!layer || layer._sunk || !isSunkName(layer.feature?.properties?.name)) return;
   layer._sinking = true;
-  const sea = sunkSeaColor(layer);
+  paintStatusColor(layer);
   [layer, ...(layer._ghosts || [])].forEach(x => {
-    if (!x._path) return;
-    x._path.style.fill = sea;
-    x._path.style.stroke = sea;
-    x._path.style.fillOpacity = '1';
-    x._path.style.strokeOpacity = '.45';
-    x._path.classList.add('sinking-island');
+    if (x._path) x._path.classList.add('sinking-island');
   });
   layer._flagFill = null;
   layer._stripeFill = null;
@@ -526,11 +531,9 @@ function sinkLayer(layer) {
 function destroyLayer(layer) {
   if (!layer || layer._destroyed || !isDestroyedName(layer.feature?.properties?.name)) return;
   layer._destroying = true;
+  paintStatusColor(layer);
   [layer, ...(layer._ghosts || [])].forEach(x => {
-    if (!x._path) return;
-    x._path.style.fillOpacity = '1';
-    x._path.style.strokeOpacity = '1';
-    x._path.classList.add('destroying-island');
+    if (x._path) x._path.classList.add('destroying-island');
   });
   layer._flagFill = null;
   layer._stripeFill = null;
@@ -1078,6 +1081,11 @@ let tileLayer = null;
     const width = image.naturalWidth, height = image.naturalHeight;
     mapWidth = width;
     mapHeight = height;
+    mapPixelCanvas = document.createElement('canvas');
+    mapPixelCanvas.width = width;
+    mapPixelCanvas.height = height;
+    mapPixelContext = mapPixelCanvas.getContext('2d', { willReadFrequently: true });
+    mapPixelContext.drawImage(image, 0, 0, width, height);
     const Repeating = L.GridLayer.extend({
       createTile(coords) {
         const tile = document.createElement('canvas');
