@@ -671,7 +671,7 @@ async function crewListPage(page) {
 // Secrets needed: ADMIN_IDS (Discord user IDs, separated by commas), GITHUB_TOKEN,
 // GOOGLE_SA_EMAIL, GOOGLE_SA_KEY (from the Google service account), DISCORD_APP_ID.
 const REPO_API = "https://api.github.com/repos/eyeonspyweezer/opvrcinteractivemap";
-const FLAG_RAW = "https://raw.githubusercontent.com/eyeonspyweezer/opvrcinteractivemap/main/crew-flags";
+const FLAG_RAW = "https://raw.githubusercontent.com/eyeonspyweezer/opvrcinteractivemap/main/crewflags";
 const CREW_SHEET_ID = "1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk";
 const NATION_HEADERS = ["crews/groups", "nations", "nation"];
 const FLAG_HEADERS = ["flag", "flag url"];
@@ -854,7 +854,7 @@ async function uploadFlag(env, source, crewName) {
     binary += String.fromCharCode(...finalBytes.subarray(k, k + 8192));
   }
 
-  const path = `crew-flags/${slugOf(crewName)}.${ext}`;
+  const path = `crewflags/${slugOf(crewName)}.${ext}`;
 
   const headers = {
     Authorization: `Bearer ${env.GITHUB_TOKEN}`,
