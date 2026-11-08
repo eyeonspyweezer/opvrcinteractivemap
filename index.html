@@ -206,6 +206,9 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #settingsFrame label { display: block; margin: 8px 0; }
 #settingsFrame input[type=range] { width: 100%; }
 .map-label div { transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none; font-family: inherit; font-size: 12px; color: #fff; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000; }
+@keyframes islandSink { 0% { opacity:1; transform:scale(1) translateY(0) rotate(0deg); } 18% { opacity:1; transform:scale(1.02,.98) translateY(0) rotate(-.4deg); } 55% { opacity:.72; transform:scale(.82,.62) translateY(8px) rotate(.7deg); } 82% { opacity:.28; transform:scale(.38,.22) translateY(24px) rotate(-1deg); } 100% { opacity:0; transform:scale(.06,.03) translateY(42px) rotate(0deg); } }
+.leaflet-interactive.sinking-island { transform-box:fill-box; transform-origin:center; animation:islandSink 1.8s cubic-bezier(.2,.7,.25,1) forwards; pointer-events:none !important; }
+@media (prefers-reduced-motion: reduce) { .leaflet-interactive.sinking-island { animation:none; opacity:0; transform:scale(.06); pointer-events:none !important; } }
 body { background: var(--bg); }
 #sZoom { color: var(--sfg); }
 </style>
@@ -394,6 +397,7 @@ const drawnItems = new L.FeatureGroup().addTo(map);
 // ===== Globe-style wrapping: polygons are also drawn as read-only copies one map width left/right =====
 const ghostItems = new L.FeatureGroup().addTo(map);
 let mapWidth = 0;          // image width, set when the map image loads
+let mapHeight = 0;         // image height, used for sunk-island sea-color matching
 const WRAP_COPIES = 3;     // copies on each side
 const eachShape = (fn) => { drawnItems.eachLayer(fn); ghostItems.eachLayer(fn); };
 const shiftLL = (ll, dx) => Array.isArray(ll) ? ll.map((x) => shiftLL(x, dx)) : L.latLng(ll.lat, ll.lng + dx);
@@ -466,12 +470,57 @@ function applyFlagFill(layer) {
 }
 function applyHidden(layer) {
   [layer, ...(layer._ghosts || [])].forEach((x) => {
-    if (x._path) x._path.style.display = layer._hidden ? 'none' : '';
+    if (x._path) x._path.style.display = (layer._hidden || layer._sunk) ? 'none' : '';
   });
+}
+
+function isSunkName(name) {
+  return /^\s*Sunk\s*\(\d{2}\/\d{2}\/\d{2}\)/i.test(String(name || ''));
+}
+const SEA_LIGHT = '#d1e3ff';
+const SEA_MIDDLE = '#618ed2';
+const SEA_BETWEEN = '#81d2ff';
+function mixHex(a, b, t) {
+  const ah = a.slice(1), bh = b.slice(1);
+  const ar = parseInt(ah.slice(0,2),16), ag = parseInt(ah.slice(2,4),16), ab = parseInt(ah.slice(4,6),16);
+  const br = parseInt(bh.slice(0,2),16), bg = parseInt(bh.slice(2,4),16), bb = parseInt(bh.slice(4,6),16);
+  const f = Math.max(0, Math.min(1, t)), h = n => Math.round(n).toString(16).padStart(2,'0');
+  return '#' + h(ar+(br-ar)*f) + h(ag+(bg-ag)*f) + h(ab+(bb-ab)*f);
+}
+function sunkSeaColor(layer) {
+  if (!mapHeight) return SEA_BETWEEN;
+  const d = Math.abs(layer.getBounds().getCenter().lat - mapHeight / 2);
+  if (d <= 105) return mixHex(SEA_MIDDLE, SEA_BETWEEN, d / 105);
+  return mixHex(SEA_BETWEEN, SEA_LIGHT, Math.min(1, (d - 105) / Math.max(105, mapHeight / 2 - 105)));
+}
+function sinkLayer(layer) {
+  if (!layer || layer._sunk || !isSunkName(layer.feature?.properties?.name)) return;
+  layer._sunk = true;
+  const sea = sunkSeaColor(layer);
+  [layer, ...(layer._ghosts || [])].forEach(x => {
+    if (!x._path) return;
+    x._path.style.fill = sea;
+    x._path.style.stroke = sea;
+    x._path.style.fillOpacity = '1';
+    x._path.style.strokeOpacity = '.45';
+    x._path.classList.add('sinking-island');
+  });
+  layer._flagFill = null;
+  layer._stripeFill = null;
+  applyHidden(layer);
+  setTimeout(() => {
+    [layer, ...(layer._ghosts || [])].forEach(x => { if (x._path) x._path.style.display = 'none'; });
+    rebuildLabels();
+  }, 1850);
+}
+function animateSunkIslands() {
+  if (!mapHeight) return;
+  drawnItems.eachLayer(l => { if (isSunkName(l.feature?.properties?.name)) sinkLayer(l); });
 }
 
 function shouldHide(layer) {
   const name = String(layer.feature.properties.name || '');
+  if (layer._sunk || isSunkName(name)) return true;
   if (SHOW && !layerKinds(layer).some((k) => SHOW.has(k))) return true;
   if (SHOW_CREW && !layerCrews(layer).includes(norm(SHOW_CREW))) return true;
   if (OPT.hideUnnamed && name.includes('???')) return true;
@@ -496,6 +545,7 @@ function rebuildFlags() {
   rebuildLabels();
   if (!OPT.flags) return;
   drawnItems.eachLayer((l) => {
+    if (l._sunk || isSunkName(l.feature?.properties?.name)) return;
     const groups = preferMarines(
       ownersOf(resolveOwner(l.feature.properties)).flatMap(groupsOf)
     );
@@ -995,6 +1045,7 @@ let tileLayer = null;
   image.onload = () => {
     const width = image.naturalWidth, height = image.naturalHeight;
     mapWidth = width;
+    mapHeight = height;
     const Repeating = L.GridLayer.extend({
       createTile(coords) {
         const tile = document.createElement('canvas');
@@ -1019,6 +1070,7 @@ let tileLayer = null;
     map.setMaxBounds([[0, -1e9], [height, 1e9]]);
     map.options.maxBoundsViscosity = 1;
     rebuildGhosts();
+    requestAnimationFrame(() => animateSunkIslands());
   };
   image.onerror = () => setStatus(`Could not load image: ${imageUrl}`);
   image.src = imageUrl;
@@ -1311,6 +1363,7 @@ function collect() {
     const p = l.feature && l.feature.properties;
     if (!p) return;
     const label = String(p.name);
+    if (isSunkName(label) || l._sunk) return;
     onMapKeys.add(islandKey(label));
     islands.push({
       label,
@@ -1513,7 +1566,7 @@ function rebuildLabels() {
   labelItems.clearLayers();
   if (!OPT.names || !mapWidth) return;
   drawnItems.eachLayer((l) => {
-    if (l._hidden) return;
+    if (l._hidden || l._sunk || isSunkName(l.feature.properties.name)) return;
     const name = String(l.feature.properties.name || '');
     if (!name || name.includes('???')) return;
     const c = turf.pointOnFeature(l.toGeoJSON()).geometry.coordinates;
