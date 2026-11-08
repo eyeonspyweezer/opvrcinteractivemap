@@ -230,6 +230,15 @@ async function islandChoices(query) {
   hits.sort((a, b) => (a.Unknown === "1") - (b.Unknown === "1"));
   return hits.slice(0, 25).map((r) => ({ name: r["Island Name"].slice(0, 100), value: r.ID }));
 }
+
+async function renameIslandChoices(query) {
+  const q = query.toLowerCase();
+  const islands = await tsv("island-colors.tsv");
+  return islands
+    .filter((r) => r["Island Name"] && r["Island Name"].toLowerCase().includes(q))
+    .slice(0, 25)
+    .map((r) => ({ name: r["Island Name"].slice(0, 100), value: r["Island Name"].slice(0, 100) }));
+}
 // ---------- VRChat world population (no authentication) ----------
 async function getWorldPopulation(worldId) {
   try {
@@ -1108,6 +1117,15 @@ export default {
             { type: 3, name: "owner", description: "New owner name", required: true },
           ],
         },
+        {
+          name: "renameisland",
+          description: "🔒 Restricted: rename an island on the map",
+          type: 1,
+          options: [
+            { type: 3, name: "island", description: "Current island name", required: true, autocomplete: true },
+            { type: 3, name: "new_name", description: "New island name", required: true, max_length: 100 },
+          ],
+        },
       ];
       // TEST command. To remove it: open the /register link again with  &test=off  at the end
 
@@ -1211,6 +1229,23 @@ export default {
         );
         return json({ type: 5, data: { flags: 64 } });
       }
+
+      if (name === "renameisland") {
+        if (!isAdmin(env, i)) return json(notAllowed(i));
+        const oldName = String(i.data.options?.find((o) => o.name === "island")?.value ?? "");
+        const newName = String(i.data.options?.find((o) => o.name === "new_name")?.value ?? "");
+        ctx.waitUntil(
+          (async () => {
+            const msg = await handleRenameIslandCommand(oldName, newName, env);
+            await fetch(`https://discord.com/api/v10/webhooks/${env.DISCORD_APP_ID}/${i.token}/messages/@original`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ content: msg }),
+            });
+          })()
+        );
+        return json({ type: 5, data: { flags: 64 } });
+      }
     }
 
     // autocomplete while typing an island name
@@ -1222,7 +1257,9 @@ export default {
           ? await groupChoices(typed)
           : i.data.name === "editcrew"
             ? (isAdmin(env, i) ? await crewNameChoices(typed) : [])
-            : await islandChoices(typed);
+            : i.data.name === "renameisland"
+              ? (isAdmin(env, i) ? await renameIslandChoices(typed) : [])
+              : await islandChoices(typed);
 
       return json({ type: 8, data: { choices } });
     }
@@ -1273,6 +1310,68 @@ export default {
     return new Response("unknown", { status: 400 });
   },
 };
+
+async function handleRenameIslandCommand(oldName, newName, env) {
+  need(env, ["GITHUB_PAT_TOKEN"]);
+  try {
+    oldName = String(oldName || "").trim();
+    newName = String(newName || "").trim();
+
+    if (!oldName || !newName) throw new Error("Please provide both the current island name and the new island name.");
+    if (newName.length > 100) throw new Error("The new island name must be 100 characters or fewer.");
+    if (oldName.toLowerCase() === newName.toLowerCase()) throw new Error("The new name is the same as the current name.");
+
+    const token = await googleToken(env);
+    const spreadId = "14I31HO_9qbplW8LWP63-itFL1eAjL0O-ecEAxxCOJpM";
+    const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadId}/values/A1:C500`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!r.ok) throw new Error(`Google Sheets fetch failed with status ${r.status}`);
+
+    const rows = (await r.json()).values || [];
+    const oldKey = oldName.toLowerCase();
+    const newKey = newName.toLowerCase();
+    const rowIndex = rows.findIndex((row) => String(row[0] || "").trim().toLowerCase() === oldKey);
+    if (rowIndex < 0) throw new Error(`Island "${oldName}" could not be found in the island spreadsheet.`);
+
+    const duplicate = rows.findIndex((row, index) =>
+      index !== rowIndex && String(row[0] || "").trim().toLowerCase() === newKey
+    );
+    if (duplicate >= 0) throw new Error(`An island named "${newName}" already exists.`);
+
+    const updateResponse = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadId}/values/A${rowIndex + 1}?valueInputOption=USER_ENTERED`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ values: [[newName]] })
+      }
+    );
+    if (!updateResponse.ok) throw new Error("Could not rename the island in Google Sheets.");
+
+    const rebuild = await fetch(
+      "https://api.github.com/repos/eyeonspyweezer/opvrcinteractivemap/actions/workflows/update-island-data.yml/dispatches",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.GITHUB_PAT_TOKEN}`,
+          "User-Agent": "Cloudflare-Discord-Bot",
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ ref: "main" })
+      }
+    );
+    if (!rebuild.ok) throw new Error(`Island was renamed in Google Sheets, but the map rebuild could not be started (GitHub returned ${rebuild.status}).`);
+
+    return `✅ Renamed **${oldName}** to **${newName}** in the island tracker. The map data rebuild has started.`;
+  } catch (error) {
+    return `⚠️ Error renaming island: ${error.message}`;
+  }
+}
 
 async function handleSetOwnerCommand(islandName, newOwner, env) {
   need(env, ["GITHUB_PAT_TOKEN"]);
