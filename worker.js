@@ -493,11 +493,11 @@ async function islandMessage(query) {
 
   if (rawOwner && rawOwner !== "—" && rawOwner !== "Unowned") {
     if (ownerData.link && ownerData.discord) {
-      ownerDisplay = `[${rawOwner}](${ownerData.link}) (${ownerData.discord})`;
+      ownerDisplay = `[${rawOwner}](${ownerData.link}) (@${ownerData.discord})`;
     } else if (ownerData.link) {
       ownerDisplay = `[${rawOwner}](${ownerData.link})`;
     } else if (ownerData.discord) {
-      ownerDisplay = `${rawOwner} (${ownerData.discord})`;
+      ownerDisplay = `${rawOwner} (@${ownerData.discord})`;
     }
   }
 
