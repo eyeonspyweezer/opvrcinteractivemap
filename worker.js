@@ -222,13 +222,21 @@ async function getOwnerLinks() {
   }
 }
 
+function islandDisplayName(island) {
+  if (String(island.ID) === "2") return "New Kuraigana (On top of Onigashima)";
+  return island["Island Name"];
+}
+
 async function islandChoices(query) {
   const q = query.toLowerCase();
   const islands = await tsv("island-colors.tsv");
-  const hits = islands.filter((r) => r["Island Name"].toLowerCase().includes(q));
+  const hits = islands.filter((r) =>
+    r["Island Name"].toLowerCase().includes(q) ||
+    islandDisplayName(r).toLowerCase().includes(q)
+  );
   // real names first, ??? islands last
   hits.sort((a, b) => (a.Unknown === "1") - (b.Unknown === "1"));
-  return hits.slice(0, 25).map((r) => ({ name: r["Island Name"].slice(0, 100), value: r.ID }));
+  return hits.slice(0, 25).map((r) => ({ name: islandDisplayName(r).slice(0, 100), value: r.ID }));
 }
 
 async function renameIslandChoices(query) {
@@ -557,7 +565,7 @@ async function islandMessage(query) {
   return {
     embeds: [
       {
-        title: isl["Island Name"],
+        title: islandDisplayName(isl),
         url: BASE + "/",
         color,
         fields,
@@ -610,7 +618,7 @@ async function sheetPage(kind, page) {
     title = "Islands and owners";
     rows = (await tsv("island-colors.tsv"))
       .filter((r) => r.Unknown !== "1")
-      .map((r) => `• **${esc(r["Island Name"])}** — ${r.Unowned === "1" ? "Unowned" : esc(r.Owner || "—")}`);
+      .map((r) => `• **${esc(islandDisplayName(r))}** — ${r.Unowned === "1" ? "Unowned" : esc(r.Owner || "—")}`);
   }
   const pages = Math.max(1, Math.ceil(rows.length / SHEET_PAGE));
   const p = Math.min(Math.max(page, 0), pages - 1);
