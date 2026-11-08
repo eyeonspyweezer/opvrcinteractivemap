@@ -495,7 +495,7 @@ function sunkSeaColor(layer) {
 }
 function sinkLayer(layer) {
   if (!layer || layer._sunk || !isSunkName(layer.feature?.properties?.name)) return;
-  layer._sunk = true;
+  layer._sinking = true;
   const sea = sunkSeaColor(layer);
   [layer, ...(layer._ghosts || [])].forEach(x => {
     if (!x._path) return;
@@ -520,7 +520,7 @@ function animateSunkIslands() {
 
 function shouldHide(layer) {
   const name = String(layer.feature.properties.name || '');
-  if (layer._sunk || isSunkName(name)) return true;
+  if (layer._sunk) return true;
   if (SHOW && !layerKinds(layer).some((k) => SHOW.has(k))) return true;
   if (SHOW_CREW && !layerCrews(layer).includes(norm(SHOW_CREW))) return true;
   if (OPT.hideUnnamed && name.includes('???')) return true;
@@ -545,7 +545,7 @@ function rebuildFlags() {
   rebuildLabels();
   if (!OPT.flags) return;
   drawnItems.eachLayer((l) => {
-    if (l._sunk || isSunkName(l.feature?.properties?.name)) return;
+    if (l._sunk || l._sinking || isSunkName(l.feature?.properties?.name)) return;
     const groups = preferMarines(
       ownersOf(resolveOwner(l.feature.properties)).flatMap(groupsOf)
     );
