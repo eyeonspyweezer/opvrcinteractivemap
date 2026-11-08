@@ -487,28 +487,33 @@ function isGoneName(name) {
 }
 let mapPixelCanvas = null, mapPixelContext = null;
 function mapPixelColor(layer) {
-  if (!mapPixelContext || !mapWidth || !mapHeight) return '#618ed2';
+  if (!mapPixelContext || !mapWidth || !mapHeight) {
+    console.warn('[island status] Map image pixels are not ready; cannot sample island color.');
+    return null;
+  }
   try {
-    // Use a point guaranteed to be inside the polygon, then sample the original map image.
+    // CRS.Simple has its Y axis increasing upward, while image pixels start at the top.
+    // Convert the polygon's map coordinate to the matching image pixel coordinate.
     const point = turf.pointOnFeature(layer.toGeoJSON()).geometry.coordinates;
     const x = ((Math.floor(point[0]) % mapWidth) + mapWidth) % mapWidth;
-    const y = Math.max(0, Math.min(mapHeight - 1, Math.floor(point[1])));
+    const y = Math.max(0, Math.min(mapHeight - 1, Math.floor(mapHeight - point[1])));
     const pixel = mapPixelContext.getImageData(x, y, 1, 1).data;
     return 'rgb(' + pixel[0] + ',' + pixel[1] + ',' + pixel[2] + ')';
   } catch (err) {
     console.warn('[island status] Could not sample map image color:', err);
-    return '#618ed2';
+    return null;
   }
 }
 function paintStatusColor(layer) {
   const color = mapPixelColor(layer);
+  if (!color) return;
   [layer, ...(layer._ghosts || [])].forEach(x => {
     if (!x._path) return;
-    x._path.style.fill = color;
-    x._path.style.stroke = color;
-    x._path.style.fillOpacity = '1';
-    x._path.style.strokeOpacity = '1';
-    x._path.style.opacity = '1';
+    x._path.style.setProperty('fill', color, 'important');
+    x._path.style.setProperty('stroke', color, 'important');
+    x._path.style.setProperty('fill-opacity', '1', 'important');
+    x._path.style.setProperty('stroke-opacity', '1', 'important');
+    x._path.style.setProperty('opacity', '1', 'important');
   });
 }
 function sinkLayer(layer) {
