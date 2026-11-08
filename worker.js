@@ -278,7 +278,7 @@ function sinceText(sinceDate, atLeast) {
 }
 
 
-async function islandMessage(query, test = false) {
+async function islandMessage(query) {
   const [islands, groups, sinceRows, islandVisitRows, worldVisitRows] =
     await Promise.all([
       tsv("island-colors.tsv"),
@@ -297,14 +297,20 @@ async function islandMessage(query, test = false) {
   if (!isl) return { content: `I couldn't find an island called "${query}".` };
 
   const formatVisits = (value) => {
-    if (value === undefined || value === null || String(value).trim() === "") {
-      return "Unavailable";
-    }
-
+    if (value === undefined || value === null || String(value).trim() === "") return "";
     const number = Number(value);
-    return Number.isFinite(number)
-      ? number.toLocaleString("en-US")
-      : "Unavailable";
+    return Number.isFinite(number) ? number.toLocaleString("en-US") : "";
+  };
+
+  const visitLine = (row, field) => {
+    if (!row) return "";
+    const status = String(row[`${field} Status`] || "").toLowerCase();
+    const value = formatVisits(row[field]);
+
+    if (status === "unavailable") return "Unavailable";
+    if (status !== "ok" || !value || Number(row[field]) === 0) return "";
+
+    return value;
   };
 
   const groupNames = [isl.Group1, isl.Group2, isl.Group3]
@@ -312,7 +318,6 @@ async function islandMessage(query, test = false) {
     .map((id) => groups.find((g) => g.ID === id)?.Group)
     .filter(Boolean);
 
-  // One link per VRChat world.
   const ids = [
     ...new Set(
       (isl.Link.match(
@@ -325,17 +330,19 @@ async function islandMessage(query, test = false) {
     ? ids.map((id) => `https://vrchat.com/home/world/${id}`)
     : isl.Link.split(/\s+/).filter(Boolean);
 
+  const worldLabel = (n) => ids.length === 1 ? "VRChat World" : `World ${n + 1}`;
+
   const links = urls
     .slice(0, 6)
-    .map((u, n) => `[World ${n + 1}](${u})`);
+    .map((u, n) => `[${worldLabel(n)}](${u})`);
 
-  // Live population data from VRChat.
   const populations = await Promise.all(
     ids.map((id) => getWorldPopulation(id))
   );
 
   const populationLines = populations.map((p, n) => {
-    if (!p) return `**World ${n + 1}:** Unavailable`;
+    const label = worldLabel(n);
+    if (!p) return `**${label}:** Unavailable`;
 
     const valid = [p.total, p.public, p.private].every(
       (v) => Number.isFinite(v)
@@ -345,18 +352,27 @@ async function islandMessage(query, test = false) {
       (r) => (r["World ID"] || "").toLowerCase() === ids[n]
     );
 
-    const visits = worldVisit
-      ? formatVisits(worldVisit["Lifetime Visits"])
-      : "Unavailable";
+    const visitParts = [];
+    const visit24 = visitLine(worldVisit, "Visits 24h");
+    const visit7 = visitLine(worldVisit, "Visits 7d");
+    const visit30 = visitLine(worldVisit, "Visits 30d");
+
+    if (visit24) visitParts.push(`Last 24 hours: ${visit24}`);
+    if (visit7) visitParts.push(`Last 7 days: ${visit7}`);
+    if (visit30) visitParts.push(`Last 30 days: ${visit30}`);
+
+    const visitText = visitParts.length
+      ? `\n📈 ${visitParts.join(" · ")}`
+      : "";
 
     if (!valid) {
-      return `**World ${n + 1}:** Population unavailable\n📈 Lifetime visits: ${visits}`;
+      return `**${label}:** Population unavailable${visitText}`;
     }
 
     return (
-      `**World ${n + 1}**\n` +
-      `👥 Total: ${p.total} · 🌐 Public: ${p.public} · 🔒 Private: ${p.private}\n` +
-      `📈 Lifetime visits: ${visits}`
+      `**${label}**\n` +
+      `👥 Total: ${p.total} · 🌐 Public: ${p.public} · 🔒 Private: ${p.private}` +
+      visitText
     );
   });
 
@@ -379,26 +395,18 @@ async function islandMessage(query, test = false) {
         : "")
     : "Population data unavailable";
 
-  // Historical visit totals from the GitHub tracker.
   const islandVisits = islandVisitRows.find(
     (r) => String(r["Island ID"]) === String(isl.ID)
   );
 
-  const lifetimeVisits = islandVisits
-    ? formatVisits(islandVisits["Lifetime Visits"])
-    : "Unavailable";
+  const islandVisitParts = [];
+  const island24 = visitLine(islandVisits, "Visits 24h");
+  const island7 = visitLine(islandVisits, "Visits 7d");
+  const island30 = visitLine(islandVisits, "Visits 30d");
 
-  const visits24h = islandVisits
-    ? formatVisits(islandVisits["Visits 24h"])
-    : "Unavailable";
-
-  const visits7d = islandVisits
-    ? formatVisits(islandVisits["Visits 7d"])
-    : "Unavailable";
-
-  const visits30d = islandVisits
-    ? formatVisits(islandVisits["Visits 30d"])
-    : "Unavailable";
+  if (island24) islandVisitParts.push(`Last 24 hours: ${island24}`);
+  if (island7) islandVisitParts.push(`Last 7 days: ${island7}`);
+  if (island30) islandVisitParts.push(`Last 30 days: ${island30}`);
 
   const flagNum = [
     isl.Flag,
@@ -432,7 +440,6 @@ async function islandMessage(query, test = false) {
     parseInt((isl.Color.split(/\s+/)[0] || "#005aff").replace("#", ""), 16) ||
     0x005aff;
 
-  // Fetch owner links.
   const ownerLinks = await getOwnerLinks();
   const rawOwner = (isl.Owner || "").trim();
   const ownerData = ownerLinks[rawOwner.toLowerCase()] || {};
@@ -449,172 +456,48 @@ async function islandMessage(query, test = false) {
     }
   }
 
-  return {
-    embeds: [
-      {
-        title: isl["Island Name"],
-        url: BASE + "/",
-        color,
-        fields: [
-          { name: "Status", value: status, inline: true },
-          { name: "Owner", value: ownerDisplay, inline: true },
-          { name: "Group", value: groupNames.join(", ") || "—", inline: true },
-          ...(sinceLine ? [{ name: "Control", value: sinceLine }] : []),
-          {
-            name: "VRChat worlds",
-            value: links.join("\n") || "No world link yet",
-          },
-          {
-            name: "👥 Island Population",
-            value: populationSummary,
-          },
-          {
-            name: "🌐 Individual World Populations",
-            value: populationLines.length
-              ? populationLines.join("\n\n").slice(0, 1024)
-              : "No VRChat worlds listed",
-          },
-          {
-            name: "📈 Island Visits",
-            value:
-              `Lifetime: **${lifetimeVisits}**\n` +
-              `Last 24 hours: ${visits24h}\n` +
-              `Last 7 days: ${visits7d}\n` +
-              `Last 30 days: ${visits30d}`,
-          },
-        ],
-        ...(flagNum !== undefined
-          ? { thumbnail: { url: flagUrl(flagNum) } }
-          : {}),
-        image: {
-          url: `${BASE}/islands/${isl.ID}.jpg?v=${stamp()}`,
-        },
-      },
-    ],
-  };
-}
+  const firstGroupId = [isl.Group1, isl.Group2, isl.Group3]
+    .find((id) => id && id !== "0");
 
-async function islandMessageOld(query) {
-  const [islands, groups, sinceRows] = await Promise.all([
-    tsv("island-colors.tsv"),
-    tsv("island-groups.tsv"),
-    tsv("island-since.tsv").catch(() => []),
-  ]);
+  const firstGroup = firstGroupId
+    ? groups.find((g) => g.ID === firstGroupId)?.Group
+    : "";
 
-  const q = query.toLowerCase();
-  const isl =
-    islands.find((r) => r.ID === query) ||
-    islands.find((r) => r["Island Name"].toLowerCase() === q) ||
-    islands.find((r) => r["Island Name"].toLowerCase().includes(q));
+  const gifSlug = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "unknown";
 
-  if (!isl) return { content: `I couldn't find an island called "${query}".` };
+  const gifUrl =
+    `${IMG_TEST}/islandgifs/current/${gifSlug(firstGroup || "unowned")}/${gifSlug(isl["Island Name"])}.gif?v=${stamp()}`;
 
-  const groupNames = [isl.Group1, isl.Group2, isl.Group3]
-    .filter((id) => id && id !== "0")
-    .map((id) => groups.find((g) => g.ID === id)?.Group)
-    .filter(Boolean);
-
-  const ids = [
-    ...new Set(
-      isl.Link.match(
-        /wrld_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
-      ) || []
-    ),
+  const fields = [
+    { name: "Status", value: status, inline: true },
+    { name: "Owner", value: ownerDisplay, inline: true },
+    { name: "Group", value: groupNames.join(", ") || "—", inline: true },
+    ...(sinceLine ? [{ name: "Control", value: sinceLine }] : []),
+    {
+      name: "VRChat worlds",
+      value: links.join("\n") || "No world link yet",
+    },
+    {
+      name: "👥 Island Population",
+      value: populationSummary,
+    },
+    {
+      name: "🌐 Individual World Populations",
+      value: populationLines.length
+        ? populationLines.join("\n\n").slice(0, 1024)
+        : "No VRChat worlds listed",
+    },
   ];
 
-  const urls = ids.length
-    ? ids.map((id) => `https://vrchat.com/home/world/${id}`)
-    : isl.Link.split(/\s+/).filter(Boolean);
-
-  const links = urls.slice(0, 6).map((u, n) => `[World ${n + 1}](${u})`);
-
-  const populations = await Promise.all(
-    ids.map((id) => getWorldPopulation(id))
-  );
-
-  const populationLines = populations.map((p, n) => {
-    if (!p) return `**World ${n + 1}:** Unavailable`;
-
-    const valid = [p.total, p.public, p.private].every(
-      (v) => Number.isFinite(v)
-    );
-
-    if (!valid) return `**World ${n + 1}:** Population unavailable`;
-
-    return (
-      `**World ${n + 1}**\n` +
-      `👥 Total: ${p.total} · 🌐 Public: ${p.public} · 🔒 Private: ${p.private}`
-    );
-  });
-
-  const availablePopulations = populations.filter(
-    (p) =>
-      p &&
-      Number.isFinite(p.total) &&
-      Number.isFinite(p.public) &&
-      Number.isFinite(p.private)
-  );
-
-  const islandTotal = availablePopulations.reduce((sum, p) => sum + p.total, 0);
-  const islandPublic = availablePopulations.reduce((sum, p) => sum + p.public, 0);
-  const islandPrivate = availablePopulations.reduce((sum, p) => sum + p.private, 0);
-
-  const populationSummary = availablePopulations.length
-    ? `**Island total: ${islandTotal}**\n🌐 Public: ${islandPublic} · 🔒 Private: ${islandPrivate}` +
-      (availablePopulations.length < ids.length
-        ? `\n⚠️ Only ${availablePopulations.length} of ${ids.length} worlds returned usable data.`
-        : "")
-    : "Population data unavailable";
-
-  const lifetimeVisits = populations.every(
-    (p) => p && Number.isFinite(p.visits)
-  )
-    ? populations.reduce((sum, p) => sum + p.visits, 0)
-    : null;
-
-  const flagNum = [
-    isl.Flag,
-    ...[isl.Group1, isl.Group2, isl.Group3].map(
-      (id) => groups.find((g) => g.ID === id)?.Flag
-    ),
-  ]
-    .map((x) => parseInt(x, 10))
-    .find((n) => n >= 0);
-
-  const since = sinceRows.find((r) => r["Island Name"] === isl["Island Name"]);
-  const sinceLine =
-    since && isl.Unknown !== "1" && since.Since
-      ? `${isl.Unowned === "1" ? "Unowned" : "Same owner"} since ${sinceText(
-          since.Since,
-          since.AtLeast === "1"
-        )}`
-      : "";
-
-  const status =
-    isl.Unknown === "1"
-      ? "❓ Unknown island"
-      : isl.Unowned === "1"
-        ? "⚪ Unowned"
-        : "Owned";
-
-  const color =
-    parseInt((isl.Color.split(/\s+/)[0] || "#005aff").replace("#", ""), 16) ||
-    0x005aff;
-
-  const ownerLinks = await getOwnerLinks();
-  const rawOwner = (isl.Owner || "").trim();
-  const ownerData = ownerLinks[rawOwner.toLowerCase()] || {};
-
-  let ownerDisplay = rawOwner || "—";
-
-  if (rawOwner && rawOwner !== "—" && rawOwner !== "Unowned") {
-    if (ownerData.link && ownerData.discord) {
-      ownerDisplay = `[${rawOwner}](${ownerData.link}) (${ownerData.discord})`;
-    } else if (ownerData.link) {
-      ownerDisplay = `[${rawOwner}](${ownerData.link})`;
-    } else if (ownerData.discord) {
-      ownerDisplay = `${rawOwner} (${ownerData.discord})`;
-    }
+  if (islandVisitParts.length) {
+    fields.push({
+      name: "📈 Island Visits",
+      value: islandVisitParts.join("\n"),
+    });
   }
 
   return {
@@ -623,45 +506,17 @@ async function islandMessageOld(query) {
         title: isl["Island Name"],
         url: BASE + "/",
         color,
-        fields: [
-          { name: "Status", value: status, inline: true },
-          { name: "Owner", value: ownerDisplay, inline: true },
-          { name: "Group", value: groupNames.join(", ") || "—", inline: true },
-          ...(sinceLine ? [{ name: "Control", value: sinceLine }] : []),
-          {
-            name: "VRChat worlds",
-            value: links.join("\n") || "No world link yet",
-          },
-          {
-            name: "👥 Island Population",
-            value: populationSummary,
-          },
-          {
-            name: "🌐 Individual World Populations",
-            value: populationLines.length
-              ? populationLines.join("\n\n").slice(0, 1024)
-              : "No VRChat worlds listed",
-          },
-          {
-            name: "📈 Lifetime Visits",
-            value:
-              lifetimeVisits !== null
-                ? lifetimeVisits.toLocaleString("en-US")
-                : "Visit count unavailable",
-          },
-        ],
+        fields,
         ...(flagNum !== undefined
           ? { thumbnail: { url: flagUrl(flagNum) } }
           : {}),
         image: {
-          url: `${BASE}/islands/${isl.ID}.jpg?v=${stamp()}`,
+          url: gifUrl,
         },
       },
     ],
   };
 }
-
-
 
 // ---------- groups ----------
 async function groupData(g) {
@@ -1200,21 +1055,6 @@ export default {
           ],
         },
         {
-          name: "islandold",
-          description: "Show the previous island information display",
-          type: 1,
-          options: [
-            {
-              type: 3,
-              name: "name",
-              description: "Island name",
-              required: true,
-              autocomplete: true
-            }
-          ],
-        },
-
-        {
           name: "setowner",
           description: "🔒 Restricted: change an island's owner in Google Sheets",
           type: 1,
@@ -1305,15 +1145,6 @@ export default {
         return json({
           type: 4,
           data: await islandMessage(
-            String(i.data.options?.[0]?.value ?? "")
-          )
-        });
-      }
-
-      if (name === "islandold") {
-        return json({
-          type: 4,
-          data: await islandMessageOld(
             String(i.data.options?.[0]?.value ?? "")
           )
         });
