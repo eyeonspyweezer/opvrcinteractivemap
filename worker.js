@@ -328,70 +328,115 @@ async function islandMessage(query) {
 
   const urls = ids.length
     ? ids.map((id) => `https://vrchat.com/home/world/${id}`)
-    : isl.Link.split(/\s+/).filter(Boolean);
-
-  const worldLabel = (n) => ids.length === 1 ? "VRChat World" : `World ${n + 1}`;
-
-  const links = urls
-    .slice(0, 6)
-    .map((u, n) => `[${worldLabel(n)}](${u})`);
+    : isl.Link.split(/\\s+/).filter(Boolean);
 
   const populations = await Promise.all(
     ids.map((id) => getWorldPopulation(id))
   );
 
-  const populationLines = populations.map((p, n) => {
-    const label = worldLabel(n);
-    if (!p) return `**${label}:** Unavailable`;
-
-    const valid = [p.total, p.public, p.private].every(
-      (v) => Number.isFinite(v)
-    );
-
-    const worldVisit = worldVisitRows.find(
-      (r) => (r["World ID"] || "").toLowerCase() === ids[n]
-    );
-
-    const visitParts = [];
-    const visit24 = visitLine(worldVisit, "Visits 24h");
-    const visit7 = visitLine(worldVisit, "Visits 7d");
-    const visit30 = visitLine(worldVisit, "Visits 30d");
-
-    if (visit24) visitParts.push(`Last 24 hours: ${visit24}`);
-    if (visit7) visitParts.push(`Last 7 days: ${visit7}`);
-    if (visit30) visitParts.push(`Last 30 days: ${visit30}`);
-
-    const visitText = visitParts.length
-      ? `\n📈 ${visitParts.join(" · ")}`
-      : "";
-
-    if (!valid) {
-      return `**${label}:** Population unavailable${visitText}`;
+  // A single linked world gets the simple "VRChat World" label.
+  // Multiple linked worlds get numbered "#1", "#2", etc. and use
+  // the actual VRChat world name returned by the API.
+  const worldLabel = (n, p) => {
+    const name = p?.name ? String(p.name).trim() : "";
+    if (ids.length === 1) {
+      return name ? `VRChat World — ${name}` : "VRChat World";
     }
+    return name ? `#${n + 1} ${name}` : `#${n + 1} World`;
+  };
 
-    return (
-      `**${label}**\n` +
-      `👥 Total: ${p.total} · 🌐 Public: ${p.public} · 🔒 Private: ${p.private}` +
-      visitText
-    );
-  });
+  const links = urls
+    .slice(0, 6)
+    .map((u, n) => {
+      const p = populations[n];
+      const label = worldLabel(n, p);
+      return `[${label}](${u})`;
+    });
+
+  const populationLines = populations
+    .map((p, n) => {
+      // If the world has zero total players, hide that world's details entirely.
+      if (
+        !p ||
+        !Number.isFinite(Number(p.total)) ||
+        Number(p.total) <= 0
+      ) {
+        return "";
+      }
+
+      const total = Number(p.total);
+      const pub = Number(p.public);
+      const priv = Number(p.private);
+      const label = worldLabel(n, p);
+
+      const worldVisit = worldVisitRows.find(
+        (r) => (r["World ID"] || "").toLowerCase() === ids[n]
+      );
+
+      const visitParts = [];
+      const visit24 = visitLine(worldVisit, "Visits 24h");
+      const visit7 = visitLine(worldVisit, "Visits 7d");
+      const visit30 = visitLine(worldVisit, "Visits 30d");
+
+      if (visit24) visitParts.push(`Last 24 hours: ${visit24}`);
+      if (visit7) visitParts.push(`Last 7 days: ${visit7}`);
+      if (visit30) visitParts.push(`Last 30 days: ${visit30}`);
+
+      const populationParts = [`👥 Total: ${total}`];
+
+      // Hide a zero Public or Private value instead of displaying "0".
+      if (Number.isFinite(pub) && pub > 0) {
+        populationParts.push(`🌐 Public: ${pub}`);
+      }
+      if (Number.isFinite(priv) && priv > 0) {
+        populationParts.push(`🔒 Private: ${priv}`);
+      }
+
+      const visitText = visitParts.length
+        ? `\\n📈 ${visitParts.join(" · ")}`
+        : "";
+
+      return `**${label}**\\n${populationParts.join(" · ")}${visitText}`;
+    })
+    .filter(Boolean);
 
   const availablePopulations = populations.filter(
     (p) =>
       p &&
-      Number.isFinite(p.total) &&
-      Number.isFinite(p.public) &&
-      Number.isFinite(p.private)
+      Number.isFinite(Number(p.total)) &&
+      Number(p.total) >= 0 &&
+      Number.isFinite(Number(p.public)) &&
+      Number.isFinite(Number(p.private))
   );
 
-  const islandTotal = availablePopulations.reduce((sum, p) => sum + p.total, 0);
-  const islandPublic = availablePopulations.reduce((sum, p) => sum + p.public, 0);
-  const islandPrivate = availablePopulations.reduce((sum, p) => sum + p.private, 0);
+  // Island population is the combined total of all linked VRChat worlds.
+  const islandTotal = availablePopulations.reduce(
+    (sum, p) => sum + Number(p.total),
+    0
+  );
+  const islandPublic = availablePopulations.reduce(
+    (sum, p) => sum + Number(p.public),
+    0
+  );
+  const islandPrivate = availablePopulations.reduce(
+    (sum, p) => sum + Number(p.private),
+    0
+  );
+
+  const populationSummaryParts = [`**Island total: ${islandTotal}**`];
+
+  // Hide Public/Private when their combined value is zero.
+  if (islandPublic > 0) {
+    populationSummaryParts.push(`🌐 Public: ${islandPublic}`);
+  }
+  if (islandPrivate > 0) {
+    populationSummaryParts.push(`🔒 Private: ${islandPrivate}`);
+  }
 
   const populationSummary = availablePopulations.length
-    ? `**Island total: ${islandTotal}**\n🌐 Public: ${islandPublic} · 🔒 Private: ${islandPrivate}` +
+    ? populationSummaryParts.join(" · ") +
       (availablePopulations.length < ids.length
-        ? `\n⚠️ Only ${availablePopulations.length} of ${ids.length} worlds returned usable data.`
+        ? `\\n⚠️ Only ${availablePopulations.length} of ${ids.length} worlds returned usable data.`
         : "")
     : "Population data unavailable";
 
@@ -437,7 +482,7 @@ async function islandMessage(query) {
         : "Owned";
 
   const color =
-    parseInt((isl.Color.split(/\s+/)[0] || "#005aff").replace("#", ""), 16) ||
+    parseInt((isl.Color.split(/\\s+/)[0] || "#005aff").replace("#", ""), 16) ||
     0x005aff;
 
   const ownerLinks = await getOwnerLinks();
@@ -479,24 +524,24 @@ async function islandMessage(query) {
     ...(sinceLine ? [{ name: "Control", value: sinceLine }] : []),
     {
       name: "VRChat worlds",
-      value: links.join("\n") || "No world link yet",
+      value: links.join("\\n") || "No world link yet",
     },
     {
       name: "👥 Island Population",
       value: populationSummary,
     },
-    {
-      name: "🌐 Individual World Populations",
-      value: populationLines.length
-        ? populationLines.join("\n\n").slice(0, 1024)
-        : "No VRChat worlds listed",
-    },
+    ...(populationLines.length
+      ? [{
+          name: "🌐 Individual World Populations",
+          value: populationLines.join("\\n\\n").slice(0, 1024),
+        }]
+      : []),
   ];
 
   if (islandVisitParts.length) {
     fields.push({
       name: "📈 Island Visits",
-      value: islandVisitParts.join("\n"),
+      value: islandVisitParts.join("\\n"),
     });
   }
 
