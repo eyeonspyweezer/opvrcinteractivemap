@@ -543,7 +543,7 @@ async function islandMessage(query) {
       value: links.join("\\n") || "No world link yet",
     },
     {
-      name: "👥 Island Population",
+      name: "👥 Current Players",
       value: populationSummary,
     },
     ...(populationLines.length
