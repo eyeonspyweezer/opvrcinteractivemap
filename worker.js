@@ -90,7 +90,8 @@ async function getGroups() {
       discordInvite: extra.DiscordInvite || "",
       vrchatMembers: extra.VRChatMembers || "",
       vrchatOnline: extra.VRChatOnline || "",
-      discordMembers: extra.DiscordMembers || ""
+      discordMembers: extra.DiscordMembers || "",
+      flagUrl: extra.FlagURL || ""
     };
   });
 }
@@ -1050,39 +1051,55 @@ async function sheetPage(kind, page) {
 }
 
 // ---------- /crewlist pagination ----------
-const CREW_PAGE_SIZE = 15;
-
-async function crewListPage(page) {
+const CREW_PAGE_SIZE = 10;
+const CREW_SORTS = [["islands","Island count"],["az","A–Z"],["za","Z–A"],["vrchatMembers","VRChat members"],["vrchatOnline","VRChat online"],["discordMembers","Discord members"],["growth","Visit growth (7 days)"]];
+async function crewListPage(page, sortBy = "islands") {
   const groups = await getGroups();
-  groups.sort((a, b) => b.islands - a.islands);
-
-  const pages = Math.max(1, Math.ceil(groups.length / CREW_PAGE_SIZE));
-  const p = Math.min(Math.max(page, 0), pages - 1);
-  const slice = groups.slice(p * CREW_PAGE_SIZE, (p + 1) * CREW_PAGE_SIZE);
-
-  const rows = slice.map((g) => `• **${esc(g.name)}** — ${g.islands} island${g.islands === 1 ? "" : "s"}`);
-  const updated = await lastUpdated();
-
-  return {
-    embeds: [
-      {
-        title: "🏴‍☠️ Registered Crews & Factions",
-        description: rows.join("\n") || "No crews found.",
-        color: 0x005aff,
-        footer: { text: `Page ${p + 1} of ${pages}` },
-        ...(updated ? { timestamp: updated } : {}),
-      },
-    ],
-    components: [
-      {
-        type: 1,
-        components: [
-          { type: 2, style: 2, label: "◀ Back", custom_id: `cl_${p - 1}`, disabled: p === 0 },
-          { type: 2, style: 1, label: "Next ▶", custom_id: `cl_${p + 1}`, disabled: p >= pages - 1 },
-        ],
-      },
-    ],
+  const sortKey = CREW_SORTS.some(([key]) => key === sortBy) ? sortBy : "islands";
+  let growthByName = new Map();
+  if (sortKey === "growth") {
+    try { const activity = await buildWorldActivity("7d"); growthByName = new Map((activity.crewGrowth || []).map(row => [row.name.toLowerCase(), row.gained])); } catch {}
+  }
+  const valueOf = g => {
+    if (sortKey === "islands") return Number(g.islands);
+    if (sortKey === "vrchatMembers") return g.vrchatMembers.trim() === "" ? null : Number(g.vrchatMembers);
+    if (sortKey === "vrchatOnline") return g.vrchatOnline.trim() === "" ? null : Number(g.vrchatOnline);
+    if (sortKey === "discordMembers") return g.discordMembers.trim() === "" ? null : Number(g.discordMembers);
+    if (sortKey === "growth") return growthByName.has(g.name.toLowerCase()) ? growthByName.get(g.name.toLowerCase()) : null;
+    return null;
   };
+  groups.sort((a,b) => {
+    if (sortKey === "az") return a.name.localeCompare(b.name);
+    if (sortKey === "za") return b.name.localeCompare(a.name);
+    const av=valueOf(a), bv=valueOf(b);
+    if (av===null && bv===null) return a.name.localeCompare(b.name);
+    if (av===null) return 1; if (bv===null) return -1; return bv-av;
+  });
+  const pages=Math.max(1,Math.ceil(groups.length/CREW_PAGE_SIZE)), p=Math.min(Math.max(page,0),pages-1);
+  const slice=groups.slice(p*CREW_PAGE_SIZE,(p+1)*CREW_PAGE_SIZE);
+  const fmt=v=>v===null||v===undefined||v===""||!Number.isFinite(Number(v))?"Unavailable":Number(v).toLocaleString("en-US");
+  const embeds=slice.map(g=>{
+    const growth=growthByName.has(g.name.toLowerCase())?growthByName.get(g.name.toLowerCase()):null;
+    const links=[];
+    if(g.vrchatGroupUrl) links.push("[VRChat group]("+g.vrchatGroupUrl+")");
+    if(g.discordInvite) links.push("[Discord invite]("+g.discordInvite+")");
+    const image=g.flagUrl||flagUrl(g.flag);
+    return {title:g.name,description:links.join(" · ")||"No group links listed.",color:0x005aff,
+      fields:[
+        {name:"Islands",value:String(g.islands),inline:true},
+        {name:"VRChat members",value:fmt(g.vrchatMembers),inline:true},
+        {name:"VRChat online",value:fmt(g.vrchatOnline),inline:true},
+        {name:"Discord members",value:fmt(g.discordMembers),inline:true},
+        {name:"Visit growth (7 days)",value:fmt(growth),inline:true}
+      ],...(image?{thumbnail:{url:image}}:{})};
+  });
+  return {embeds,components:[
+    {type:1,components:[{type:3,custom_id:`cls_${sortKey}_${p}`,placeholder:"Sort crews by…",options:CREW_SORTS.map(([value,label])=>({label,value,default:value===sortKey}))}]},
+    {type:1,components:[
+      {type:2,style:2,label:"◀ Back",custom_id:`cl_${sortKey}_${p-1}`,disabled:p===0},
+      {type:2,style:1,label:"Next ▶",custom_id:`cl_${sortKey}_${p+1}`,disabled:p>=pages-1}
+    ]}
+  ]};
 }
 // ---------- restricted commands: /addcrew and /editcrew ----------
 // Secrets needed: ADMIN_IDS (Discord user IDs, separated by commas), GITHUB_TOKEN,
@@ -1712,8 +1729,12 @@ export default {
         return json({ type: 7, data: await sheetPage(k === "c" ? "c" : "i", parseInt(pg, 10) || 0) });
       }
       if (i.data.custom_id.startsWith("cl_")) {
-        const [, pg] = i.data.custom_id.split("_");
-        return json({ type: 7, data: await crewListPage(parseInt(pg, 10) || 0) });
+        const [, sort, pg] = i.data.custom_id.split("_");
+        return json({ type: 7, data: await crewListPage(parseInt(pg, 10) || 0, sort || "islands") });
+      }
+      if (i.data.custom_id.startsWith("cls_")) {
+        const [, sort] = i.data.custom_id.split("_");
+        return json({ type: 7, data: await crewListPage(0, sort || "islands") });
       }
       const [kind, mask] = i.data.custom_id.split("_");
 
