@@ -94,7 +94,12 @@ def main():
         raise SystemExit("Missing island-colors.tsv")
 
     world_ids = set()
-    for island in read_tsv(SOURCE):
+    source_rows = read_tsv(SOURCE)
+    print(f"Source file: {SOURCE.resolve()} ({SOURCE.stat().st_size} bytes); parsed {len(source_rows)} island rows.")
+    if source_rows:
+        print(f"Parsed columns: {list(source_rows[0].keys())}")
+        print(f"First row Link value: {str(source_rows[0].get('Link') or '')[:160]!r}")
+    for island in source_rows:
         links = " ".join((island.get("Link") or "", island.get("WorldId") or ""))
         world_ids.update(match.group(0).lower() for match in WORLD_RE.finditer(links))
 
