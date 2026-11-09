@@ -428,11 +428,14 @@ async function buildWorldActivity(durationValue = "7d") {
       }
     }
 
-    if (!baseline) continue;
+    // If the requested duration reaches farther back than the tracker history,
+    // use the oldest available snapshot instead of returning an empty result.
+    if (!baseline) baseline = samples[0];
 
     if (current.checkedAt !== latest["Last Checked UTC"]) continue;
 
     const gained = current.visits - baseline.visits;
+    const comparisonMs = Math.max(0, Date.parse(current.checkedAt) - Date.parse(baseline.checkedAt));
     if (gained === 0) continue;
 
     visitGrowth.push({
@@ -441,6 +444,7 @@ async function buildWorldActivity(durationValue = "7d") {
       gained,
       checkedAt: current.checkedAt,
       previousAt: baseline.checkedAt,
+      comparisonMs,
       islands: worldIslands.get(id) || []
     });
   }
@@ -523,6 +527,7 @@ async function buildWorldActivity(durationValue = "7d") {
   return {
     checkedAt: new Date().toISOString(),
     duration: duration.label,
+    comparisonDays: visitGrowth.length ? Math.max(...visitGrowth.map(x => x.comparisonMs || 0)) / 86400000 : 0,
     crewGrowth,
     ownerGrowth,
     trackedWorldCount: worldIds.size
@@ -583,7 +588,7 @@ function worldActivityMessage(data) {
   return {
     embeds: [{
       title: "VRChat World Activity — Crew Ranking",
-      description: `Ranked by visit growth over the last ${data.duration}. Each # is an island link.\\n\\n${description}`.slice(0, 5900),
+      description: `Ranked by visit growth over the requested ${data.duration}. Each # is an island link.\\n${data.comparisonDays > 0 && data.comparisonDays < parseWorldActivityDuration(data.duration).ms / 86400000 ? `Only ${data.comparisonDays.toFixed(1)} days of recorded history are currently available.\\n` : ""}\\n${description}`.slice(0, 5900),
       color: 0x005aff,
       footer: {
         text: `Visit tracker: ${data.trackedWorldCount} linked worlds. Rankings use recorded lifetime-visit snapshots.`
