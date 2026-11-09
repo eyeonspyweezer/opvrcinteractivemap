@@ -744,17 +744,6 @@ function liveActivityMessage(data, kind) {
     ? lines.join("\n")
     : "No mapped islands, crews, or owners were available to rank.";
 
-  const expectedWorlds = new Set(
-    [...data.islandRankings].flatMap(row => [...row.worldIds])
-  ).size;
-  const checkedWorlds = new Set(
-    [...data.islandRankings].flatMap(row => [...row.worldIds])
-      .filter(id => {
-        const row = data.populationByWorld?.get(id);
-        return row?.Status === "ok";
-      })
-  ).size;
-
   return {
     embeds: [{
       title: config.title,
