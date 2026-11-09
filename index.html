@@ -634,6 +634,7 @@ let ownerMap = new Map();    // island (lowercase) -> owner
 let leaderMap = new Map();   // leader (lowercase) -> [nations]
 let nationColor = new Map(); // nation (lowercase) -> color
 let nationFlag = new Map();  // nation (lowercase) -> flag image
+let nationLink = new Map(); // group/nation (lowercase) -> website
 let leaderLink = new Map();  // leader (lowercase) -> website
 
 function parseSheet(text, aHeads, bHeads, loose) {
@@ -827,6 +828,10 @@ function linkOf(raw) {
   }
   return '';
 }
+function groupLinkOf(group) {
+  const url = nationLink.get(String(group || '').trim().toLowerCase()) || '';
+  return /^https?:\/\//i.test(url) ? url : '';
+}
 
 function applyStyle(layer) {
   const p = layer.feature.properties;
@@ -893,11 +898,11 @@ function ownerTextColor(owner) {
 }
 function tipContent(layer) {
   const p = layer.feature.properties;
-  const raw = resolveOwner(p); // exact string from the island owner sheet
+  const raw = resolveOwner(p);
   const el = document.createElement('div');
-  
+  const safeUrl = (u) => /^https?:\/\//i.test(String(u || '').trim()) ? String(u).trim() : '';
 
-  const line = (label, value, opts = {}) => {
+  const line = (label, value) => {
     if (!value) return;
     const row = document.createElement('div');
     row.className = 'tip-line';
@@ -909,51 +914,53 @@ function tipContent(layer) {
     }
     const val = document.createElement('span');
     val.textContent = value;
-    if (opts.underline) {
-      val.style.textDecoration = 'underline';
-      val.style.textDecorationColor = 'rgb(62, 44, 42)';
-    }
     row.appendChild(val);
     el.appendChild(row);
   };
 
-  // Island name only
   line('', String(p.name || ''));
 
-  // Owner = sheet text for THIS island only (no crew leaders expansion)
-  const ownerOnly = String(raw || '').trim();
-  if (ownerOnly) {
+  ownersOf(String(raw || '').trim()).forEach((owner, i) => {
     const row = document.createElement('div');
     row.className = 'tip-line';
     const lab = document.createElement('span');
     lab.className = 'tip-label';
     lab.textContent = 'Owner:';
     row.appendChild(lab);
-    const val = document.createElement('span');
-    if (linkOf(raw)) { val.style.textDecoration = 'underline'; val.style.textDecorationColor = 'rgb(62, 44, 42)'; }
-    ownersOf(ownerOnly).forEach((o, i) => {
-      if (i) val.appendChild(document.createTextNode(' / '));
-      const sp = document.createElement('span');
-      sp.textContent = o;
-      const c = ownerTextColor(o);
-      if (c) sp.style.color = c;
-      val.appendChild(sp);
+    if (i) row.appendChild(document.createTextNode(' '));
+    const url = safeUrl(linkOf(owner));
+    const name = document.createElement(url ? 'a' : 'span');
+    name.textContent = owner;
+    if (url) { name.href = url; name.target = '_blank'; name.rel = 'noopener'; name.className = 'owner-link'; }
+    const c = ownerTextColor(owner);
+    if (c) name.style.color = c;
+    row.appendChild(name);
+    el.appendChild(row);
+  });
+
+  const crews = isGoneStatus(layer) ? [] : preferMarines([
+    ...new Set(ownersOf(raw).flatMap(groupsOf).filter((g) => g && !/ Kingdom$/i.test(g)))
+  ]);
+  if (crews.length) {
+    const row = document.createElement('div');
+    row.className = 'tip-line';
+    const lab = document.createElement('span');
+    lab.className = 'tip-label';
+    lab.textContent = 'Group:';
+    row.appendChild(lab);
+    crews.forEach((group, i) => {
+      if (i) row.appendChild(document.createTextNode(', '));
+      const url = safeUrl(groupLinkOf(group));
+      const name = document.createElement(url ? 'a' : 'span');
+      name.textContent = group;
+      if (url) { name.href = url; name.target = '_blank'; name.rel = 'noopener'; name.className = 'owner-link'; }
+      row.appendChild(name);
     });
-    row.appendChild(val);
     el.appendChild(row);
   }
 
-  // Crews/groups derived from those owners — separate line
-  const crews = isGoneStatus(layer) ? [] : preferMarines([
-    ...new Set(
-      ownersOf(raw).flatMap(groupsOf).filter((g) => g && !/ Kingdom$/i.test(g))
-    )
-  ]);
-  if (crews.length) line('Crew:', crews.join(', '));
-
   const w = worldOf(p.name);
   if (w && w.players) line('Players:', w.players);
-
   return el;
 }
 
@@ -1063,10 +1070,11 @@ function loadExtra(text) {
 
 function loadNations(text) {
   const rows = parseSheet(text, CONFIG.nationHeaders, CONFIG.leaderHeaders);
-  leaderMap = new Map(); nationColor = new Map(); nationFlag = new Map(); leaderLink = new Map();
+  leaderMap = new Map(); nationColor = new Map(); nationFlag = new Map(); nationLink = new Map(); leaderLink = new Map();
   const pick = (r, list) => { const k = list.map((h) => h.toLowerCase()).find((h) => r.cols[h]); return k ? r.cols[k] : ''; };
   rows.forEach((r) => {
     const link = pick(r, CONFIG.linkHeaders);
+    if (link && !nationLink.has(r.a.trim().toLowerCase())) nationLink.set(r.a.trim().toLowerCase(), link);
     ownersOf(r.b).forEach((owner) => {
       const k = owner.replace(/\?+$/, '').trim().toLowerCase();
       if (!k) return;
