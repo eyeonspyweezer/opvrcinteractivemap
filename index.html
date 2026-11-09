@@ -491,19 +491,47 @@ function isGoneStatus(layer) {
 let mapPixelCanvas = null, mapPixelContext = null;
 function mapPixelColor(layer) {
   if (!mapPixelContext || !mapWidth || !mapHeight) {
-    console.warn('[island status] Map image pixels are not ready; cannot sample island color.');
+    console.warn('[island status] Map image pixels are not ready; cannot sample ocean color.');
     return null;
   }
   try {
-    // CRS.Simple has its Y axis increasing upward, while image pixels start at the top.
-    // Convert the polygon's map coordinate to the matching image pixel coordinate.
-    const point = turf.pointOnFeature(layer.toGeoJSON()).geometry.coordinates;
-    const x = ((Math.floor(point[0]) % mapWidth) + mapWidth) % mapWidth;
-    const y = Math.max(0, Math.min(mapHeight - 1, Math.floor(mapHeight - point[1])));
-    const pixel = mapPixelContext.getImageData(x, y, 1, 1).data;
-    return 'rgb(' + pixel[0] + ',' + pixel[1] + ',' + pixel[2] + ')';
+    // Sample just OUTSIDE the polygon bounds. Sampling its center picks up the
+    // island's own PNG color, which makes the opaque polygon blend in invisibly.
+    const bounds = turf.bbox(layer.toGeoJSON());
+    const [minX, minY, maxX, maxY] = bounds;
+    const pad = 5;
+    const spanX = Math.max(1, maxX - minX);
+    const spanY = Math.max(1, maxY - minY);
+    const stepX = Math.max(1, Math.floor(spanX / 24));
+    const stepY = Math.max(1, Math.floor(spanY / 24));
+    const samples = [];
+    const read = (mapX, mapY) => {
+      const x = ((Math.floor(mapX) % mapWidth) + mapWidth) % mapWidth;
+      const y = Math.max(0, Math.min(mapHeight - 1, Math.floor(mapHeight - mapY)));
+      const px = mapPixelContext.getImageData(x, y, 1, 1).data;
+      if (px[3] >= 200) samples.push([px[0], px[1], px[2]]);
+    };
+    for (let x = minX; x <= maxX; x += stepX) {
+      read(x, minY - pad);
+      read(x, maxY + pad);
+    }
+    for (let y = minY; y <= maxY; y += stepY) {
+      read(minX - pad, y);
+      read(maxX + pad, y);
+    }
+    if (!samples.length) return null;
+
+    // Use the most common nearby ocean color; this avoids a few coastline or
+    // neighboring-island pixels skewing the cover color.
+    const counts = new Map();
+    samples.forEach(rgb => {
+      const key = rgb.join(',');
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    return 'rgb(' + best + ')';
   } catch (err) {
-    console.warn('[island status] Could not sample map image color:', err);
+    console.warn('[island status] Could not sample surrounding map color:', err);
     return null;
   }
 }
