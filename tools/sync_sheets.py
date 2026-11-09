@@ -153,8 +153,52 @@ def sync_owner_links():
     print(f"Owner links: {len(owners)} owners written to {OWNER_FILE}")
 
 
+CREW_SHEET = "1IcCHc-ERXwUGyJmyDChw5MXwShDeGDNqkCr7fIafoDk"
+CREW_FILE = Path("crew-links.tsv")
+
+CREW_FIELDS = {
+    "vrchat_group_url": ("vrchat group url", "vrchat url", "vrc group url", "vrchat group link", "vrc group link"),
+    "vrchat_group_id": ("vrchat group id", "vrc group id", "group id"),
+    "discord_invite": ("discord invite", "discord invite url", "discord url", "discord server invite", "invite link"),
+    "vrchat_members": ("vrchat members", "vrc members", "total vrchat members", "group members", "total members"),
+    "vrchat_online": ("vrchat online", "vrc online", "vrchat online members", "online members", "members online"),
+    "discord_members": ("discord members", "discord server members", "discord member count", "server members"),
+}
+
+def sync_crew_metadata():
+    rows = fetch_tsv(CREW_SHEET)
+    header_index = None
+    columns = {}
+    for i, row in enumerate(rows):
+        low = [re.sub(r"\\s+", " ", c.strip().lower()) for c in row]
+        if low and low[0] in ("crews/groups", "nations", "nation"):
+            header_index = i
+            for field, aliases in CREW_FIELDS.items():
+                columns[field] = next((j for j, value in enumerate(low) if value in aliases), None)
+            break
+
+    if header_index is None:
+        raise ValueError("Could not find the Crews/Groups header row in the crew spreadsheet.")
+
+    def cell(row, index):
+        return row[index].strip() if index is not None and index < len(row) else ""
+
+    lines = ["Group\\tVRChatGroupURL\\tVRChatGroupID\\tDiscordInvite\\tVRChatMembers\\tVRChatOnline\\tDiscordMembers"]
+    for row in rows[header_index + 1:]:
+        name = cell(row, 0)
+        if not name:
+            continue
+        values = [name] + [cell(row, columns[field]) for field in CREW_FIELDS]
+        lines.append("\\t".join(value.replace("\\t", " ").replace("\\r", " ").replace("\\n", " ") for value in values))
+
+    output = "\\n".join(lines) + "\\n"
+    if not CREW_FILE.exists() or CREW_FILE.read_text(encoding="utf-8") != output:
+        CREW_FILE.write_text(output, encoding="utf-8")
+    print(f"Crew metadata: {len(lines) - 1} groups written to {CREW_FILE}; detected columns: " +
+          ", ".join(key for key, index in columns.items() if index is not None))
+
 def main():
-    for step in (sync_backgrounds, sync_owner_links):
+    for step in (sync_backgrounds, sync_owner_links, sync_crew_metadata):
         try:
             step()
         except Exception as e:
