@@ -380,30 +380,10 @@ async function buildWorldActivity() {
 }
 
 async function getWorldActivity() {
-  const cacheKey = new Request("https://opvrc-internal-cache.invalid/world-activity-v1");
-  try {
-    const cached = await caches.default.match(cacheKey);
-    if (cached) return await cached.json();
-  } catch {}
-
+  // Deduplicate simultaneous command requests in this Worker isolate.
+  // Individual VRChat world responses are edge-cached for 15 minutes in getWorldPopulation().
   if (worldActivityInFlight) return await worldActivityInFlight;
-
-  worldActivityInFlight = (async () => {
-    const data = await buildWorldActivity();
-    try {
-      await caches.default.put(
-        cacheKey,
-        new Response(JSON.stringify(data), {
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "public, max-age=600"
-          }
-        })
-      );
-    } catch {}
-    return data;
-  })();
-
+  worldActivityInFlight = buildWorldActivity();
   try {
     return await worldActivityInFlight;
   } finally {
@@ -446,7 +426,7 @@ function worldActivityMessage(data) {
       color: 0x005aff,
       fields,
       footer: {
-        text: `Live player scan: ${data.candidateCount} worlds max, cached 10 minutes. Visit gains compare the latest tracker snapshots.`
+        text: `Live player scan: up to ${data.candidateCount} worlds, cached 15 minutes. Visit gains compare the latest tracker snapshots.`
       },
       timestamp: data.checkedAt
     }]
