@@ -525,7 +525,6 @@ async function buildWorldActivity(durationValue = "7d") {
     duration: duration.label,
     crewGrowth,
     ownerGrowth,
-    candidateCount: liveCandidates.length,
     trackedWorldCount: worldIds.size
   };
 }
@@ -587,7 +586,7 @@ function worldActivityMessage(data) {
       description: `Ranked by visit growth over the last ${data.duration}. Each # is an island link.\\n\\n${description}`.slice(0, 5900),
       color: 0x005aff,
       footer: {
-        text: `Visit tracker: ${data.trackedWorldCount} linked worlds. Live player scan: up to ${data.candidateCount} highest-growth worlds, cached 15 minutes.`
+        text: `Visit tracker: ${data.trackedWorldCount} linked worlds. Rankings use recorded lifetime-visit snapshots.`
       },
       timestamp: data.checkedAt
     }]
@@ -1608,6 +1607,20 @@ export default {
         },
 
         {
+          name: "worldactivity",
+          description: "Rank crews by VRChat world visit growth",
+          type: 1,
+          options: [
+            {
+              type: 3,
+              name: "duration",
+              description: "How far back to compare recorded visits",
+              required: false,
+              choices: worldActivityDurationOptions()
+            }
+          ]
+        },
+        {
           name: "islandactivity",
           description: "Rank islands by current online players across their linked worlds",
           type: 1
@@ -1730,6 +1743,19 @@ export default {
       }
       if (name === "crewlist") {
         return json({ type: 4, data: await crewListPage(0) });
+      }
+
+      if (name === "worldactivity") {
+        const duration = String(i.data.options?.find((o) => o.name === "duration")?.value || "7d");
+        ctx.waitUntil((async () => {
+          const data = await worldActivityResponse(duration);
+          await fetch(`https://discord.com/api/v10/webhooks/${env.DISCORD_APP_ID}/${i.token}/messages/@original`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+          });
+        })());
+        return json({ type: 5 });
       }
 
       if (name === "islandactivity" || name === "crewactivity" || name === "owneractivity") {
