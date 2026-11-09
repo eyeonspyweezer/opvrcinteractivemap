@@ -163,6 +163,7 @@ CREW_FIELDS = {
     "vrchat_members": ("vrchat members", "vrc members", "total vrchat members", "group members", "total members"),
     "vrchat_online": ("vrchat online", "vrc online", "vrchat online members", "online members", "members online"),
     "discord_members": ("discord members", "discord server members", "discord member count", "server members"),
+    "flag_url": ("flag", "flag url", "flag image", "flag image url"),
 }
 
 def sync_crew_metadata():
@@ -183,7 +184,7 @@ def sync_crew_metadata():
     def cell(row, index):
         return row[index].strip() if index is not None and index < len(row) else ""
 
-    lines = ["Group\\tVRChatGroupURL\\tVRChatGroupID\\tDiscordInvite\\tVRChatMembers\\tVRChatOnline\\tDiscordMembers"]
+    lines = ["Group\\tVRChatGroupURL\\tVRChatGroupID\\tDiscordInvite\\tVRChatMembers\\tVRChatOnline\\tDiscordMembers\\tFlagURL"]
     for row in rows[header_index + 1:]:
         name = cell(row, 0)
         if not name:
