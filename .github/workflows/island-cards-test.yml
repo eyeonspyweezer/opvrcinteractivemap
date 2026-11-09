@@ -14,6 +14,10 @@ on:
       - 'tools/build_island_gifs.py'
       - 'tools/build_island_cards.py'
       - '.github/workflows/island-cards-test.yml'
+      - 'island-colors.tsv'
+      - 'island-groups.tsv'
+      - 'island-flags.png'
+      - 'island-since.tsv'
 
 permissions:
   contents: write
