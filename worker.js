@@ -275,16 +275,55 @@ async function getWorldPopulation(worldId) {
   }
 }
 
-// ---------- /worldactivity: cached activity scan ----------
+// ---------- /worldactivity: crew-ranked activity scan ----------
 let worldActivityInFlight = null;
 
-async function buildWorldActivity() {
-  const [islands, latestRows, historyRows] = await Promise.all([
+function parseWorldActivityDuration(value) {
+  const v = String(value || "7d").trim().toLowerCase();
+  const m = v.match(/^(\\d+(?:\\.\\d+)?)(m|h|d|w)$/);
+  if (!m) return { label: "7 days", ms: 7 * 86400000 };
+
+  const amount = Number(m[1]);
+  const unitMs = {
+    m: 60000,
+    h: 3600000,
+    d: 86400000,
+    w: 604800000
+  }[m[2]];
+
+  const ms = amount * unitMs;
+  if (!Number.isFinite(ms) || ms <= 0) return { label: "7 days", ms: 7 * 86400000 };
+
+  const unitName = { m: "minute", h: "hour", d: "day", w: "week" }[m[2]];
+  return {
+    label: `${amount} ${unitName}${amount === 1 ? "" : "s"}`,
+    ms
+  };
+}
+
+function worldActivityDurationOptions() {
+  return [
+    { name: "1 hour", value: "1h" },
+    { name: "6 hours", value: "6h" },
+    { name: "24 hours", value: "24h" },
+    { name: "3 days", value: "3d" },
+    { name: "7 days (default)", value: "7d" },
+    { name: "14 days", value: "14d" },
+    { name: "30 days", value: "30d" }
+  ];
+}
+
+async function buildWorldActivity(durationValue = "7d") {
+  const duration = parseWorldActivityDuration(durationValue);
+
+  const [islands, latestRows, historyRows, groups] = await Promise.all([
     tsv("island-colors.tsv"),
     tsv("island-world-visits.tsv"),
-    tsv("island-world-visit-history.tsv")
+    tsv("island-world-visit-history.tsv"),
+    tsv("island-groups.tsv")
   ]);
 
+  const groupById = new Map(groups.map(g => [String(g.ID), g]));
   const worldIslands = new Map();
   const worldIds = new Set();
   const worldPattern = /wrld_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
@@ -292,12 +331,35 @@ async function buildWorldActivity() {
   for (const island of islands) {
     const links = `${island.Link || ""} ${island.WorldId || ""}`;
     const ids = links.match(worldPattern) || [];
+
     for (const rawId of ids) {
       const id = rawId.toLowerCase();
       worldIds.add(id);
-      if (!worldIslands.has(id)) worldIslands.set(id, []);
-      const label = islandDisplayName(island);
-      if (label && !worldIslands.get(id).includes(label)) worldIslands.get(id).push(label);
+
+      if (!worldIslands.has(id)) {
+        worldIslands.set(id, []);
+      }
+
+      const groupNames = [island.Group1, island.Group2, island.Group3]
+        .filter(id => id && id !== "0")
+        .map(id => groupById.get(String(id))?.Group)
+        .filter(Boolean);
+
+      const label =
+        groupNames[0] ||
+        String(island.Owner || "").trim() ||
+        (island.Unowned === "1" ? "Unowned" : "Unassigned");
+
+      const existing = worldIslands.get(id);
+      const entry = {
+        islandId: String(island.ID),
+        islandName: islandDisplayName(island),
+        ownerLabel: label
+      };
+
+      if (!existing.some(x => x.islandId === entry.islandId)) {
+        existing.push(entry);
+      }
     }
   }
 
@@ -306,84 +368,174 @@ async function buildWorldActivity() {
   );
 
   const samplesById = new Map();
+
   for (const row of historyRows) {
     const id = (row["World ID"] || "").toLowerCase();
-    const stamp = row["Checked At UTC"] || "";
+    const checkedAt = row["Checked At UTC"] || "";
     const visits = Number(row["Lifetime Visits"]);
-    if (!worldIds.has(id) || !stamp || !Number.isFinite(visits)) continue;
-    if (!samplesById.has(id)) samplesById.set(id, new Map());
-    samplesById.get(id).set(stamp, visits);
+
+    if (!worldIds.has(id) || !checkedAt || !Number.isFinite(visits)) continue;
+
+    if (!samplesById.has(id)) {
+      samplesById.set(id, []);
+    }
+
+    samplesById.get(id).push({
+      checkedAt,
+      visits
+    });
   }
 
+  const cutoff = Date.now() - duration.ms;
   const visitGrowth = [];
+
   for (const id of worldIds) {
-    const samples = [...(samplesById.get(id) || new Map()).entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]));
-    if (samples.length < 2) continue;
-    const [previousAt, previousVisits] = samples[samples.length - 2];
-    const [checkedAt, currentVisits] = samples[samples.length - 1];
     const latest = latestById.get(id);
-    if (latest?.Status !== "ok" || checkedAt !== latest["Last Checked UTC"]) continue;
-    const gained = currentVisits - previousVisits;
-    if (gained <= 0) continue;
+
+    if (!latest || latest.Status !== "ok") continue;
+
+    const samples = (samplesById.get(id) || [])
+      .sort((a, b) => a.checkedAt.localeCompare(b.checkedAt));
+
+    if (samples.length < 2) continue;
+
+    const current = samples[samples.length - 1];
+
+    // Use the newest snapshot at or before the requested cutoff.
+    // If the tracker has no snapshot inside the requested window,
+    // do not pretend a shorter duration is available.
+    let baseline = null;
+
+    for (let i = samples.length - 2; i >= 0; i--) {
+      if (Date.parse(samples[i].checkedAt) <= cutoff) {
+        baseline = samples[i];
+        break;
+      }
+    }
+
+    if (!baseline) continue;
+
+    if (current.checkedAt !== latest["Last Checked UTC"]) continue;
+
+    const gained = current.visits - baseline.visits;
+    if (gained === 0) continue;
+
     visitGrowth.push({
       id,
       name: latest["World Name"] || id,
       gained,
-      checkedAt,
-      previousAt,
+      checkedAt: current.checkedAt,
+      previousAt: baseline.checkedAt,
       islands: worldIslands.get(id) || []
     });
   }
 
-  visitGrowth.sort((a, b) => b.gained - a.gained);
-  const recentWorlds = visitGrowth.slice(0, 10);
+  // Aggregate each island into its primary crew/organization.
+  // Group1 is treated as the primary organization; if there is no group,
+  // the island owner name is used. This prevents shared Group2/Group3
+  // assignments from double-counting the same island's visits.
+  const buckets = new Map();
 
-  // Only live-check the 10 worlds with the largest recent visit gains.
-  // If no comparison baseline exists yet, use the 10 highest lifetime-visit worlds.
-  const candidates = recentWorlds.length
-    ? recentWorlds.slice(0, 10)
-    : latestRows
-        .filter(row => row.Status === "ok" && worldIds.has((row["World ID"] || "").toLowerCase()))
-        .sort((a, b) => Number(b["Lifetime Visits"] || 0) - Number(a["Lifetime Visits"] || 0))
-        .slice(0, 12)
-        .map(row => ({
-          id: (row["World ID"] || "").toLowerCase(),
-          name: row["World Name"] || row["World ID"],
+  for (const item of visitGrowth) {
+    for (const island of item.islands) {
+      const key = island.ownerLabel || "Unassigned";
+
+      if (!buckets.has(key)) {
+        buckets.set(key, {
+          name: key,
           gained: 0,
-          checkedAt: row["Last Checked UTC"] || "",
-          previousAt: "",
-          islands: worldIslands.get((row["World ID"] || "").toLowerCase()) || []
-        }));
+          islandMap: new Map()
+        });
+      }
 
-  const activeWorlds = [];
-  for (let i = 0; i < candidates.length; i += 3) {
-    const batch = candidates.slice(i, i + 3);
-    const results = await Promise.all(batch.map(async candidate => ({
-      ...candidate,
-      population: await getWorldPopulation(candidate.id)
-    })));
-    activeWorlds.push(...results);
+      const bucket = buckets.get(key);
+      bucket.gained += item.gained;
+
+      if (!bucket.islandMap.has(island.islandId)) {
+        bucket.islandMap.set(island.islandId, {
+          id: island.islandId,
+          name: island.islandName,
+          worldIds: [],
+          worldVisitGain: 0
+        });
+      }
+
+      const islandEntry = bucket.islandMap.get(island.islandId);
+      islandEntry.worldVisitGain += item.gained;
+      if (!islandEntry.worldIds.includes(item.id)) {
+        islandEntry.worldIds.push(item.id);
+      }
+    }
   }
 
-  const active = activeWorlds
-    .filter(item => item.population && Number.isFinite(Number(item.population.total)) && Number(item.population.total) > 0)
-    .sort((a, b) => Number(b.population.total) - Number(a.population.total));
+  const crewGrowth = [...buckets.values()]
+    .map(bucket => ({
+      ...bucket,
+      islands: [...bucket.islandMap.values()]
+        .sort((a, b) => b.worldVisitGain - a.worldVisitGain)
+    }))
+    .filter(bucket => bucket.gained !== 0)
+    .sort((a, b) => b.gained - a.gained);
+
+  // Only live-check a limited number of highest-growth worlds to avoid
+  // hammering VRChat. Responses are edge-cached for 15 minutes.
+  const liveCandidates = visitGrowth
+    .slice()
+    .sort((a, b) => Math.abs(b.gained) - Math.abs(a.gained))
+    .slice(0, 15);
+
+  const liveByWorld = new Map();
+
+  for (let i = 0; i < liveCandidates.length; i += 3) {
+    const batch = liveCandidates.slice(i, i + 3);
+    const results = await Promise.all(
+      batch.map(async candidate => ({
+        id: candidate.id,
+        population: await getWorldPopulation(candidate.id)
+      }))
+    );
+
+    for (const result of results) {
+      if (result.population) {
+        liveByWorld.set(result.id, result.population);
+      }
+    }
+  }
+
+  for (const bucket of crewGrowth) {
+    bucket.activePlayers = 0;
+
+    for (const island of bucket.islands) {
+      island.activePlayers = 0;
+
+      for (const worldId of island.worldIds) {
+        const population = liveByWorld.get(worldId);
+        if (!population) continue;
+
+        const total = Number(population.total);
+        if (Number.isFinite(total) && total > 0) {
+          island.activePlayers += total;
+          bucket.activePlayers += total;
+        }
+      }
+    }
+  }
 
   return {
     checkedAt: new Date().toISOString(),
-    active,
-    visitGrowth: recentWorlds,
-    candidateCount: candidates.length,
-    hasVisitBaseline: visitGrowth.length > 0
+    duration: duration.label,
+    crewGrowth,
+    candidateCount: liveCandidates.length,
+    trackedWorldCount: worldIds.size
   };
 }
 
-async function getWorldActivity() {
+async function getWorldActivity(durationValue = "7d") {
   // Deduplicate simultaneous command requests in this Worker isolate.
-  // Individual VRChat world responses are edge-cached for 15 minutes in getWorldPopulation().
   if (worldActivityInFlight) return await worldActivityInFlight;
-  worldActivityInFlight = buildWorldActivity();
+
+  worldActivityInFlight = buildWorldActivity(durationValue);
+
   try {
     return await worldActivityInFlight;
   } finally {
@@ -393,51 +545,62 @@ async function getWorldActivity() {
 
 function worldActivityMessage(data) {
   const count = value => Number(value || 0).toLocaleString("en-US");
-  const worldLink = item => `[**${item.population?.name || item.name}**](https://vrchat.com/home/world/${item.id})`;
-  const islandText = item => item.islands?.length ? ` — ${item.islands.slice(0, 3).join(", ")}` : "";
 
-  const activeLines = data.active.map(item => {
-    const p = item.population;
-    const parts = [`👥 ${count(p.total)} total`];
-    if (Number(p.public) > 0) parts.push(`🌐 ${count(p.public)} public`);
-    if (Number(p.private) > 0) parts.push(`🔒 ${count(p.private)} private`);
-    return `${worldLink(item)} — ${parts.join(" · ")}${islandText(item)}`;
+  const islandLink = island => {
+    const firstWorld = island.worldIds?.[0];
+    if (firstWorld) {
+      return `[${island.name}](https://vrchat.com/home/world/${firstWorld})`;
+    }
+    return island.name;
+  };
+
+  const crewLines = data.crewGrowth.map((crew, index) => {
+    const islandLinks = crew.islands
+      .slice(0, 8)
+      .map((island, islandIndex) => {
+        const active = island.activePlayers > 0
+          ? ` · ${count(island.activePlayers)} active`
+          : "";
+        return `[#${islandIndex + 1}](https://vrchat.com/home/world/${island.worldIds?.[0] || ""})`;
+      });
+
+    const islandNames = crew.islands
+      .slice(0, 8)
+      .map((island, islandIndex) =>
+        `[#${islandIndex + 1}](https://vrchat.com/home/world/${island.worldIds?.[0] || ""})`
+      );
+
+    const totalActive = crew.activePlayers > 0
+      ? ` / ${count(crew.activePlayers)} active players`
+      : "";
+
+    return `**${index + 1}. ${crew.name}** — **+${count(crew.gained)} total visits**${totalActive} (${islandNames.join(", ")})`;
   });
 
-  const visitLines = data.visitGrowth.slice(0, 10).map(item =>
-    `[**${item.name}**](https://vrchat.com/home/world/${item.id}) — **+${count(item.gained)}** visits${islandText(item)}`
-  );
-
-  const fields = [
-    {
-      name: "🟢 Currently active",
-      value: activeLines.join("\n").slice(0, 1024) || "No players found in the worlds checked."
-    },
-    {
-      name: "📈 Recent new visits",
-      value: visitLines.join("\n").slice(0, 1024) || "No positive visit changes between the latest tracker snapshots yet."
-    }
-  ];
+  const description = crewLines.length
+    ? crewLines.join("\\n")
+    : "No non-zero visit changes were found for the selected duration.";
 
   return {
     embeds: [{
-      title: "VRChat World Activity",
-      description: "Activity across VRChat worlds linked to the OPVRC island map.",
+      title: "VRChat World Activity — Crew Ranking",
+      description: `Ranked by visit growth over the last ${data.duration}. Each # is an island link.\\n\\n${description}`.slice(0, 5900),
       color: 0x005aff,
-      fields,
       footer: {
-        text: `Live player scan: up to ${data.candidateCount} worlds, cached 15 minutes. Visit gains compare the latest tracker snapshots.`
+        text: `Visit tracker: ${data.trackedWorldCount} linked worlds. Live player scan: up to ${data.candidateCount} highest-growth worlds, cached 15 minutes.`
       },
       timestamp: data.checkedAt
     }]
   };
 }
 
-async function worldActivityResponse() {
+async function worldActivityResponse(durationValue = "7d") {
   try {
-    return worldActivityMessage(await getWorldActivity());
+    return worldActivityMessage(await getWorldActivity(durationValue));
   } catch (error) {
-    return { content: "⚠️ I couldn't load world activity right now. The cached visit tracker or VRChat API may be temporarily unavailable." };
+    return {
+      content: "⚠️ I couldn't load world activity right now. The cached visit tracker or VRChat API may be temporarily unavailable."
+    };
   }
 }
 
@@ -1269,8 +1432,17 @@ export default {
 
         {
           name: "worldactivity",
-          description: "Show currently active VRChat worlds and recent visit increases",
-          type: 1
+          description: "Rank island activity by crew/organization and visit growth",
+          type: 1,
+          options: [
+            {
+              type: 3,
+              name: "duration",
+              description: "How far back to compare visits",
+              required: false,
+              choices: worldActivityDurationOptions()
+            }
+          ]
         },
         {
           name: "island",
@@ -1383,8 +1555,9 @@ export default {
       }
 
       if (name === "worldactivity") {
+        const duration = String(i.data.options?.find((o) => o.name === "duration")?.value || "7d");
         ctx.waitUntil((async () => {
-          const data = await worldActivityResponse();
+          const data = await worldActivityResponse(duration);
           await fetch(`https://discord.com/api/v10/webhooks/${env.DISCORD_APP_ID}/${i.token}/messages/@original`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
