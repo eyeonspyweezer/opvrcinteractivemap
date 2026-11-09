@@ -1,1 +1,22 @@
-Group\tVRChatGroupURL\tVRChatGroupID\tDiscordInvite\tVRChatMembers\tVRChatOnline\tDiscordMembers\nThe Olympus Pirates\t\t\t\t\t\t\nThe Marines\t\t\t\t\t\t\nThe Thriller Bark Pirates\t\t\t\t\t\t\nRevolutionary Army\t\t\t\t\t\t\nThe Vael Pirates\t\t\t\t\t\t\nThe World Government\t\t\t\t\t\t\nThe Ying & Yong Pirates\t\t\t\t\t\t\nThe Akazaya Pirates\t\t\t\t\t\t\nThe Star Pirates\t\t\t\t\t\t\nThe Unknown Pirates\t\t\t\t\t\t\nThe Tazmanian Pirates\t\t\t\t\t\t\nThe Requiem Pirates\t\t\t\t\t\t\nThe Donquixote Pirates\t\t\t\t\t\t\nThe Infamous Straw Hats\t\t\t\t\t\t\nThe Straw Hats\t\t\t\t\t\t\nThe Roger Pirates\t\t\t\t\t\t\nThe Frostbite Pirates\t\t\t\t\t\t\nThe Moonlight Pirates\t\t\t\t\t\t\nThe Rocks Pirates\t\t\t\t\t\t\nThe Bloodsail Pirates\t\t\t\t\t\t\nNeo-Cipher Pol\t\t\t\t\t\t\n
+Group	VRChatGroupURL	VRChatGroupID	DiscordInvite	VRChatMembers	VRChatOnline	DiscordMembers	FlagURL
+The Olympus Pirates							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/olympuspirates.webp
+The Marines							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/marines.webp
+The Thriller Bark Pirates							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/IMG_5788.webp
+Revolutionary Army							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/revolutionaryarmy.webp
+The Vael Pirates							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/vaelpirates.webp
+The World Government							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/worldgovernment.webp
+The Ying & Yong Pirates							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/IMG_2615.webp
+The Akazaya Pirates							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/akazayapirates.webp
+The Star Pirates							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/starpirates.webp
+The Unknown Pirates							https://raw.githubusercontent.com/eyeonspyweezer/opvrcinteractivemap/main/crewflags/the-unknown-pirates.webp
+The Tazmanian Pirates							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/tazmanianpirates.webp
+The Requiem Pirates							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/requiempirates.webp
+The Donquixote Pirates							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/donquixotepirates.webp
+The Infamous Straw Hats							
+The Straw Hats							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/infamousstrawhatpirates.webp
+The Roger Pirates							https://github.com/eyeonspyweezer/opvrcinteractivemap/blob/main/crewflags/IMG_2394.webp
+The Frostbite Pirates							
+The Moonlight Pirates							https://raw.githubusercontent.com/eyeonspyweezer/opvrcinteractivemap/main/crew-flags/the-moonlight-pirates.png
+The Rocks Pirates							https://raw.githubusercontent.com/eyeonspyweezer/opvrcinteractivemap/main/crewflags/the-rocks-pirates.webp
+The Bloodsail Pirates							https://raw.githubusercontent.com/eyeonspyweezer/opvrcinteractivemap/main/crewflags/the-bloodsail-pirates.webp
+Neo-Cipher Pol							
