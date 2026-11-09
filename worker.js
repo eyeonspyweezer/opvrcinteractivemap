@@ -416,23 +416,29 @@ async function buildWorldActivity(durationValue = "7d") {
 
     const current = samples[samples.length - 1];
 
-    // Use the newest snapshot at or before the requested cutoff.
-    // If the tracker has no snapshot inside the requested window,
-    // do not pretend a shorter duration is available.
+    // "7d" means the rolling past 7 days, not a snapshot exactly 7 days ago.
+    // Prefer the newest snapshot at or before the cutoff. If no snapshot is
+    // that old, use the oldest snapshot that is still inside the requested
+    // window. Never compare against a snapshot older than the requested window.
     let baseline = null;
 
     for (let i = samples.length - 2; i >= 0; i--) {
-      if (Date.parse(samples[i].checkedAt) <= cutoff) {
+      const sampleTime = Date.parse(samples[i].checkedAt);
+      if (sampleTime <= cutoff) {
         baseline = samples[i];
         break;
       }
     }
 
-    // If the requested duration reaches farther back than the tracker history,
-    // use the oldest available snapshot instead of returning an empty result.
-    if (!baseline) baseline = samples[0];
+    if (!baseline) {
+      const oldest = samples[0];
+      const oldestTime = Date.parse(oldest.checkedAt);
+      if (oldestTime >= cutoff) {
+        baseline = oldest;
+      }
+    }
 
-    if (current.checkedAt !== latest["Last Checked UTC"]) continue;
+    if (!baseline || current.checkedAt !== latest["Last Checked UTC"]) continue;
 
     const gained = current.visits - baseline.visits;
     const comparisonMs = Math.max(0, Date.parse(current.checkedAt) - Date.parse(baseline.checkedAt));
