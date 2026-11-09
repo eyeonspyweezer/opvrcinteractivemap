@@ -1,0 +1,46 @@
+name: Track live VRChat world populations
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+  push:
+    paths:
+      - "island-colors.tsv"
+      - "tools/track_vrchat_populations.py"
+      - ".github/workflows/track-vrchat-populations.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vrchat-world-populations
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch live VRChat world populations
+        run: python tools/track_vrchat_populations.py
+
+      - name: Commit live population snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add island-world-populations.tsv
+          if ! git diff --cached --quiet; then
+            git commit -m "Update live VRChat world populations [skip ci]"
+            git push
+          else
+            echo "No population changes to commit."
+          fi
