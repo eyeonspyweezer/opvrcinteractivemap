@@ -98,7 +98,9 @@ def main():
     print(f"Source file: {SOURCE.resolve()} ({SOURCE.stat().st_size} bytes); parsed {len(source_rows)} island rows.")
     if source_rows:
         print(f"Parsed columns: {list(source_rows[0].keys())}")
-        print(f"First row Link value: {str(source_rows[0].get('Link') or '')[:160]!r}")
+        first_link = str(source_rows[0].get("Link") or "")
+        print(f"First row Link value: {first_link[:160]!r}")
+        print(f"Regex pattern: {WORLD_RE.pattern!r}; matches: {WORLD_RE.findall(first_link)!r}")
     for island in source_rows:
         links = " ".join((island.get("Link") or "", island.get("WorldId") or ""))
         world_ids.update(match.group(0).lower() for match in WORLD_RE.finditer(links))
