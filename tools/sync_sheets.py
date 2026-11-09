@@ -171,7 +171,7 @@ def sync_crew_metadata():
     header_index = None
     columns = {}
     for i, row in enumerate(rows):
-        low = [re.sub(r"\\s+", " ", c.strip().lower()) for c in row]
+        low = [re.sub(r"\s+", " ", c.strip().lower()) for c in row]
         if low and low[0] in ("crews/groups", "nations", "nation"):
             header_index = i
             for field, aliases in CREW_FIELDS.items():
@@ -184,15 +184,15 @@ def sync_crew_metadata():
     def cell(row, index):
         return row[index].strip() if index is not None and index < len(row) else ""
 
-    lines = ["Group\\tVRChatGroupURL\\tVRChatGroupID\\tDiscordInvite\\tVRChatMembers\\tVRChatOnline\\tDiscordMembers\\tFlagURL"]
+    lines = ["Group\tVRChatGroupURL\tVRChatGroupID\tDiscordInvite\tVRChatMembers\tVRChatOnline\tDiscordMembers\tFlagURL"]
     for row in rows[header_index + 1:]:
         name = cell(row, 0)
         if not name:
             continue
         values = [name] + [cell(row, columns[field]) for field in CREW_FIELDS]
-        lines.append("\\t".join(value.replace("\\t", " ").replace("\\r", " ").replace("\\n", " ") for value in values))
+        lines.append("\t".join(value.replace("\t", " ").replace("\r", " ").replace("\n", " ") for value in values))
 
-    output = "\\n".join(lines) + "\\n"
+    output = "\n".join(lines) + "\n"
     if not CREW_FILE.exists() or CREW_FILE.read_text(encoding="utf-8") != output:
         CREW_FILE.write_text(output, encoding="utf-8")
     print(f"Crew metadata: {len(lines) - 1} groups written to {CREW_FILE}; detected columns: " +
