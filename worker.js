@@ -70,19 +70,18 @@ async function verify(request, body, publicKey) {
 
 // ---------- TSV groups ----------
 async function getGroups() {
-  const txt = await (await fetch(BASE + "/island-groups.tsv", { cf: { cacheTtl: 300 } })).text();
-  const [head, ...rows] = txt.trim().split(/\\r?\\n/);
-  const cols = head.split("\\t");
+  const groups = await tsv("island-groups.tsv");
   const metadata = await tsv("crew-links.tsv").catch(() => []);
-  const metadataByName = new Map(metadata.map(row => [String(row.Group || "").trim().toLowerCase(), row]));
-  return rows.map((line) => {
-    const v = line.split("\\t");
-    const o = Object.fromEntries(cols.map((c, i) => [c, v[i]]));
+  const metadataByName = new Map(
+    metadata.map(row => [String(row.Group || "").trim().toLowerCase(), row])
+  );
+
+  return groups.map((o) => {
     const f = parseInt(o.Flag, 10);
     const extra = metadataByName.get(String(o.Group || "").trim().toLowerCase()) || {};
     return {
-      id: o.ID,
-      name: o.Group,
+      id: o.ID || "",
+      name: o.Group || "",
       islands: parseInt(o.Islands, 10) || 0,
       flag: Number.isNaN(f) ? -1 : f,
       vrchatGroupUrl: extra.VRChatGroupURL || "",
@@ -493,50 +492,6 @@ async function buildWorldActivity(durationValue = "7d") {
     .filter(bucket => bucket.gained !== 0)
     .sort((a, b) => b.gained - a.gained);
 
-  // Only live-check a limited number of highest-growth worlds to avoid
-  // hammering VRChat. Responses are edge-cached for 15 minutes.
-  const liveCandidates = visitGrowth
-    .slice()
-    .sort((a, b) => Math.abs(b.gained) - Math.abs(a.gained))
-    .slice(0, 15);
-
-  const liveByWorld = new Map();
-
-  for (let i = 0; i < liveCandidates.length; i += 3) {
-    const batch = liveCandidates.slice(i, i + 3);
-    const results = await Promise.all(
-      batch.map(async candidate => ({
-        id: candidate.id,
-        population: await getWorldPopulation(candidate.id)
-      }))
-    );
-
-    for (const result of results) {
-      if (result.population) {
-        liveByWorld.set(result.id, result.population);
-      }
-    }
-  }
-
-  for (const bucket of crewGrowth) {
-    bucket.activePlayers = 0;
-
-    for (const island of bucket.islands) {
-      island.activePlayers = 0;
-
-      for (const worldId of island.worldIds) {
-        const population = liveByWorld.get(worldId);
-        if (!population) continue;
-
-        const total = Number(population.total);
-        if (Number.isFinite(total) && total > 0) {
-          island.activePlayers += total;
-          bucket.activePlayers += total;
-        }
-      }
-    }
-  }
-
   // Rank actual island owners separately from Group1/crew organization rankings.
   const ownerBuckets = new Map();
   for (const item of visitGrowth) {
@@ -562,10 +517,6 @@ async function buildWorldActivity(durationValue = "7d") {
   const ownerGrowth = [...ownerBuckets.values()].map(bucket => ({
     name: bucket.name,
     gained: bucket.gained,
-    activePlayers: [...bucket.worldIds].reduce((sum, id) => {
-      const total = Number(liveByWorld.get(id)?.total || 0);
-      return sum + (Number.isFinite(total) && total > 0 ? total : 0);
-    }, 0),
     islands: [...bucket.islands.values()].sort((a, b) => b.worldVisitGain - a.worldVisitGain)
   })).filter(bucket => bucket.gained !== 0).sort((a, b) => b.gained - a.gained);
 
@@ -677,6 +628,154 @@ async function ownerActivityResponse(durationValue = "7d") {
   try { return ownerActivityMessage(await getWorldActivity(durationValue)); }
   catch (error) { return { content: "Owner activity could not be loaded. The cached visit tracker or VRChat API may be temporarily unavailable." }; }
 }
+// ---------- live online-player rankings ----------
+// The GitHub Action refreshes all mapped worlds every 10 minutes. Reading one
+// TSV avoids Cloudflare's per-invocation subrequest limit and avoids sampling.
+async function buildLiveActivity() {
+  const [islands, groups, populationRows] = await Promise.all([
+    tsv("island-colors.tsv"),
+    tsv("island-groups.tsv"),
+    tsv("island-world-populations.tsv").catch(() => [])
+  ]);
+
+  const populationByWorld = new Map(
+    populationRows.map(row => [String(row["World ID"] || "").toLowerCase(), row])
+  );
+  const checkedAt = populationRows
+    .map(row => row["Checked At UTC"] || "")
+    .filter(Boolean)
+    .sort()
+    .slice(-1)[0] || "";
+
+  const groupById = new Map(groups.map(group => [String(group.ID), group]));
+  const worldPattern = /wrld_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+  const mappedIslands = islands.map(island => {
+    const linkText = `${island.Link || ""} ${island.WorldId || ""}`;
+    const worldIds = [...new Set((linkText.match(worldPattern) || []).map(id => id.toLowerCase()))];
+    const groupIds = [...new Set([island.Group1, island.Group2, island.Group3].filter(id => id && id !== "0"))];
+    const groupNames = groupIds.map(id => groupById.get(String(id))?.Group).filter(Boolean);
+    const owner = String(island.Owner || "").trim() ||
+      (island.Unowned === "1" ? "Unowned" : "Unassigned");
+
+    return {
+      id: String(island.ID || ""),
+      name: islandDisplayName(island),
+      owner,
+      groupNames,
+      worldIds
+    };
+  }).filter(island => island.worldIds.length > 0);
+
+  const measure = worldIds => {
+    let players = 0;
+    let knownWorlds = 0;
+    for (const id of worldIds) {
+      const row = populationByWorld.get(id);
+      const value = row ? Number(row["Total Players"]) : NaN;
+      if (row?.Status === "ok" && row["Total Players"] !== "" && Number.isFinite(value) && value >= 0) {
+        players += value;
+        knownWorlds++;
+      }
+    }
+    return { players, knownWorlds, worldCount: worldIds.size };
+  };
+
+  const islandRankings = mappedIslands.map(island => {
+    const worldIds = new Set(island.worldIds);
+    return {
+      name: island.name,
+      islandIds: new Set([island.id]),
+      worldIds,
+      ...measure(worldIds)
+    };
+  });
+
+  const aggregate = (keyForIsland) => {
+    const buckets = new Map();
+    for (const island of mappedIslands) {
+      for (const label of new Set(keyForIsland(island).filter(Boolean))) {
+        if (!buckets.has(label)) {
+          buckets.set(label, { name: label, islandIds: new Set(), worldIds: new Set() });
+        }
+        const bucket = buckets.get(label);
+        bucket.islandIds.add(island.id);
+        for (const worldId of island.worldIds) bucket.worldIds.add(worldId);
+      }
+    }
+    return [...buckets.values()].map(bucket => ({ ...bucket, ...measure(bucket.worldIds) }));
+  };
+
+  const crewRankings = aggregate(island => island.groupNames);
+  const ownerRankings = aggregate(island => [island.owner]);
+
+  const sortRankings = rows => rows.sort((a, b) =>
+    b.players - a.players || a.name.localeCompare(b.name)
+  );
+
+  return {
+    checkedAt,
+    trackedWorldCount: populationRows.length,
+    islandRankings: sortRankings(islandRankings),
+    crewRankings: sortRankings(crewRankings),
+    ownerRankings: sortRankings(ownerRankings)
+  };
+}
+
+function liveActivityMessage(data, kind) {
+  const config = {
+    island: { title: "Island Online Activity", rows: data.islandRankings, limit: 20, extra: row => `${row.knownWorlds}/${row.worldCount} worlds checked` },
+    crew: { title: "Crew / Group Online Activity", rows: data.crewRankings, limit: 20, extra: row => `${row.islandIds.size} islands · ${row.knownWorlds}/${row.worldCount} worlds checked` },
+    owner: { title: "Island Owner Online Activity", rows: data.ownerRankings, limit: 20, extra: row => `${row.islandIds.size} islands · ${row.knownWorlds}/${row.worldCount} worlds checked` }
+  }[kind];
+
+  if (!data.checkedAt || !data.trackedWorldCount) {
+    return { content: "⚠️ The live player snapshot has not been generated yet. The GitHub Actions population tracker needs to complete its first run." };
+  }
+
+  const lines = config.rows.slice(0, config.limit).map((row, index) => {
+    const worlds = [...row.worldIds].slice(0, 2).map(id => `[world](https://vrchat.com/home/world/${id})`).join(" · ");
+    const players = row.knownWorlds ? `${row.players.toLocaleString("en-US")} players` : "Unavailable";
+    const links = kind === "island" && worlds ? ` · ${worlds}` : "";
+    return `**${index + 1}. ${row.name}** — **${players}** · ${config.extra(row)}${links}`;
+  });
+
+  const description = lines.length
+    ? lines.join("\n")
+    : "No mapped islands, crews, or owners were available to rank.";
+
+  const expectedWorlds = new Set(
+    [...data.islandRankings].flatMap(row => [...row.worldIds])
+  ).size;
+  const checkedWorlds = new Set(
+    [...data.islandRankings].flatMap(row => [...row.worldIds])
+      .filter(id => {
+        const row = data.populationByWorld?.get(id);
+        return row?.Status === "ok";
+      })
+  ).size;
+
+  return {
+    embeds: [{
+      title: config.title,
+      description: description.slice(0, 3900),
+      color: 0x005aff,
+      footer: {
+        text: `Live VRChat snapshot · ${data.trackedWorldCount} world records · captured ${data.checkedAt} · scheduled every 10 minutes`
+      },
+      timestamp: data.checkedAt
+    }]
+  };
+}
+
+async function liveActivityResponse(kind) {
+  try {
+    return liveActivityMessage(await buildLiveActivity(), kind);
+  } catch (error) {
+    return { content: `⚠️ Could not load live player rankings: ${String(error?.message || error).slice(0, 300)}` };
+  }
+}
+
 // "August 1st, 2026 (95 days ago)"; after 60 days it says months instead
 function sinceText(sinceDate, atLeast) {
   const d = new Date(sinceDate + "T00:00:00Z");
@@ -1520,24 +1619,19 @@ export default {
         },
 
         {
-          name: "worldactivity",
-          description: "Rank island activity by crew/organization and visit growth",
-          type: 1,
-          options: [
-            {
-              type: 3,
-              name: "duration",
-              description: "How far back to compare visits",
-              required: false,
-              choices: worldActivityDurationOptions()
-            }
-          ]
+          name: "islandactivity",
+          description: "Rank islands by current online players across their linked worlds",
+          type: 1
+        },
+        {
+          name: "crewactivity",
+          description: "Rank crews and groups by current online players across their islands",
+          type: 1
         },
         {
           name: "owneractivity",
-          description: "Rank island owners by recent VRChat world visit growth",
-          type: 1,
-          options: [{ type: 3, name: "duration", description: "How far back to compare visits", required: false, choices: worldActivityDurationOptions() }]
+          description: "Rank island owners by current online players across their islands",
+          type: 1
         },
         {
           name: "island",
@@ -1649,10 +1743,10 @@ export default {
         return json({ type: 4, data: await crewListPage(0) });
       }
 
-      if (name === "worldactivity" || name === "owneractivity") {
-        const duration = String(i.data.options?.find((o) => o.name === "duration")?.value || "7d");
+      if (name === "islandactivity" || name === "crewactivity" || name === "owneractivity") {
+        const kind = name === "islandactivity" ? "island" : name === "crewactivity" ? "crew" : "owner";
         ctx.waitUntil((async () => {
-          const data = name === "owneractivity" ? await ownerActivityResponse(duration) : await worldActivityResponse(duration);
+          const data = await liveActivityResponse(kind);
           await fetch(`https://discord.com/api/v10/webhooks/${env.DISCORD_APP_ID}/${i.token}/messages/@original`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
