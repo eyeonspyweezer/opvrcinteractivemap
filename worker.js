@@ -339,10 +339,10 @@ async function buildWorldActivity() {
   visitGrowth.sort((a, b) => b.gained - a.gained);
   const recentWorlds = visitGrowth.slice(0, 10);
 
-  // Only live-check the 12 worlds with the largest recent visit gains.
-  // If no comparison baseline exists yet, use the 12 highest lifetime-visit worlds.
+  // Only live-check the 10 worlds with the largest recent visit gains.
+  // If no comparison baseline exists yet, use the 10 highest lifetime-visit worlds.
   const candidates = recentWorlds.length
-    ? recentWorlds.slice(0, 12)
+    ? recentWorlds.slice(0, 10)
     : latestRows
         .filter(row => row.Status === "ok" && worldIds.has((row["World ID"] || "").toLowerCase()))
         .sort((a, b) => Number(b["Lifetime Visits"] || 0) - Number(a["Lifetime Visits"] || 0))
@@ -411,11 +411,11 @@ function worldActivityMessage(data) {
   const fields = [
     {
       name: "🟢 Currently active",
-      value: activeLines.join("\\n").slice(0, 1024) || "No players found in the worlds checked."
+      value: activeLines.join("\n").slice(0, 1024) || "No players found in the worlds checked."
     },
     {
       name: "📈 Recent new visits",
-      value: visitLines.join("\\n").slice(0, 1024) || "No positive visit changes between the latest tracker snapshots yet."
+      value: visitLines.join("\n").slice(0, 1024) || "No positive visit changes between the latest tracker snapshots yet."
     }
   ];
 
