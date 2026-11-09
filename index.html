@@ -472,7 +472,7 @@ function applyFlagFill(layer) {
 }
 function applyHidden(layer) {
   [layer, ...(layer._ghosts || [])].forEach((x) => {
-    if (x._path) x._path.style.display = (layer._hidden || layer._sunk || layer._destroyed) ? 'none' : '';
+    if (x._path) x._path.style.display = layer._hidden ? 'none' : '';
   });
 }
 
@@ -521,36 +521,21 @@ function paintStatusColor(layer) {
 }
 function sinkLayer(layer) {
   if (!layer || layer._sunk || !isSunkStatus(layer)) return;
-  layer._sinking = true;
-  paintStatusColor(layer);
-  [layer, ...(layer._ghosts || [])].forEach(x => {
-    if (x._path) x._path.classList.add('sinking-island');
-  });
+  layer._sunk = true;
   layer._flagFill = null;
   layer._stripeFill = null;
+  paintStatusColor(layer);
   applyHidden(layer);
-  setTimeout(() => {
-    layer._sinking = false;
-    layer._sunk = true;
-    applyHidden(layer);
-    rebuildLabels();
-  }, 1850);
+  rebuildLabels();
 }
 function destroyLayer(layer) {
   if (!layer || layer._destroyed || !isDestroyedStatus(layer)) return;
-  layer._destroying = true;
-  paintStatusColor(layer);
-  [layer, ...(layer._ghosts || [])].forEach(x => {
-    if (x._path) x._path.classList.add('destroying-island');
-  });
+  layer._destroyed = true;
   layer._flagFill = null;
   layer._stripeFill = null;
-  setTimeout(() => {
-    layer._destroying = false;
-    layer._destroyed = true;
-    applyHidden(layer);
-    rebuildLabels();
-  }, 2050);
+  paintStatusColor(layer);
+  applyHidden(layer);
+  rebuildLabels();
 }
 function animateSunkIslands() {
   if (!mapHeight) return;
@@ -562,7 +547,6 @@ function animateSunkIslands() {
 
 function shouldHide(layer) {
   const name = String(layer.feature.properties.name || '');
-  if (layer._sunk || layer._destroyed) return true;
   if (SHOW && !layerKinds(layer).some((k) => SHOW.has(k))) return true;
   if (SHOW_CREW && !layerCrews(layer).includes(norm(SHOW_CREW))) return true;
   if (OPT.hideUnnamed && name.includes('???')) return true;
