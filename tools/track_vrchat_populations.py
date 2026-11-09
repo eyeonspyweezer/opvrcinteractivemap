@@ -14,7 +14,7 @@ ROOT = Path(".")
 SOURCE = ROOT / "island-colors.tsv"
 OUTPUT = ROOT / "island-world-populations.tsv"
 WORLD_RE = re.compile(
-    r"wrld_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+    r"wrld_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
     re.I,
 )
 API = "https://api.vrchat.cloud/api/1/worlds/{}"
@@ -95,12 +95,7 @@ def main():
 
     world_ids = set()
     source_rows = read_tsv(SOURCE)
-    print(f"Source file: {SOURCE.resolve()} ({SOURCE.stat().st_size} bytes); parsed {len(source_rows)} island rows.")
-    if source_rows:
-        print(f"Parsed columns: {list(source_rows[0].keys())}")
-        first_link = str(source_rows[0].get("Link") or "")
-        print(f"First row Link value: {first_link[:160]!r}")
-        print(f"Regex pattern: {WORLD_RE.pattern!r}; matches: {WORLD_RE.findall(first_link)!r}")
+    print(f"Parsed {len(source_rows)} island rows from {SOURCE}.")
     for island in source_rows:
         links = " ".join((island.get("Link") or "", island.get("WorldId") or ""))
         world_ids.update(match.group(0).lower() for match in WORLD_RE.finditer(links))
