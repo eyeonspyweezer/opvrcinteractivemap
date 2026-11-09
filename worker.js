@@ -71,13 +71,27 @@ async function verify(request, body, publicKey) {
 // ---------- TSV groups ----------
 async function getGroups() {
   const txt = await (await fetch(BASE + "/island-groups.tsv", { cf: { cacheTtl: 300 } })).text();
-  const [head, ...rows] = txt.trim().split(/\r?\n/);
-  const cols = head.split("\t");
+  const [head, ...rows] = txt.trim().split(/\\r?\\n/);
+  const cols = head.split("\\t");
+  const metadata = await tsv("crew-links.tsv").catch(() => []);
+  const metadataByName = new Map(metadata.map(row => [String(row.Group || "").trim().toLowerCase(), row]));
   return rows.map((line) => {
-    const v = line.split("\t");
+    const v = line.split("\\t");
     const o = Object.fromEntries(cols.map((c, i) => [c, v[i]]));
     const f = parseInt(o.Flag, 10);
-    return { id: o.ID, name: o.Group, islands: parseInt(o.Islands, 10) || 0, flag: Number.isNaN(f) ? -1 : f };
+    const extra = metadataByName.get(String(o.Group || "").trim().toLowerCase()) || {};
+    return {
+      id: o.ID,
+      name: o.Group,
+      islands: parseInt(o.Islands, 10) || 0,
+      flag: Number.isNaN(f) ? -1 : f,
+      vrchatGroupUrl: extra.VRChatGroupURL || "",
+      vrchatGroupId: extra.VRChatGroupID || "",
+      discordInvite: extra.DiscordInvite || "",
+      vrchatMembers: extra.VRChatMembers || "",
+      vrchatOnline: extra.VRChatOnline || "",
+      discordMembers: extra.DiscordMembers || ""
+    };
   });
 }
 
