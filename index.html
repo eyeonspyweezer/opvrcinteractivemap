@@ -163,6 +163,16 @@ button.list-btn { font: inherit; text-transform: uppercase; cursor: pointer; }
 #imgOverlay[hidden] { display: none; }
 #imgBig { max-width: 90vw; max-height: 90vh; transform-origin: center; user-select: none; -webkit-user-drag: none; cursor: grab; }
 a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-color: var(--sfg); }
+.island-banner {
+  display: block;
+  width: min(600px, 75vw);
+  height: 100px;
+  max-width: 100%;
+  margin-top: 9px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 4px;
+}
 
 
 .dc-row { display: flex; justify-content: space-between; gap: 14px; align-items: center; }
@@ -1411,23 +1421,40 @@ function nationsOf(raw) {
   return [];
 }
 
+// Island banner images: reuse the existing island-backgrounds folder.
+// The directory is fetched once; individual images load only when their island popup opens.
+const islandBackgrounds = new Map();
+let islandBackgroundsPromise = null;
+function loadIslandBackgrounds() {
+  if (!islandBackgroundsPromise) {
+    islandBackgroundsPromise = fetch('https://api.github.com/repos/eyeonspyweezer/opvrcinteractivemap/contents/island-backgrounds?ref=main')
+      .then((r) => { if (!r.ok) throw new Error('Could not load island backgrounds'); return r.json(); })
+      .then((files) => {
+        files.filter((f) => f.type === 'file' && /\.(jpe?g|png|webp|gif)$/i.test(f.name))
+          .forEach((f) => islandBackgrounds.set(islandKey(f.name.replace(/\.[^.]+$/, '')), f.download_url));
+      })
+      .catch((err) => { console.warn('[map] Island backgrounds unavailable:', err); });
+  }
+  return islandBackgroundsPromise;
+}
+
 function wireClick(target, layer) {
-  target.on('click', (e) => {
+  target.on('click', async (e) => {
     if (map.getContainer().classList.contains('drawing')) return;
     const p = layer.feature.properties, raw = resolveOwner(p);
     const isUrl = (u) => /^https?:\/\//i.test(u || '');
+    await loadIslandBackgrounds();
+    const bannerUrl = islandBackgrounds.get(islandKey(p.name)) || '';
     const links = linksOf(p.name);
     const w = links.length ? null : worldOf(p.name);
     const nameHref = links[0] || (w && w.link) || '';
     const ownerHref = linkOf(raw);
-    if (!isUrl(nameHref) && !isUrl(ownerHref)) return;
+    if (!isUrl(nameHref) && !isUrl(ownerHref) && !bannerUrl) return;
     const box = document.createElement('div');
-    // Island name: first link, underlined
     const nm = document.createElement(isUrl(nameHref) ? 'a' : 'div');
     nm.className = 'pop-name'; nm.textContent = String(p.name || '');
     if (isUrl(nameHref)) { nm.href = nameHref; nm.target = '_blank'; nm.rel = 'noopener'; }
     box.appendChild(nm);
-    // Owner (red / blue by group), linked if the crew sheet has a website
     if (raw) {
       const ol = document.createElement(isUrl(ownerHref) ? 'a' : 'div');
       ol.textContent = ownerLabel(raw);
@@ -1436,7 +1463,6 @@ function wireClick(target, layer) {
       if (c) { ol.style.color = c; ol.style.textDecorationColor = c; }
       box.appendChild(ol);
     }
-    // Every link after the first one
     if (links.length > 1) {
       const t = document.createElement('div'); t.className = 'pop-more'; t.textContent = 'More links:'; box.appendChild(t);
       links.slice(1).forEach((u, i) => {
@@ -1445,10 +1471,19 @@ function wireClick(target, layer) {
         box.appendChild(a);
       });
     }
-    L.popup().setLatLng(e.latlng).setContent(box).openOn(map);
+    if (bannerUrl) {
+      const img = document.createElement('img');
+      img.className = 'island-banner';
+      img.alt = String(p.name || '') + ' image';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.src = bannerUrl;
+      img.onerror = () => img.remove();
+      box.appendChild(img);
+    }
+    L.popup({ maxWidth: 640 }).setLatLng(e.latlng).setContent(box).openOn(map);
   });
 }
-
 function collect() {
   const islands = [], orgs = new Map(), owners = new Map();
   const onMapKeys = new Set();
