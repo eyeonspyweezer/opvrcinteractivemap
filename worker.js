@@ -354,7 +354,8 @@ async function buildWorldActivity(durationValue = "7d") {
       const entry = {
         islandId: String(island.ID),
         islandName: islandDisplayName(island),
-        ownerLabel: label
+        ownerLabel: label,
+        ownerName: String(island.Owner || "").trim() || (island.Unowned === "1" ? "Unowned" : "Unassigned")
       };
 
       if (!existing.some(x => x.islandId === entry.islandId)) {
@@ -521,10 +522,43 @@ async function buildWorldActivity(durationValue = "7d") {
     }
   }
 
+  // Rank actual island owners separately from Group1/crew organization rankings.
+  const ownerBuckets = new Map();
+  for (const item of visitGrowth) {
+    const ownersForWorld = new Map();
+    for (const island of item.islands) {
+      const ownerName = island.ownerName || "Unassigned";
+      if (!ownersForWorld.has(ownerName)) ownersForWorld.set(ownerName, []);
+      ownersForWorld.get(ownerName).push(island);
+    }
+    for (const [ownerName, ownerIslands] of ownersForWorld) {
+      if (!ownerBuckets.has(ownerName)) ownerBuckets.set(ownerName, { name: ownerName, gained: 0, islands: new Map(), worldIds: new Set() });
+      const bucket = ownerBuckets.get(ownerName);
+      bucket.gained += item.gained;
+      bucket.worldIds.add(item.id);
+      for (const island of ownerIslands) {
+        if (!bucket.islands.has(island.islandId)) bucket.islands.set(island.islandId, { id: island.islandId, name: island.islandName, worldIds: [], worldVisitGain: 0 });
+        const entry = bucket.islands.get(island.islandId);
+        entry.worldVisitGain += item.gained;
+        if (!entry.worldIds.includes(item.id)) entry.worldIds.push(item.id);
+      }
+    }
+  }
+  const ownerGrowth = [...ownerBuckets.values()].map(bucket => ({
+    name: bucket.name,
+    gained: bucket.gained,
+    activePlayers: [...bucket.worldIds].reduce((sum, id) => {
+      const total = Number(liveByWorld.get(id)?.total || 0);
+      return sum + (Number.isFinite(total) && total > 0 ? total : 0);
+    }, 0),
+    islands: [...bucket.islands.values()].sort((a, b) => b.worldVisitGain - a.worldVisitGain)
+  })).filter(bucket => bucket.gained !== 0).sort((a, b) => b.gained - a.gained);
+
   return {
     checkedAt: new Date().toISOString(),
     duration: duration.label,
     crewGrowth,
+    ownerGrowth,
     candidateCount: liveCandidates.length,
     trackedWorldCount: worldIds.size
   };
@@ -604,6 +638,30 @@ async function worldActivityResponse(durationValue = "7d") {
   }
 }
 
+function ownerActivityMessage(data) {
+  const count = value => Number(value || 0).toLocaleString("en-US");
+  const ownerLines = (data.ownerGrowth || []).map((owner, index) => {
+    const islandLinks = owner.islands.slice(0, 8).map(island => {
+      const worldId = island.worldIds?.[0];
+      return worldId ? `[${island.name}](https://vrchat.com/home/world/${worldId})` : island.name;
+    });
+    const active = owner.activePlayers > 0 ? ` · ${count(owner.activePlayers)} active players` : "";
+    return `**${index + 1}. ${owner.name}** — **+${count(owner.gained)} visits**${active}\n${islandLinks.join(", ")}`;
+  });
+  const description = ownerLines.length ? ownerLines.join("\n\n") : "No non-zero visit changes were found for the selected duration.";
+  return { embeds: [{
+    title: "VRChat World Activity — Island Owner Ranking",
+    description: `Ranked by visit growth for islands assigned to each Owner in the map data over the last ${data.duration}. This is growth during the selected period, not lifetime visits.\n\n${description}`.slice(0, 5900),
+    color: 0x005aff,
+    footer: { text: `Visit tracker: ${data.trackedWorldCount} linked worlds. Live player scan: up to ${data.candidateCount} highest-growth worlds, cached 15 minutes.` },
+    timestamp: data.checkedAt
+  }] };
+}
+
+async function ownerActivityResponse(durationValue = "7d") {
+  try { return ownerActivityMessage(await getWorldActivity(durationValue)); }
+  catch (error) { return { content: "Owner activity could not be loaded. The cached visit tracker or VRChat API may be temporarily unavailable." }; }
+}
 // "August 1st, 2026 (95 days ago)"; after 60 days it says months instead
 function sinceText(sinceDate, atLeast) {
   const d = new Date(sinceDate + "T00:00:00Z");
@@ -1445,6 +1503,12 @@ export default {
           ]
         },
         {
+          name: "owneractivity",
+          description: "Rank island owners by recent VRChat world visit growth",
+          type: 1,
+          options: [{ type: 3, name: "duration", description: "How far back to compare visits", required: false, choices: worldActivityDurationOptions() }]
+        },
+        {
           name: "island",
           description: "Show island information, population and tracked visits",
           type: 1,
@@ -1554,10 +1618,10 @@ export default {
         return json({ type: 4, data: await crewListPage(0) });
       }
 
-      if (name === "worldactivity") {
+      if (name === "worldactivity" || name === "owneractivity") {
         const duration = String(i.data.options?.find((o) => o.name === "duration")?.value || "7d");
         ctx.waitUntil((async () => {
-          const data = await worldActivityResponse(duration);
+          const data = name === "owneractivity" ? await ownerActivityResponse(duration) : await worldActivityResponse(duration);
           await fetch(`https://discord.com/api/v10/webhooks/${env.DISCORD_APP_ID}/${i.token}/messages/@original`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
