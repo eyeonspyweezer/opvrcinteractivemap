@@ -253,9 +253,9 @@ async function getWorldPopulation(worldId) {
       `https://api.vrchat.cloud/api/1/worlds/${worldId}`,
       {
         headers: {
-          "User-Agent": "OPVRC-Island-Map/1.0"
+          "User-Agent": "OPVRCMapBot/1.1 https://discord.gg/TeunYpsHb6"
         },
-        cf: { cacheTtl: 300 }
+        cf: { cacheTtl: 900 }
       }
     );
 
@@ -272,6 +272,192 @@ async function getWorldPopulation(worldId) {
     };
   } catch {
     return null;
+  }
+}
+
+// ---------- /worldactivity: cached activity scan ----------
+let worldActivityInFlight = null;
+
+async function buildWorldActivity() {
+  const [islands, latestRows, historyRows] = await Promise.all([
+    tsv("island-colors.tsv"),
+    tsv("island-world-visits.tsv"),
+    tsv("island-world-visit-history.tsv")
+  ]);
+
+  const worldIslands = new Map();
+  const worldIds = new Set();
+  const worldPattern = /wrld_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+  for (const island of islands) {
+    const links = `${island.Link || ""} ${island.WorldId || ""}`;
+    const ids = links.match(worldPattern) || [];
+    for (const rawId of ids) {
+      const id = rawId.toLowerCase();
+      worldIds.add(id);
+      if (!worldIslands.has(id)) worldIslands.set(id, []);
+      const label = islandDisplayName(island);
+      if (label && !worldIslands.get(id).includes(label)) worldIslands.get(id).push(label);
+    }
+  }
+
+  const latestById = new Map(
+    latestRows.map(row => [(row["World ID"] || "").toLowerCase(), row])
+  );
+
+  const samplesById = new Map();
+  for (const row of historyRows) {
+    const id = (row["World ID"] || "").toLowerCase();
+    const stamp = row["Checked At UTC"] || "";
+    const visits = Number(row["Lifetime Visits"]);
+    if (!worldIds.has(id) || !stamp || !Number.isFinite(visits)) continue;
+    if (!samplesById.has(id)) samplesById.set(id, new Map());
+    samplesById.get(id).set(stamp, visits);
+  }
+
+  const visitGrowth = [];
+  for (const id of worldIds) {
+    const samples = [...(samplesById.get(id) || new Map()).entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]));
+    if (samples.length < 2) continue;
+    const [previousAt, previousVisits] = samples[samples.length - 2];
+    const [checkedAt, currentVisits] = samples[samples.length - 1];
+    const latest = latestById.get(id);
+    if (latest?.Status !== "ok" || checkedAt !== latest["Last Checked UTC"]) continue;
+    const gained = currentVisits - previousVisits;
+    if (gained <= 0) continue;
+    visitGrowth.push({
+      id,
+      name: latest["World Name"] || id,
+      gained,
+      checkedAt,
+      previousAt,
+      islands: worldIslands.get(id) || []
+    });
+  }
+
+  visitGrowth.sort((a, b) => b.gained - a.gained);
+  const recentWorlds = visitGrowth.slice(0, 10);
+
+  // Only live-check the 12 worlds with the largest recent visit gains.
+  // If no comparison baseline exists yet, use the 12 highest lifetime-visit worlds.
+  const candidates = recentWorlds.length
+    ? recentWorlds.slice(0, 12)
+    : latestRows
+        .filter(row => row.Status === "ok" && worldIds.has((row["World ID"] || "").toLowerCase()))
+        .sort((a, b) => Number(b["Lifetime Visits"] || 0) - Number(a["Lifetime Visits"] || 0))
+        .slice(0, 12)
+        .map(row => ({
+          id: (row["World ID"] || "").toLowerCase(),
+          name: row["World Name"] || row["World ID"],
+          gained: 0,
+          checkedAt: row["Last Checked UTC"] || "",
+          previousAt: "",
+          islands: worldIslands.get((row["World ID"] || "").toLowerCase()) || []
+        }));
+
+  const activeWorlds = [];
+  for (let i = 0; i < candidates.length; i += 3) {
+    const batch = candidates.slice(i, i + 3);
+    const results = await Promise.all(batch.map(async candidate => ({
+      ...candidate,
+      population: await getWorldPopulation(candidate.id)
+    })));
+    activeWorlds.push(...results);
+  }
+
+  const active = activeWorlds
+    .filter(item => item.population && Number.isFinite(Number(item.population.total)) && Number(item.population.total) > 0)
+    .sort((a, b) => Number(b.population.total) - Number(a.population.total));
+
+  return {
+    checkedAt: new Date().toISOString(),
+    active,
+    visitGrowth: recentWorlds,
+    candidateCount: candidates.length,
+    hasVisitBaseline: visitGrowth.length > 0
+  };
+}
+
+async function getWorldActivity() {
+  const cacheKey = new Request("https://opvrc-internal-cache.invalid/world-activity-v1");
+  try {
+    const cached = await caches.default.match(cacheKey);
+    if (cached) return await cached.json();
+  } catch {}
+
+  if (worldActivityInFlight) return await worldActivityInFlight;
+
+  worldActivityInFlight = (async () => {
+    const data = await buildWorldActivity();
+    try {
+      await caches.default.put(
+        cacheKey,
+        new Response(JSON.stringify(data), {
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "public, max-age=600"
+          }
+        })
+      );
+    } catch {}
+    return data;
+  })();
+
+  try {
+    return await worldActivityInFlight;
+  } finally {
+    worldActivityInFlight = null;
+  }
+}
+
+function worldActivityMessage(data) {
+  const count = value => Number(value || 0).toLocaleString("en-US");
+  const worldLink = item => `[**${item.population?.name || item.name}**](https://vrchat.com/home/world/${item.id})`;
+  const islandText = item => item.islands?.length ? ` — ${item.islands.slice(0, 3).join(", ")}` : "";
+
+  const activeLines = data.active.map(item => {
+    const p = item.population;
+    const parts = [`👥 ${count(p.total)} total`];
+    if (Number(p.public) > 0) parts.push(`🌐 ${count(p.public)} public`);
+    if (Number(p.private) > 0) parts.push(`🔒 ${count(p.private)} private`);
+    return `${worldLink(item)} — ${parts.join(" · ")}${islandText(item)}`;
+  });
+
+  const visitLines = data.visitGrowth.slice(0, 10).map(item =>
+    `[**${item.name}**](https://vrchat.com/home/world/${item.id}) — **+${count(item.gained)}** visits${islandText(item)}`
+  );
+
+  const fields = [
+    {
+      name: "🟢 Currently active",
+      value: activeLines.join("\\n").slice(0, 1024) || "No players found in the worlds checked."
+    },
+    {
+      name: "📈 Recent new visits",
+      value: visitLines.join("\\n").slice(0, 1024) || "No positive visit changes between the latest tracker snapshots yet."
+    }
+  ];
+
+  return {
+    embeds: [{
+      title: "VRChat World Activity",
+      description: "Activity across VRChat worlds linked to the OPVRC island map.",
+      color: 0x005aff,
+      fields,
+      footer: {
+        text: `Live player scan: ${data.candidateCount} worlds max, cached 10 minutes. Visit gains compare the latest tracker snapshots.`
+      },
+      timestamp: data.checkedAt
+    }]
+  };
+}
+
+async function worldActivityResponse() {
+  try {
+    return worldActivityMessage(await getWorldActivity());
+  } catch (error) {
+    return { content: "⚠️ I couldn't load world activity right now. The cached visit tracker or VRChat API may be temporarily unavailable." };
   }
 }
 
@@ -1102,6 +1288,11 @@ export default {
         },
 
         {
+          name: "worldactivity",
+          description: "Show currently active VRChat worlds and recent visit increases",
+          type: 1
+        },
+        {
           name: "island",
           description: "Show island information, population and tracked visits",
           type: 1,
@@ -1209,6 +1400,18 @@ export default {
       }
       if (name === "crewlist") {
         return json({ type: 4, data: await crewListPage(0) });
+      }
+
+      if (name === "worldactivity") {
+        ctx.waitUntil((async () => {
+          const data = await worldActivityResponse();
+          await fetch(`https://discord.com/api/v10/webhooks/${env.DISCORD_APP_ID}/${i.token}/messages/@original`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+          });
+        })());
+        return json({ type: 5 });
       }
 
       if (name === "island") {
