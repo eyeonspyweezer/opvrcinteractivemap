@@ -5,7 +5,6 @@ on:
     paths:
       - "flags/**"
       - "crewflags/**"
-      - "crew-flags/**"
       - "tools/compress_flag_images.py"
       - ".github/workflows/compress-community-flags.yml"
   workflow_dispatch:
@@ -38,7 +37,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add flags crewflags crew-flags
+          git add -A -- flags crewflags
           if ! git diff --cached --quiet; then
             git commit -m "Automatically compress oversized community flags [skip ci]"
             git push
