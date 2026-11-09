@@ -618,7 +618,7 @@ function ownerActivityMessage(data) {
     title: "VRChat World Activity — Island Owner Ranking",
     description: `Ranked by visit growth for islands assigned to each Owner in the map data over the last ${data.duration}. This is growth during the selected period, not lifetime visits.\n\n${description}`.slice(0, 5900),
     color: 0x005aff,
-    footer: { text: `Visit tracker: ${data.trackedWorldCount} linked worlds. Live player scan: up to ${data.candidateCount} highest-growth worlds, cached 15 minutes.` },
+    footer: { text: `Visit tracker: ${data.trackedWorldCount} linked worlds. Rankings use recorded lifetime-visit snapshots.` },
     timestamp: data.checkedAt
   }] };
 }
