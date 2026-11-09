@@ -476,14 +476,17 @@ function applyHidden(layer) {
   });
 }
 
-function isSunkName(name) {
-  return /^\s*Sunk\s*\(\d{2}\/\d{2}\/\d{2}\)/i.test(String(name || ''));
+function ownerStatus(layer) {
+  return String(resolveOwner(layer.feature?.properties || {}) || '').trim();
 }
-function isDestroyedName(name) {
-  return /^\s*Destroyed\s*\(\d{2}\/\d{2}\/\d{2}\)/i.test(String(name || ''));
+function isSunkStatus(layer) {
+  return /^Sunk\s*\(\d{1,2}\/\d{1,2}\/\d{2,4}\)/i.test(ownerStatus(layer));
 }
-function isGoneName(name) {
-  return isSunkName(name) || isDestroyedName(name);
+function isDestroyedStatus(layer) {
+  return /^Destroyed\s*\(\d{1,2}\/\d{1,2}\/\d{2,4}\)/i.test(ownerStatus(layer));
+}
+function isGoneStatus(layer) {
+  return isSunkStatus(layer) || isDestroyedStatus(layer);
 }
 let mapPixelCanvas = null, mapPixelContext = null;
 function mapPixelColor(layer) {
@@ -517,7 +520,7 @@ function paintStatusColor(layer) {
   });
 }
 function sinkLayer(layer) {
-  if (!layer || layer._sunk || !isSunkName(layer.feature?.properties?.name)) return;
+  if (!layer || layer._sunk || !isSunkStatus(layer)) return;
   layer._sinking = true;
   paintStatusColor(layer);
   [layer, ...(layer._ghosts || [])].forEach(x => {
@@ -534,7 +537,7 @@ function sinkLayer(layer) {
   }, 1850);
 }
 function destroyLayer(layer) {
-  if (!layer || layer._destroyed || !isDestroyedName(layer.feature?.properties?.name)) return;
+  if (!layer || layer._destroyed || !isDestroyedStatus(layer)) return;
   layer._destroying = true;
   paintStatusColor(layer);
   [layer, ...(layer._ghosts || [])].forEach(x => {
@@ -552,9 +555,8 @@ function destroyLayer(layer) {
 function animateSunkIslands() {
   if (!mapHeight) return;
   drawnItems.eachLayer(l => {
-    const name = l.feature?.properties?.name;
-    if (isSunkName(name)) sinkLayer(l);
-    else if (isDestroyedName(name)) destroyLayer(l);
+    if (isSunkStatus(l)) sinkLayer(l);
+    else if (isDestroyedStatus(l)) destroyLayer(l);
   });
 }
 
@@ -585,7 +587,7 @@ function rebuildFlags() {
   rebuildLabels();
   if (!OPT.flags) return;
   drawnItems.eachLayer((l) => {
-    if (l._sunk || l._sinking || l._destroyed || l._destroying || isGoneName(l.feature?.properties?.name)) return;
+    if (l._sunk || l._sinking || l._destroyed || l._destroying || isGoneStatus(l)) return;
     const groups = preferMarines(
       ownersOf(resolveOwner(l.feature.properties)).flatMap(groupsOf)
     );
@@ -930,7 +932,7 @@ function tipContent(layer) {
   }
 
   // Crews/groups derived from those owners — separate line
-  const crews = preferMarines([
+  const crews = isGoneStatus(layer) ? [] : preferMarines([
     ...new Set(
       ownersOf(raw).flatMap(groupsOf).filter((g) => g && !/ Kingdom$/i.test(g))
     )
@@ -1009,6 +1011,7 @@ function loadOwners(text) {
   });
   window.__islandDupKeys = dupKeys;
   refreshAll();
+  animateSunkIslands(); // Status is stored in the Owner field, so re-check after the sheet loads.
   setStatus(`Loaded ${ownerMap.size} owner rows.`);
 }
 
@@ -1042,6 +1045,7 @@ function loadExtra(text) {
     if (!ownerIslandLabels.has(k)) ownerIslandLabels.set(k, v.label);
   });
   refreshAll();
+  animateSunkIslands(); // Also re-check statuses supplied by the extra Owner sheet.
   setStatus(`Loaded ${hits.size} islands, ${linkMap.size} with links, ${worldIdMap.size} World IDs.`);
 }
 
@@ -1344,8 +1348,33 @@ function islandKey(name) {
 }
 const norm = (s) => String(s || '').toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]/g, '');
 // Shared owners are split on these (change here if needed): "/"  ","  "&"  and the word "and"
-const OWNER_SPLIT = /\s*(?:\/|,|&|\band\b)\s*/i;
-const ownersOf = (raw) => String(raw || '').split(OWNER_SPLIT).map((s) => s.trim()).filter(Boolean);
+// Split shared owners only at top level; slashes inside status dates like Sunk (11/08/26) stay intact.
+function ownersOf(raw) {
+  const s = String(raw || ''), out = [];
+  let part = '', depth = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '(') depth++;
+    if (ch === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (ch === '/' || ch === ',' || ch === '&')) {
+      if (part.trim()) out.push(part.trim());
+      part = '';
+      continue;
+    }
+    if (depth === 0 && /\s/.test(ch) && /^and\b/i.test(s.slice(i).trimStart())) {
+      const rest = s.slice(i).trimStart();
+      if (/^and\b/i.test(rest)) {
+        if (part.trim()) out.push(part.trim());
+        part = '';
+        i += s.slice(i).search(/and\b/i) + 2;
+        continue;
+      }
+    }
+    part += ch;
+  }
+  if (part.trim()) out.push(part.trim());
+  return out;
+}
 function aliasOf(raw) {
   const k = norm(raw);
   for (const canon of Object.keys(OWNER_ALIASES)) {
@@ -1408,7 +1437,7 @@ function collect() {
     const p = l.feature && l.feature.properties;
     if (!p) return;
     const label = String(p.name);
-    if (isGoneName(label) || l._sunk || l._destroyed) return;
+    if (isGoneStatus(l) || l._sunk || l._destroyed) return;
     onMapKeys.add(islandKey(label));
     islands.push({
       label,
@@ -1611,7 +1640,7 @@ function rebuildLabels() {
   labelItems.clearLayers();
   if (!OPT.names || !mapWidth) return;
   drawnItems.eachLayer((l) => {
-    if (l._hidden || l._sunk || l._destroyed || isGoneName(l.feature.properties.name)) return;
+    if (l._hidden || l._sunk || l._destroyed || isGoneStatus(l)) return;
     const name = String(l.feature.properties.name || '');
     if (!name || name.includes('???')) return;
     const c = turf.pointOnFeature(l.toGeoJSON()).geometry.coordinates;
