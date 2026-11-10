@@ -1046,10 +1046,34 @@ function stripePattern(colors) {
   return id;
 }
 
+const ownerProfileLinkMap = new Map();
+let ownerProfileLinksPromise = null;
+function loadOwnerProfileLinks() {
+  if (!ownerProfileLinksPromise) {
+    ownerProfileLinksPromise = fetch('owner-links.tsv', { cache: 'no-cache' })
+      .then((response) => { if (!response.ok) throw new Error('HTTP ' + response.status); return response.text(); })
+      .then((text) => {
+        const lines = text.replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(Boolean);
+        const headers = (lines.shift() || '').split('\\t').map((x) => x.trim().toLowerCase());
+        const ownerCol = headers.indexOf('owner');
+        const linkCol = headers.indexOf('profile link');
+        if (ownerCol < 0 || linkCol < 0) return ownerProfileLinkMap;
+        lines.forEach((line) => {
+          const cells = line.split('\\t');
+          const owner = (cells[ownerCol] || '').trim();
+          const url = (cells[linkCol] || '').trim();
+          if (owner && /^https?:\\/\\//i.test(url)) ownerProfileLinkMap.set(ownerKey(owner), url);
+        });
+        return ownerProfileLinkMap;
+      })
+      .catch((error) => { console.warn('[map] Owner profile links unavailable:', error); return ownerProfileLinkMap; });
+  }
+  return ownerProfileLinksPromise;
+}
 function linkOf(raw) {
-  for (const o of ownersOf(raw)) {
-    const k = ownerKey(o);
-    for (const [leader, url] of leaderLink) if (ownerKey(leader) === k) return url;
+  for (const owner of ownersOf(raw)) {
+    const url = ownerProfileLinkMap.get(ownerKey(owner));
+    if (url) return url;
   }
   return '';
 }
@@ -1739,7 +1763,7 @@ function loadIslandBackgrounds() {
 }
 function wireHoverImage(target, sourceLayer) {
   target.on('mouseover', async () => {
-    await loadIslandBackgrounds();
+    await Promise.all([loadIslandBackgrounds(), loadOwnerProfileLinks()]);
     if (target.isTooltipOpen()) target.setTooltipContent(tipContent(sourceLayer));
   });
 }
@@ -1850,7 +1874,7 @@ function wireClick(target, layer) {
     if (map.getContainer().classList.contains('drawing')) return;
     const p = layer.feature.properties, raw = resolveOwner(p);
     const isUrl = (u) => /^https?:\/\//i.test(u || '');
-    await Promise.all([loadIslandBackgrounds(), loadCivilianList(), loadIslandExtraStats()]);
+    await Promise.all([loadIslandBackgrounds(), loadCivilianList(), loadIslandExtraStats(), loadOwnerProfileLinks()]);
     const bannerUrl = islandBackgrounds.get(islandKey(p.name)) || '';
     const links = linksOf(p.name);
     const w = links.length ? null : worldOf(p.name);
