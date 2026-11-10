@@ -1929,7 +1929,7 @@ export default {
           { type: 2, style: 3, label: "Add", custom_id: `schedule_add_${i.channel_id}_${i.data.target_id}` },
           { type: 2, style: 2, label: "Cancel", custom_id: "schedule_cancel" }
         ] }]
-      } } };
+      } } });
     }
 
     // slash commands
