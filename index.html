@@ -1814,6 +1814,7 @@ function formatWorldDate(value) {
   if (!value) return '';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString([], {
+    timeZone: 'UTC',
     year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
   }) + ' UTC';
 }
