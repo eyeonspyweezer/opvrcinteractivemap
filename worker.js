@@ -2255,7 +2255,7 @@ export default {
           ? ownerLines.join("\n").slice(0, 1024)
           : "No named island owners are currently listed for this crew.";
 
-        const crewKey = g.name.toLowerCase().replace(/^the\\s+/, "").replace(/[^a-z0-9]/g, "");
+        const crewKey = g.name.toLowerCase().replace(/^the\s+/, "").replace(/[^a-z0-9]/g, "");
         const vrchatUrl = g.vrchatGroupUrl ||
           (g.vrchatGroupId ? `https://vrchat.com/home/group/${g.vrchatGroupId}` : "") ||
           (crewKey === "marines" ? LINKS.marines : crewKey === "revolutionaryarmy" ? LINKS.revolutionary : "");
