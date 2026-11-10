@@ -327,6 +327,7 @@ body { background: var(--bg); }
   <label><input type="checkbox" id="optColors"> Island colors</label>
   <label><input type="checkbox" id="optFlags" checked> Flags on the map</label>
   <label><input type="checkbox" id="optNames" checked> Island names on the map</label>
+  <label><input type="checkbox" id="optOwners"> Show island owners next to names</label>
   <label><input type="checkbox" id="optHideUnnamed"> Hide Unnamed Islands</label>
   <label><input type="checkbox" id="optHideUnowned"> Hide unowned islands</label>
   <label>Fill opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
@@ -365,7 +366,33 @@ const VRC_WORLDS = {
 // Settings defaults. Flags are skipped automatically on data saver, 2G or low-memory devices (where the browser reports it).
 const conn = navigator.connection || {};
 const lowResources = !!(conn.saveData || /2g/.test(conn.effectiveType || '') || (navigator.deviceMemory && navigator.deviceMemory <= 2));
-const OPT = { colors: false, flags: !lowResources, names: true, hideUnnamed: false, hideUnowned: false };
+const LOCAL_SETTINGS_KEY = 'opvrc:settings:v1';
+function loadLocalSettings() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_SETTINGS_KEY) || '{}') || {}; }
+  catch (_) { return {}; }
+}
+const savedSettings = loadLocalSettings();
+function saveLocalSettings() {
+  try {
+    localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify({
+      theme: document.documentElement.dataset.theme || '',
+      colors: OPT.colors, flags: OPT.flags, names: OPT.names,
+      owners: OPT.owners, hideUnnamed: OPT.hideUnnamed, hideUnowned: OPT.hideUnowned,
+      opacity: POLYGON_FILL_OPACITY
+    }));
+  } catch (_) {
+    // Keep the page usable if browser storage is unavailable.
+  }
+}
+const savedBool = (key, fallback) => typeof savedSettings[key] === 'boolean' ? savedSettings[key] : fallback;
+const OPT = {
+  colors: savedBool('colors', false),
+  flags: savedBool('flags', !lowResources),
+  names: savedBool('names', true),
+  owners: savedBool('owners', false),
+  hideUnnamed: savedBool('hideUnnamed', false),
+  hideUnowned: savedBool('hideUnowned', false)
+};
 
 // ===== Link/bot filters: ?show=pirates,marines  (no ?show = everything) =====
 let SHOW = null, SHOW_CREW = null;
@@ -415,15 +442,20 @@ const SHEET_NO_OWNER_COLOR = 'rgb(0, 146, 70)';        // no owner at all (green
 const NO_OWNER_COLOR = 'rgb(255, 215, 0)'; // listed in the Islands sheet but no owner yet (yellow)
 const OWNED_NO_CREW_COLOR = 'rgb(128, 0, 128)'; // has owner, but no crew/group in the crew sheet (purple)
 // Polygon fill transparency: 0 = invisible fill, 1 = fully solid. Change this number to adjust all polygons.
-let POLYGON_FILL_OPACITY = 0.5; // solid color / stripe fill opacity
+let POLYGON_FILL_OPACITY = Number.isFinite(savedSettings.opacity)
+  ? Math.max(0, Math.min(1, savedSettings.opacity)) : 0.5; // solid color / stripe fill opacity
 
 const $ = (id) => document.getElementById(id);
 const setStatus = (t) => console.log(t); // no status panel in the public page
 // ===== UI: theme, list, debug =====
+if (savedSettings.theme === 'light' || savedSettings.theme === 'dark') {
+  document.documentElement.dataset.theme = savedSettings.theme;
+}
 $('themeBtn').addEventListener('click', () => {
   const root = document.documentElement;
   const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   root.dataset.theme = dark ? 'light' : 'dark';
+  saveLocalSettings();
 });
 $('listToggle').addEventListener('click', () => {
   $('sideList').classList.toggle('open');
@@ -2041,7 +2073,8 @@ function rebuildLabels() {
     const c = turf.pointOnFeature(l.toGeoJSON()).geometry.coordinates;
     for (let k = -WRAP_COPIES; k <= WRAP_COPIES; k++) {
       const el = document.createElement('div');
-      el.textContent = name;
+      const ownerSuffix = OPT.owners ? ownersOf(resolveOwner(l.feature.properties)).join(' / ') : '';
+      el.textContent = ownerSuffix ? name + ' (' + ownerSuffix + ')' : name;
       L.marker([c[1], c[0] + k * mapWidth], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'map-label', html: el, iconSize: [0, 0] }) }).addTo(labelItems);
     }
   });
@@ -2052,17 +2085,25 @@ document.querySelectorAll('.ico').forEach((el) => {
   const url = ICONS[el.dataset.icon];
   if (url) { el.style.setProperty('--ico', `url("${url}")`); el.classList.add('has-img'); el.textContent = ''; }
 });
-$('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked; restyleAll(); });
-$('optFlags').addEventListener('change', (e) => { OPT.flags = e.target.checked; rebuildFlags(); });
-$('optNames').addEventListener('change', (e) => { OPT.names = e.target.checked; rebuildLabels(); });
-$('optHideUnnamed').addEventListener('change', (e) => { OPT.hideUnnamed = e.target.checked; rebuildVisibility(); });
-$('optHideUnowned').addEventListener('change', (e) => { OPT.hideUnowned = e.target.checked; rebuildVisibility(); });
+$('optColors').checked = OPT.colors;
+$('optFlags').checked = OPT.flags;
+$('optNames').checked = OPT.names;
+$('optOwners').checked = OPT.owners;
+$('optHideUnnamed').checked = OPT.hideUnnamed;
+$('optHideUnowned').checked = OPT.hideUnowned;
+$('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked; restyleAll(); saveLocalSettings(); });
+$('optFlags').addEventListener('change', (e) => { OPT.flags = e.target.checked; rebuildFlags(); saveLocalSettings(); });
+$('optNames').addEventListener('change', (e) => { OPT.names = e.target.checked; rebuildLabels(); saveLocalSettings(); });
+$('optOwners').addEventListener('change', (e) => { OPT.owners = e.target.checked; rebuildLabels(); saveLocalSettings(); });
+$('optHideUnnamed').addEventListener('change', (e) => { OPT.hideUnnamed = e.target.checked; rebuildVisibility(); saveLocalSettings(); });
+$('optHideUnowned').addEventListener('change', (e) => { OPT.hideUnowned = e.target.checked; rebuildVisibility(); saveLocalSettings(); });
 $('optOpacity').value = POLYGON_FILL_OPACITY;
 $('optOpacityVal').textContent = POLYGON_FILL_OPACITY;
 $('optOpacity').addEventListener('input', (e) => {
   POLYGON_FILL_OPACITY = parseFloat(e.target.value);
   $('optOpacityVal').textContent = POLYGON_FILL_OPACITY;
   restyleAll(); // updates colors, stripes, and flags together
+  saveLocalSettings();
 });
 if (lowResources) { $('optFlags').checked = false; $('optFlags').title = 'Turned off automatically (data saver / low memory)'; }
 </script>
