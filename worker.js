@@ -1602,6 +1602,7 @@ async function crewNameChoices(query) {
 // a preview and must confirm before anything is saved.
 const SCHEDULE_FILE = "scheduled-events.txt";
 const SCHEDULE_ARCHIVE_FILE = "scheduled-events-archive.txt";
+const SCHEDULE_REMINDERS_FILE = "schedule-reminders.json";
 
 function parseScheduleMessage(message) {
   const content = String(message.content || "").trim();
@@ -1789,6 +1790,99 @@ async function scheduleListMessage(env) {
   };
 }
 
+
+async function scheduleRemindersCommand(env, interaction) {
+  need(env, ["GITHUB_TOKEN"]);
+  const userId = interaction.member?.user?.id || interaction.user?.id;
+  if (!userId) return { content: "I couldn't identify your Discord account.", flags: 64 };
+
+  const stored = await readScheduleFile(env, SCHEDULE_REMINDERS_FILE);
+  const enabledOption = interaction.data.options?.find(option => option.name === "enabled");
+  const timingOption = interaction.data.options?.find(option => option.name === "timing");
+  let preference = stored.items.find(item => item.userId === userId);
+
+  if (!preference) {
+    preference = { userId, enabled: true, leadMinutes: 0, sent: [] };
+    stored.items.push(preference);
+  }
+  if (enabledOption) preference.enabled = Boolean(enabledOption.value);
+  if (timingOption) {
+    const timing = String(timingOption.value);
+    const allowed = { "0": 0, "5m": 5, "30m": 30, "1h": 60, "1d": 1440 };
+    if (!(timing in allowed)) return { content: "That reminder timing isn't supported.", flags: 64 };
+    preference.leadMinutes = allowed[timing];
+  }
+  preference.updatedAt = new Date().toISOString();
+  await writeScheduleFile(env, SCHEDULE_REMINDERS_FILE, stored.items, stored.sha, "Update personal schedule reminder preferences");
+
+  const timingLabels = { 0: "at the event start time", 5: "5 minutes before", 30: "30 minutes before", 60: "1 hour before", 1440: "1 day before" };
+  return {
+    content: preference.enabled
+      ? `🔔 Your personal event reminders are **on**. You'll be reminded ${timingLabels[preference.leadMinutes] || "at the event start time"}. Use /reminders enabled:false to turn them off.`
+      : "🔕 Your personal event reminders are **off**. The shared schedule is unchanged.",
+    flags: 64
+  };
+}
+
+async function sendDueScheduleReminders(env) {
+  need(env, ["GITHUB_TOKEN", "DISCORD_TOKEN"]);
+  const [events, preferences] = await Promise.all([
+    readScheduleFile(env, SCHEDULE_FILE),
+    readScheduleFile(env, SCHEDULE_REMINDERS_FILE)
+  ]);
+  const now = Date.now();
+  let changed = false;
+
+  for (const preference of preferences.items) {
+    if (!preference.enabled || !preference.userId) continue;
+    if (!Array.isArray(preference.sent)) preference.sent = [];
+
+    for (const event of events.items) {
+      const start = Date.parse(event.startsAt);
+      const end = Date.parse(event.endsAt);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= now) continue;
+
+      const reminderKey = String(event.sourceMessageId || event.sourceMessageUrl || event.startsAt) + ":" + preference.userId;
+      if (preference.sent.includes(reminderKey)) continue;
+
+      const dueAt = start - Math.max(0, Number(preference.leadMinutes) || 0) * 60000;
+      // Cron runs every five minutes. For an event-time reminder, this gives
+      // a maximum normal delay of five minutes without sending stale notices.
+      if (now < dueAt || now > dueAt + 10 * 60000) continue;
+
+      const dmChannel = await fetch("https://discord.com/api/v10/users/@me/channels", {
+        method: "POST",
+        headers: { Authorization: `Bot ${env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient_id: preference.userId })
+      });
+      if (!dmChannel.ok) continue;
+      const dm = await dmChannel.json();
+      const when = new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium", timeStyle: "short", timeZone: "UTC"
+      }).format(new Date(start));
+      const message = await fetch(`https://discord.com/api/v10/channels/${dm.id}/messages`, {
+        method: "POST",
+        headers: { Authorization: `Bot ${env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: `🔔 **Upcoming OPVRC event**\n**${String(event.title || "Scheduled event").slice(0, 150)}**\nWhen: ${when} UTC\n${event.sourceMessageUrl ? `Original message: ${event.sourceMessageUrl}` : ""}`
+        })
+      });
+      if (!message.ok) continue;
+      preference.sent.push(reminderKey);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    for (const preference of preferences.items) {
+      if (Array.isArray(preference.sent) && preference.sent.length > 300) {
+        preference.sent = preference.sent.slice(-300);
+      }
+    }
+    await writeScheduleFile(env, SCHEDULE_REMINDERS_FILE, preferences.items, preferences.sha, "Record sent personal schedule reminders");
+  }
+}
+
 // ---------- main ----------
 export default {
   async fetch(request, env, ctx) {
@@ -1802,6 +1896,21 @@ export default {
         { name: "map", description: "Interactive island map with toggle buttons", type: 1 },
         { name: "Add to Schedule", type: 3 },
         { name: "schedule", description: "Show upcoming events saved from Discord messages", type: 1 },
+        {
+          name: "reminders",
+          description: "Set your personal event reminder preferences",
+          type: 1,
+          options: [
+            { type: 5, name: "enabled", description: "Turn your personal reminders on or off", required: false },
+            { type: 3, name: "timing", description: "When to remind you (default: at event time)", required: false, choices: [
+              { name: "At event time (default)", value: "0" },
+              { name: "5 minutes before", value: "5m" },
+              { name: "30 minutes before", value: "30m" },
+              { name: "1 hour before", value: "1h" },
+              { name: "1 day before", value: "1d" }
+            ] }
+          ]
+        },
         {
           name: "addcrew",
           description: "🔒 Restricted: add a crew and its flag to the crews sheet",
@@ -1972,6 +2081,7 @@ export default {
       if (LINKS[name]) return json({ type: 4, data: { content: LINKS[name] } });
       if (name === "map") return json({ type: 4, data: await mapMessage(ALL_ON) });
       if (name === "schedule") return json({ type: 4, data: await scheduleListMessage(env) });
+      if (name === "reminders") return json({ type: 4, data: await scheduleRemindersCommand(env, i) });
       if (name === "addcrew" || name === "editcrew") {
         if (!isAdmin(env, i)) return json(notAllowed(i));
         ctx.waitUntil(runCrewCommand(env, i));
@@ -2159,7 +2269,10 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
-    ctx.waitUntil(archiveExpiredScheduleEvents(env));
+    ctx.waitUntil(Promise.allSettled([
+      archiveExpiredScheduleEvents(env),
+      sendDueScheduleReminders(env)
+    ]));
   }
 };
 
