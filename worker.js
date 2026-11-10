@@ -1107,6 +1107,9 @@ async function islandMessage(query) {
     });
   }
 
+  const civilianRows = await tsv("civilians.tsv").catch(() => []);
+  const hasCivilians = civilianRows.some(row => String(row.Island || "").trim().toLowerCase() === islandDisplayName(isl).toLowerCase());
+
   return {
     embeds: [
       {
@@ -1122,6 +1125,7 @@ async function islandMessage(query) {
         },
       },
     ],
+    ...(hasCivilians ? { components: [{ type: 1, components: [{ type: 2, style: 2, label: "Open civilian list", custom_id: "civilians_" + isl.ID }] }] } : {}),
   };
 }
 
@@ -2240,6 +2244,21 @@ export default {
       } catch (error) {
         return json({ type: 4, data: { flags: 64, content: `⚠️ Could not save the event: ${String(error?.message || error).slice(0, 250)}` } });
       }
+    }
+
+    // Island civilian list button
+    if (i.type === 3 && i.data.custom_id.startsWith("civilians_")) {
+      const islandId = i.data.custom_id.slice("civilians_".length);
+      const [islands, civilians] = await Promise.all([tsv("island-colors.tsv"), tsv("civilians.tsv").catch(() => [])]);
+      const island = islands.find(row => String(row.ID) === islandId);
+      if (!island) return json({ type: 4, data: { flags: 64, content: "Island not found." } });
+      const islandName = islandDisplayName(island);
+      const entries = civilians.filter(row => String(row.Island || "").trim().toLowerCase() === islandName.toLowerCase());
+      const lines = entries.map(row => {
+        const name = String(row.Name || "").trim(), url = String(row.Link || "").trim();
+        return name ? (url.startsWith("https://") || url.startsWith("http://") ? "[" + name + "](" + url + ")" : name) : "";
+      }).filter(Boolean);
+      return json({ type: 4, data: { flags: 64, embeds: [{ title: islandName + " — Civilians", description: lines.length ? lines.join("\\n") : "No civilian entries yet.", color: 0x005aff }] } });
     }
 
     // buttons + dropdown
