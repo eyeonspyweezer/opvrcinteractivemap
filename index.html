@@ -179,6 +179,12 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
   width: min(68vw, 480px);
   min-width: min(220px, 68vw);
 }
+.island-civilian-toggle { display:inline-block; margin-top:8px; padding:5px 9px; border:1px solid currentColor; border-radius:4px; background:transparent; color:inherit; font:inherit; cursor:pointer; }
+.island-civilian-list { margin-top:7px; padding-left:18px; }
+.island-civilian-list[hidden] { display:none; }
+.island-civilian-list li { margin:4px 0; }
+.island-popup-content .pop-name { font-family:'PlayfairDisplay', Georgia, serif; letter-spacing:.02em; }
+
 .island-banner {
   display: block;
   width: 100%;
@@ -1616,18 +1622,44 @@ function wireHoverImage(target, sourceLayer) {
   });
 }
 
+let civilianListCache = null;
+async function loadCivilianList() {
+  if (civilianListCache) return civilianListCache;
+  try {
+    const response = await fetch('civilians.tsv', { cache: 'no-cache' });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const lines = (await response.text()).replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(Boolean);
+    const header = lines.shift().split('\\t').map(x => x.trim().toLowerCase());
+    const islandCol = header.indexOf('island'), nameCol = header.indexOf('name'), linkCol = header.indexOf('link');
+    const map = new Map();
+    if (islandCol < 0 || nameCol < 0) return (civilianListCache = map);
+    lines.forEach(line => {
+      const cols = line.split('\\t');
+      const island = String(cols[islandCol] || '').trim();
+      const name = String(cols[nameCol] || '').trim();
+      const link = String(cols[linkCol] || '').trim();
+      if (!island || !name) return;
+      const key = islandKey(island);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push({ name, link: /^https?:\\/\\//i.test(link) ? link : '' });
+    });
+    civilianListCache = map;
+  } catch (error) { console.warn('Civilian list unavailable:', error); civilianListCache = new Map(); }
+  return civilianListCache;
+}
 function wireClick(target, layer) {
   target.on('click', async (e) => {
     if (map.getContainer().classList.contains('drawing')) return;
     const p = layer.feature.properties, raw = resolveOwner(p);
     const isUrl = (u) => /^https?:\/\//i.test(u || '');
-    await loadIslandBackgrounds();
+    await Promise.all([loadIslandBackgrounds(), loadCivilianList()]);
     const bannerUrl = islandBackgrounds.get(islandKey(p.name)) || '';
     const links = linksOf(p.name);
     const w = links.length ? null : worldOf(p.name);
     const nameHref = links[0] || (w && w.link) || '';
     const ownerHref = linkOf(raw);
-    if (!isUrl(nameHref) && !isUrl(ownerHref) && !bannerUrl) return;
+    const civilians = civilianListCache.get(islandKey(p.name)) || [];
+    if (!isUrl(nameHref) && !isUrl(ownerHref) && !bannerUrl && !civilians.length) return;
     const box = document.createElement('div');
     box.className = 'island-popup-content';
     const nm = document.createElement(isUrl(nameHref) ? 'a' : 'div');
@@ -1649,6 +1681,20 @@ function wireClick(target, layer) {
         a.href = u; a.target = '_blank'; a.rel = 'noopener'; a.className = 'owner-link'; a.style.display = 'block'; a.textContent = 'Link ' + (i + 2);
         box.appendChild(a);
       });
+    }
+    if (civilians.length) {
+      const toggle = document.createElement('button');
+      toggle.type = 'button'; toggle.className = 'island-civilian-toggle';
+      toggle.textContent = 'Show civilian list (' + civilians.length + ')';
+      const list = document.createElement('ul'); list.className = 'island-civilian-list'; list.hidden = true;
+      civilians.forEach(person => {
+        const item = document.createElement('li');
+        if (person.link) { const link = document.createElement('a'); link.href = person.link; link.target = '_blank'; link.rel = 'noopener'; link.textContent = person.name; item.appendChild(link); }
+        else item.textContent = person.name;
+        list.appendChild(item);
+      });
+      toggle.addEventListener('click', () => { list.hidden = !list.hidden; toggle.textContent = (list.hidden ? 'Show' : 'Hide') + ' civilian list (' + civilians.length + ')'; });
+      box.append(toggle, list);
     }
     if (bannerUrl) {
       const img = document.createElement('img');
