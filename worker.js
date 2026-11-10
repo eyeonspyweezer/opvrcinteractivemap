@@ -75,7 +75,7 @@ async function getGroups() {
     tsv("crew-links.tsv").catch(() => []),
     tsv("island-colors.tsv").catch(() => [])
   ]);
-  const normalize = value => String(value || "").trim().toLowerCase().replace(/^the\\s+/, "").replace(/[^a-z0-9]/g, "");
+  const normalize = value => String(value || "").trim().toLowerCase().replace(/^the\s+/, "").replace(/[^a-z0-9]/g, "");
   const metadataByName = new Map(
     metadata.map(row => [normalize(row.Group), row]).filter(([name]) => name)
   );
@@ -1233,7 +1233,6 @@ function crewInfoColor(name, fallback) {
     worldgovernment: "#10264f",
     marines: "#1676d2",
     revolutionaryarmy: "#b52b3a",
-    rocks pirates: "#30343b",
     rockspirates: "#30343b",
     starpirates: "#7046a8",
     thrillerbarkpirates: "#573b75",
