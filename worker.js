@@ -2049,7 +2049,7 @@ export default {
     if (request.method === "GET" && url.pathname === "/register") {
       if (url.searchParams.get("key") !== env.REGISTER_KEY) return new Response("no", { status: 403 });
       const commands = discordCommandDefinitions();
- To remove it: open the /register link again with  &test=off  at the end
+      // Command definitions are shared with the automatic sync helper.
 
       const registered = commands.map((c) => ({ ...c, integration_types: [0, 1], contexts: [0, 1, 2] }));
       const r = await fetch(`https://discord.com/api/v10/applications/${env.DISCORD_APP_ID}/commands`, {
