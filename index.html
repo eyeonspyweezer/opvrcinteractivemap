@@ -442,9 +442,12 @@ let mapWidth = 0;          // image width, set when the map image loads
 let mapHeight = 0;         // image height, used for sunk-island sea-color matching
 
 // ===== Subtle animated ocean waves (masked by the island polygons) =====
+// Ocean waves are disabled for performance. No SVG masks, overlay layers,
+// or animation frames are created until explicitly re-enabled in a future update.
+const OCEAN_WAVES_ENABLED = false;
 let oceanWaveLayers = [];
 let oceanWavePatterns = [];
-let oceanWavesBuilt = false;
+let oceanWavesBuilt = true;
 let oceanWaveAnimationStarted = false;
 
 function startOceanWaveAnimation() {
@@ -484,91 +487,7 @@ function oceanMaskPath() {
 }
 
 function buildOceanWaves() {
-  if (oceanWavesBuilt || !mapWidth || !mapHeight || !drawnItems.getLayers().length) return;
-  const landPath = oceanMaskPath();
-  if (!landPath) return;
-
-  const NS = 'http://www.w3.org/2000/svg';
-
-  for (let copy = -WRAP_COPIES; copy <= WRAP_COPIES; copy++) {
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${mapWidth} ${mapHeight}`);
-    svg.setAttribute('preserveAspectRatio', 'none');
-    svg.setAttribute('width', String(mapWidth));
-    svg.setAttribute('height', String(mapHeight));
-
-    const defs = document.createElementNS(NS, 'defs');
-    const mask = document.createElementNS(NS, 'mask');
-    const suffix = String(copy + WRAP_COPIES);
-    const maskId = `oceanLandMask${suffix}`;
-    const patternId = `oceanWavePattern${suffix}`;
-    mask.setAttribute('id', maskId);
-    mask.setAttribute('maskUnits', 'userSpaceOnUse');
-    mask.setAttribute('maskContentUnits', 'userSpaceOnUse');
-    mask.setAttribute('x', '0');
-    mask.setAttribute('y', '0');
-    mask.setAttribute('width', String(mapWidth));
-    mask.setAttribute('height', String(mapHeight));
-    mask.setAttribute('mask-type', 'luminance');
-
-    const waterBase = document.createElementNS(NS, 'rect');
-    waterBase.setAttribute('width', String(mapWidth));
-    waterBase.setAttribute('height', String(mapHeight));
-    waterBase.setAttribute('fill', 'white');
-
-    const land = document.createElementNS(NS, 'path');
-    land.setAttribute('d', landPath);
-    land.setAttribute('fill', 'black');
-    land.setAttribute('fill-rule', 'evenodd');
-    land.setAttribute('clip-rule', 'evenodd');
-    mask.append(waterBase, land);
-    defs.appendChild(mask);
-
-    const pattern = document.createElementNS(NS, 'pattern');
-    pattern.setAttribute('id', patternId);
-    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-    pattern.setAttribute('width', '320');
-    pattern.setAttribute('height', '100');
-    oceanWavePatterns.push(pattern);
-
-    // Fine, low-amplitude lines: intentionally understated at normal map zoom.
-    const wavePaths = [
-      ['M-320 16 C-240 10 -160 10 -80 16 S80 22 160 16 S320 10 400 16 S560 22 640 16', '#effaff', '0.85', '0.22'],
-      ['M-320 50 C-240 45 -160 45 -80 50 S80 55 160 50 S320 45 400 50 S560 55 640 50', '#bfe8fa', '0.75', '0.16'],
-      ['M-320 84 C-240 79 -160 79 -80 84 S80 89 160 84 S320 79 400 84 S560 89 640 84', '#effaff', '0.8', '0.18']
-    ];
-    wavePaths.forEach(([d, color, width, opacity]) => {
-      const path = document.createElementNS(NS, 'path');
-      path.setAttribute('d', d);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', color);
-      path.setAttribute('stroke-width', width);
-      path.setAttribute('stroke-linecap', 'round');
-      path.setAttribute('opacity', opacity);
-      pattern.appendChild(path);
-    });
-
-    defs.appendChild(pattern);
-    svg.appendChild(defs);
-
-    const waves = document.createElementNS(NS, 'rect');
-    waves.setAttribute('width', String(mapWidth));
-    waves.setAttribute('height', String(mapHeight));
-    waves.setAttribute('fill', `url(#${patternId})`);
-    waves.setAttribute('mask', `url(#${maskId})`);
-    waves.setAttribute('opacity', '0.52');
-    svg.appendChild(waves);
-
-    const bounds = [[0, copy * mapWidth], [mapHeight, (copy + 1) * mapWidth]];
-    const overlay = L.svgOverlay(svg, bounds, {
-      pane: 'wavePane',
-      interactive: false,
-      opacity: 1
-    }).addTo(map);
-    oceanWaveLayers.push(overlay);
-  }
-  oceanWavesBuilt = true;
-  startOceanWaveAnimation();
+  if (!OCEAN_WAVES_ENABLED) return;
 }
 
 const WRAP_COPIES = 3;     // copies on each side
