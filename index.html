@@ -357,7 +357,7 @@ function layerKinds(layer) {
   return groupColorsOf(owner).map((c) => KIND_BY_COLOR[c]).filter(Boolean);
 }
 function layerCrews(layer) {
-  return ownersOf(resolveOwner(layer.feature.properties)).flatMap(groupsOf).map(norm);
+  return groupsForIsland(layer.feature.properties.name, resolveOwner(layer.feature.properties)).map(norm);
 }
 // used by the screenshot robot
 window.applyFilter = (show, crew) => {
@@ -718,7 +718,46 @@ const refreshAll = () => { restyleAll(); rebuildFlags(); rebuildVisibility(); };
 
 
 // ===== Data from TSV #2 and #3 =====
-let ownerMap = new Map();    // island (lowercase) -> owner
+let ownerMap = new Map();    // live-sheet island (lowercase) -> owner
+let staticIslandData = new Map(); // generated island-colors.tsv fallback
+let staticGroupNames = new Map(); // generated group ID -> display name
+let staticIslandDataPromise = null;
+async function loadStaticIslandData() {
+  if (!staticIslandDataPromise) {
+    staticIslandDataPromise = Promise.all([
+      fetch('island-colors.tsv').then(r => { if (!r.ok) throw new Error('island-colors.tsv HTTP ' + r.status); return r.text(); }),
+      fetch('island-groups.tsv').then(r => { if (!r.ok) throw new Error('island-groups.tsv HTTP ' + r.status); return r.text(); })
+    ]).then(([islandsText, groupsText]) => {
+      const groupLines = groupsText.replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(Boolean);
+      const gh = groupLines.shift().split('\\t').map(v => v.trim().toLowerCase());
+      const gi = gh.indexOf('id'), gn = gh.indexOf('group');
+      staticGroupNames = new Map();
+      groupLines.forEach(line => {
+        const c = line.split('\\t');
+        if (gi >= 0 && gn >= 0 && c[gi] && c[gn]) staticGroupNames.set(c[gi].trim(), c[gn].trim());
+      });
+      const lines = islandsText.replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(Boolean);
+      const h = lines.shift().split('\\t').map(v => v.trim().toLowerCase());
+      const at = name => h.indexOf(name);
+      const id = at('island name'), owner = at('owner');
+      const groupCols = ['group1', 'group2', 'group3'].map(at).filter(i => i >= 0);
+      staticIslandData = new Map();
+      lines.forEach(line => {
+        const c = line.split('\\t'), name = c[id] || '';
+        if (!name) return;
+        const groups = groupCols.map(i => staticGroupNames.get((c[i] || '').trim())).filter(Boolean);
+        staticIslandData.set(islandKey(name), { owner: (c[owner] || '').trim(), groups: [...new Set(groups)] });
+      });
+      refreshAll();
+      animateSunkIslands();
+      console.log('[map] Loaded generated island fallback:', staticIslandData.size, 'islands;', staticGroupNames.size, 'groups');
+    }).catch(err => {
+      console.warn('[map] Generated island fallback unavailable:', err);
+      staticIslandDataPromise = null;
+    });
+  }
+  return staticIslandDataPromise;
+}
 let leaderMap = new Map();   // leader (lowercase) -> [nations]
 let nationColor = new Map(); // nation (lowercase) -> color
 let nationFlag = new Map();  // nation (lowercase) -> flag image
@@ -752,7 +791,18 @@ function normColor(c) {
   if (/^[0-9a-f]{6}$/i.test(c)) return '#' + c;
   return c;
 }
-const resolveOwner = (p) => { const k = islandKey(p.name); return ownerMap.has(k) ? ownerMap.get(k) : (p.owner || ''); };
+const staticIslandOf = (name) => staticIslandData.get(islandKey(name)) || null;
+const resolveOwner = (p) => {
+  const k = islandKey(p.name), live = ownerMap.get(k);
+  if (live && live.trim()) return live;
+  const generated = staticIslandOf(p.name);
+  return (generated && generated.owner) || p.owner || '';
+};
+const groupsForIsland = (name, owner) => {
+  const generated = staticIslandOf(name);
+  if (generated && generated.groups.length) return generated.groups;
+  return ownersOf(owner).flatMap(groupsOf);
+};
 const cleanOwner = (o) => String(o).replace(/\?+$/, '').trim();
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // An owner with no crew becomes "<owner> Kingdom"
@@ -1027,7 +1077,7 @@ function tipContent(layer) {
   });
 
   const crews = isGoneStatus(layer) ? [] : preferMarines([
-    ...new Set(ownersOf(raw).flatMap(groupsOf).filter((g) => g && !/ Kingdom$/i.test(g)))
+    ...new Set(groupsForIsland(p.name, raw).filter((g) => g && !/ Kingdom$/i.test(g)))
   ]);
   if (crews.length) {
     const row = document.createElement('div');
@@ -1400,6 +1450,7 @@ big.addEventListener('pointercancel', endPtr);
 
 async function loadLive() {
   console.log('[map] loadLive running, version bounty-v5');
+  await loadStaticIslandData();
   const box = $('listLive');
   const pieces = {};
   for (const key of Object.keys(SHEETS)) {
