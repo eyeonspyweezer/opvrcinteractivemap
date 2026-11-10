@@ -81,9 +81,10 @@ html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay
 }
 .leaflet-tooltip .tip-image {
   display: block;
-  width: min(220px, 60vw);
-  height: 70px;
+  width: 50%;
   max-width: 100%;
+  aspect-ratio: 16 / 5;
+  height: auto;
   margin-top: 7px;
   object-fit: cover;
   object-position: center;
@@ -173,15 +174,24 @@ button.list-btn { font: inherit; text-transform: uppercase; cursor: pointer; }
 #imgOverlay[hidden] { display: none; }
 #imgBig { max-width: 90vw; max-height: 90vh; transform-origin: center; user-select: none; -webkit-user-drag: none; cursor: grab; }
 a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-color: var(--sfg); }
+.island-popup-content {
+  box-sizing: border-box;
+  width: min(68vw, 640px);
+  min-width: min(220px, 68vw);
+}
 .island-banner {
   display: block;
-  width: min(420px, 75vw);
-  height: 90px;
+  width: 100%;
   max-width: 100%;
+  aspect-ratio: 16 / 5;
+  height: auto;
   margin-top: 9px;
   object-fit: cover;
   object-position: center;
   border-radius: 4px;
+}
+.island-popup-content.short-info .island-banner {
+  aspect-ratio: 16 / 9;
 }
 
 
@@ -990,6 +1000,7 @@ function tipContent(layer) {
     img.alt = String(p.name || '') + ' image';
     img.loading = 'lazy';
     img.decoding = 'async';
+    img.fetchPriority = 'low';
     img.src = bannerUrl;
     img.onerror = () => img.remove();
     el.appendChild(img);
@@ -1481,6 +1492,7 @@ function wireClick(target, layer) {
     const ownerHref = linkOf(raw);
     if (!isUrl(nameHref) && !isUrl(ownerHref) && !bannerUrl) return;
     const box = document.createElement('div');
+    box.className = 'island-popup-content';
     const nm = document.createElement(isUrl(nameHref) ? 'a' : 'div');
     nm.className = 'pop-name'; nm.textContent = String(p.name || '');
     if (isUrl(nameHref)) { nm.href = nameHref; nm.target = '_blank'; nm.rel = 'noopener'; }
@@ -1507,11 +1519,14 @@ function wireClick(target, layer) {
       img.alt = String(p.name || '') + ' image';
       img.loading = 'lazy';
       img.decoding = 'async';
+      img.fetchPriority = 'low';
       img.src = bannerUrl;
       img.onerror = () => img.remove();
       box.appendChild(img);
     }
-    L.popup({ maxWidth: 460 }).setLatLng(e.latlng).setContent(box).openOn(map);
+    const infoLength = box.textContent.trim().length;
+    if (infoLength < 90) box.classList.add('short-info');
+    L.popup({ maxWidth: 680, minWidth: 220 }).setLatLng(e.latlng).setContent(box).openOn(map);
   });
 }
 function collect() {
@@ -1709,7 +1724,11 @@ $('sZoom').addEventListener('click', zoomIsland);
 $('sIsland').addEventListener('keydown', (e) => { if (e.key === 'Enter') { closeLists(); zoomIsland(); } });
 const panels = ['searchFrame', 'settingsFrame'];
 function togglePanel(id) { panels.forEach((p) => $(p).classList.toggle('open', p === id && !$(p).classList.contains('open'))); closeLists(); }
-$('searchBtn').addEventListener('click', () => togglePanel('searchFrame'));
+$('searchBtn').addEventListener('click', () => {
+  const wasOpen = $('searchFrame').classList.contains('open');
+  togglePanel('searchFrame');
+  if (!wasOpen) requestAnimationFrame(() => $('sIsland').focus());
+});
 $('settingsBtn').addEventListener('click', () => togglePanel('settingsFrame'));
 document.addEventListener('pointerdown', (e) => { if (!$('searchFrame').contains(e.target)) closeLists(); });
 
