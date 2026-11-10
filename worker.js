@@ -202,7 +202,17 @@ async function mapMessage(mask, { title, description, image, thumbnail } = {}) {
 
 // ---------- /island ----------
 async function tsv(file) {
-  const res = await fetch(`${BASE}/${file}`, { cf: { cacheTtl: 300 } });
+  // Visit snapshots are updated by GitHub Actions and must not be served
+  // from an old Worker cache. Other map TSVs can keep the short cache.
+  const isVisitData =
+    file === "island-world-visits.tsv" ||
+    file === "island-world-visit-history.tsv";
+  const url = isVisitData
+    ? `${BASE}/${file}?v=${Date.now()}`
+    : `${BASE}/${file}`;
+  const res = await fetch(url, {
+    cf: { cacheTtl: isVisitData ? 0 : 300 }
+  });
   if (res.ok === false) throw new Error(`${file} not found`);
   const txt = await res.text();
   const [head, ...rows] = txt.trim().split(/\r?\n/);
@@ -438,8 +448,11 @@ async function buildWorldActivity(durationValue = "7d") {
       }
     }
 
-    if (!baseline || current.checkedAt !== latest["Last Checked UTC"]) continue;
+    if (!baseline) continue;
 
+    // Net change = current lifetime visits minus the selected baseline.
+    // Do not discard the result just because the separate latest TSV fetch
+    // has a slightly different cache generation.
     const gained = current.visits - baseline.visits;
     const comparisonMs = Math.max(0, Date.parse(current.checkedAt) - Date.parse(baseline.checkedAt));
     if (gained === 0) continue;
@@ -584,7 +597,8 @@ function worldActivityMessage(data) {
       ? ` / ${count(crew.activePlayers)} active players`
       : "";
 
-    return `**${index + 1}. ${crew.name}** — **+${count(crew.gained)} total visits**${totalActive} (${islandNames.join(", ")})`;
+    const sign = crew.gained > 0 ? "+" : crew.gained < 0 ? "" : "";
+    return `**${index + 1}. ${crew.name}** — **${sign}${count(crew.gained)} visits net change**${totalActive} (${islandNames.join(", ")})`;
   });
 
   const description = crewLines.length
@@ -594,7 +608,7 @@ function worldActivityMessage(data) {
   return {
     embeds: [{
       title: "VRChat World Activity — Crew Ranking",
-      description: `Ranked by visit growth over the requested ${data.duration}. Each # is an island link.\\n${data.comparisonDays > 0 && data.comparisonDays < parseWorldActivityDuration(data.duration).ms / 86400000 ? `Only ${data.comparisonDays.toFixed(1)} days of recorded history are currently available.\\n` : ""}\\n${description}`.slice(0, 5900),
+      description: `Ranked by net visit change over the requested ${data.duration}. Each # is an island link.\\n${data.comparisonDays > 0 && data.comparisonDays < parseWorldActivityDuration(data.duration).ms / 86400000 ? `Only ${data.comparisonDays.toFixed(1)} days of recorded history are currently available.\\n` : ""}\\n${description}`.slice(0, 5900),
       color: 0x005aff,
       footer: {
         text: `Visit tracker: ${data.trackedWorldCount} linked worlds. Rankings use recorded lifetime-visit snapshots.`
