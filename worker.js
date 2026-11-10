@@ -1883,6 +1883,163 @@ async function sendDueScheduleReminders(env) {
   }
 }
 
+function discordCommandDefinitions() {
+  return [
+  ...Object.keys(LINKS).map((name) => ({ name, description: DESCRIPTIONS[name], type: 1 })),
+  { name: "map", description: "Interactive island map with toggle buttons", type: 1 },
+  { name: "Add to Schedule", type: 3 },
+  { name: "schedule", description: "Show upcoming events saved from Discord messages", type: 1 },
+  {
+    name: "reminders",
+    description: "Set your personal event reminder preferences",
+    type: 1,
+    options: [
+      { type: 5, name: "enabled", description: "Turn your personal reminders on or off", required: false },
+      { type: 3, name: "timing", description: "When to remind you (default: at event time)", required: false, choices: [
+        { name: "At event time (default)", value: "0" },
+        { name: "5 minutes before", value: "5m" },
+        { name: "30 minutes before", value: "30m" },
+        { name: "1 hour before", value: "1h" },
+        { name: "1 day before", value: "1d" }
+      ] }
+    ]
+  },
+  {
+    name: "addcrew",
+    description: "🔒 Restricted: add a crew and its flag to the crews sheet",
+    type: 1,
+    options: [
+      { type: 3, name: "name", description: "Exact crew name, for example The Michigan House", required: true, max_length: 100 },
+      { type: 3, name: "flag_url", description: "Direct image URL (optional if uploading a file)", required: false },
+      { type: 11, name: "flag_file", description: "Upload a flag image instead", required: false },
+    ],
+  },
+  {
+    name: "editcrew",
+    description: "🔒 Restricted: change a crew's flag or rename it",
+    type: 1,
+    options: [
+      { type: 3, name: "crew", description: "The exact current crew name", required: true, autocomplete: true },
+      { type: 3, name: "new_name", description: "New crew name (optional)", required: false, max_length: 100 },
+      { type: 3, name: "new_flag_url", description: "New flag image URL (optional)", required: false },
+      { type: 11, name: "new_flag_file", description: "Upload a new flag image (optional)", required: false },
+    ],
+  },
+  {
+    name: "googlesheet",
+    description: "Simple list of islands and owners (or crews) from the map data",
+    type: 1,
+    options: [
+      {
+        type: 3,
+        name: "list",
+        description: "Which list",
+        required: false,
+        choices: [
+          { name: "Islands and owners", value: "i" },
+          { name: "Crews", value: "c" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "group",
+    description: "Show only one group's islands (start typing the name)",
+    type: 1,
+    options: [{ type: 3, name: "name", description: "Group name", required: true, autocomplete: true }],
+  },
+  {
+    name: "crewinfo",
+    description: "Show quick info and the flag of a crew/group",
+    type: 1,
+    options: [{ type: 3, name: "name", description: "Crew name", required: true, autocomplete: true }],
+  },
+  {
+    name: "crewlist",
+    description: "Show a paginated list of all crews and their island counts",
+    type: 1,
+  },
+
+  {
+    name: "worldactivity",
+    description: "Rank crews by historical net visit change; show online players separately",
+    type: 1,
+    options: [
+      {
+        type: 3,
+        name: "duration",
+        description: "How far back to compare recorded visits",
+        required: false,
+        choices: worldActivityDurationOptions()
+      }
+    ]
+  },
+  {
+    name: "islandactivity",
+    description: "Rank islands by historical net visit change; show online players separately",
+    type: 1,
+    options: [{ type: 3, name: "duration", description: "How far back to compare recorded visits", required: false, choices: worldActivityDurationOptions() }]
+  },
+  {
+    name: "crewactivity",
+    description: "Rank crews and groups by historical net visit change; show online players separately",
+    type: 1,
+    options: [{ type: 3, name: "duration", description: "How far back to compare recorded visits", required: false, choices: worldActivityDurationOptions() }]
+  },
+  {
+    name: "owneractivity",
+    description: "Rank island owners by historical net visit change; show online players separately",
+    type: 1,
+    options: [{ type: 3, name: "duration", description: "How far back to compare recorded visits", required: false, choices: worldActivityDurationOptions() }]
+  },
+  {
+    name: "island",
+    description: "Show island information, population and tracked visits",
+    type: 1,
+    options: [
+      {
+        type: 3,
+        name: "name",
+        description: "Island name",
+        required: true,
+        autocomplete: true
+      }
+    ],
+  },
+  {
+    name: "setowner",
+    description: "🔒 Restricted: change an island's owner in Google Sheets",
+    type: 1,
+    options: [
+      { type: 3, name: "island", description: "Island name", required: true, autocomplete: true },
+      { type: 3, name: "owner", description: "New owner name", required: true },
+    ],
+  },
+  {
+    name: "renameisland",
+    description: "🔒 Restricted: rename an island on the map",
+    type: 1,
+    options: [
+      { type: 3, name: "island", description: "Current island name", required: true, autocomplete: true },
+      { type: 3, name: "new_name", description: "New island name", required: true, max_length: 100 },
+    ],
+  },
+];;
+}
+
+async function syncDiscordCommands(env) {
+  need(env, ["DISCORD_APP_ID", "DISCORD_TOKEN"]);
+  const registered = discordCommandDefinitions().map((command) => ({ ...command, integration_types: [0, 1], contexts: [0, 1, 2] }));
+  const response = await fetch("https://discord.com/api/v10/applications/" + env.DISCORD_APP_ID + "/commands", {
+    method: "PUT",
+    headers: { Authorization: "Bot " + env.DISCORD_TOKEN, "Content-Type": "application/json" },
+    body: JSON.stringify(registered)
+  });
+  if (!response.ok) throw new Error("Discord command sync failed (" + response.status + "): " + (await response.text()).slice(0, 300));
+  return response;
+}
+let lastAutoCommandSyncAt = 0;
+
 // ---------- main ----------
 export default {
   async fetch(request, env, ctx) {
@@ -1891,148 +2048,8 @@ export default {
     // One-time: open https://YOUR-WORKER/register?key=REGISTER_KEY in your browser
     if (request.method === "GET" && url.pathname === "/register") {
       if (url.searchParams.get("key") !== env.REGISTER_KEY) return new Response("no", { status: 403 });
-      const commands = [
-        ...Object.keys(LINKS).map((name) => ({ name, description: DESCRIPTIONS[name], type: 1 })),
-        { name: "map", description: "Interactive island map with toggle buttons", type: 1 },
-        { name: "Add to Schedule", type: 3 },
-        { name: "schedule", description: "Show upcoming events saved from Discord messages", type: 1 },
-        {
-          name: "reminders",
-          description: "Set your personal event reminder preferences",
-          type: 1,
-          options: [
-            { type: 5, name: "enabled", description: "Turn your personal reminders on or off", required: false },
-            { type: 3, name: "timing", description: "When to remind you (default: at event time)", required: false, choices: [
-              { name: "At event time (default)", value: "0" },
-              { name: "5 minutes before", value: "5m" },
-              { name: "30 minutes before", value: "30m" },
-              { name: "1 hour before", value: "1h" },
-              { name: "1 day before", value: "1d" }
-            ] }
-          ]
-        },
-        {
-          name: "addcrew",
-          description: "🔒 Restricted: add a crew and its flag to the crews sheet",
-          type: 1,
-          options: [
-            { type: 3, name: "name", description: "Exact crew name, for example The Michigan House", required: true, max_length: 100 },
-            { type: 3, name: "flag_url", description: "Direct image URL (optional if uploading a file)", required: false },
-            { type: 11, name: "flag_file", description: "Upload a flag image instead", required: false },
-          ],
-        },
-        {
-          name: "editcrew",
-          description: "🔒 Restricted: change a crew's flag or rename it",
-          type: 1,
-          options: [
-            { type: 3, name: "crew", description: "The exact current crew name", required: true, autocomplete: true },
-            { type: 3, name: "new_name", description: "New crew name (optional)", required: false, max_length: 100 },
-            { type: 3, name: "new_flag_url", description: "New flag image URL (optional)", required: false },
-            { type: 11, name: "new_flag_file", description: "Upload a new flag image (optional)", required: false },
-          ],
-        },
-        {
-          name: "googlesheet",
-          description: "Simple list of islands and owners (or crews) from the map data",
-          type: 1,
-          options: [
-            {
-              type: 3,
-              name: "list",
-              description: "Which list",
-              required: false,
-              choices: [
-                { name: "Islands and owners", value: "i" },
-                { name: "Crews", value: "c" },
-              ],
-            },
-          ],
-        },
-        {
-          name: "group",
-          description: "Show only one group's islands (start typing the name)",
-          type: 1,
-          options: [{ type: 3, name: "name", description: "Group name", required: true, autocomplete: true }],
-        },
-        {
-          name: "crewinfo",
-          description: "Show quick info and the flag of a crew/group",
-          type: 1,
-          options: [{ type: 3, name: "name", description: "Crew name", required: true, autocomplete: true }],
-        },
-        {
-          name: "crewlist",
-          description: "Show a paginated list of all crews and their island counts",
-          type: 1,
-        },
-
-        {
-          name: "worldactivity",
-          description: "Rank crews by historical net visit change; show online players separately",
-          type: 1,
-          options: [
-            {
-              type: 3,
-              name: "duration",
-              description: "How far back to compare recorded visits",
-              required: false,
-              choices: worldActivityDurationOptions()
-            }
-          ]
-        },
-        {
-          name: "islandactivity",
-          description: "Rank islands by historical net visit change; show online players separately",
-          type: 1,
-          options: [{ type: 3, name: "duration", description: "How far back to compare recorded visits", required: false, choices: worldActivityDurationOptions() }]
-        },
-        {
-          name: "crewactivity",
-          description: "Rank crews and groups by historical net visit change; show online players separately",
-          type: 1,
-          options: [{ type: 3, name: "duration", description: "How far back to compare recorded visits", required: false, choices: worldActivityDurationOptions() }]
-        },
-        {
-          name: "owneractivity",
-          description: "Rank island owners by historical net visit change; show online players separately",
-          type: 1,
-          options: [{ type: 3, name: "duration", description: "How far back to compare recorded visits", required: false, choices: worldActivityDurationOptions() }]
-        },
-        {
-          name: "island",
-          description: "Show island information, population and tracked visits",
-          type: 1,
-          options: [
-            {
-              type: 3,
-              name: "name",
-              description: "Island name",
-              required: true,
-              autocomplete: true
-            }
-          ],
-        },
-        {
-          name: "setowner",
-          description: "🔒 Restricted: change an island's owner in Google Sheets",
-          type: 1,
-          options: [
-            { type: 3, name: "island", description: "Island name", required: true, autocomplete: true },
-            { type: 3, name: "owner", description: "New owner name", required: true },
-          ],
-        },
-        {
-          name: "renameisland",
-          description: "🔒 Restricted: rename an island on the map",
-          type: 1,
-          options: [
-            { type: 3, name: "island", description: "Current island name", required: true, autocomplete: true },
-            { type: 3, name: "new_name", description: "New island name", required: true, max_length: 100 },
-          ],
-        },
-      ];
-      // TEST command. To remove it: open the /register link again with  &test=off  at the end
+      const commands = discordCommandDefinitions();
+ To remove it: open the /register link again with  &test=off  at the end
 
       const registered = commands.map((c) => ({ ...c, integration_types: [0, 1], contexts: [0, 1, 2] }));
       const r = await fetch(`https://discord.com/api/v10/applications/${env.DISCORD_APP_ID}/commands`, {
@@ -2051,6 +2068,13 @@ export default {
     }
     const i = JSON.parse(body);
     const json = (o) => new Response(JSON.stringify(o), { headers: { "Content-Type": "application/json" } });
+
+    // Keep Discord's slash-command menu in sync automatically after Worker updates.
+    // A signed admin interaction triggers a background refresh; no password URL needed.
+    if (i.type === 2 && isAdmin(env, i) && Date.now() - lastAutoCommandSyncAt > 15 * 60 * 1000) {
+      lastAutoCommandSyncAt = Date.now();
+      ctx.waitUntil(syncDiscordCommands(env).catch(error => console.error("Automatic Discord command sync failed:", error)));
+    }
 
     if (i.type === 1) return json({ type: 1 }); // ping
 
