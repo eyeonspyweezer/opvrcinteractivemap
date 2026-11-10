@@ -437,7 +437,27 @@ let mapHeight = 0;         // image height, used for sunk-island sea-color match
 
 // ===== Subtle animated ocean waves (masked by the island polygons) =====
 let oceanWaveLayers = [];
+let oceanWavePatterns = [];
 let oceanWavesBuilt = false;
+let oceanWaveAnimationStarted = false;
+
+function startOceanWaveAnimation() {
+  if (oceanWaveAnimationStarted || !oceanWavePatterns.length) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  oceanWaveAnimationStarted = true;
+
+  const tileWidth = 320;
+  const loopDuration = 75000;
+  const startTime = performance.now();
+  const animate = (now) => {
+    const offset = -(((now - startTime) / loopDuration * tileWidth) % tileWidth);
+    oceanWavePatterns.forEach((pattern) => {
+      pattern.setAttribute('patternTransform', `translate(${offset} 0)`);
+    });
+    requestAnimationFrame(animate);
+  };
+  requestAnimationFrame(animate);
+}
 
 function oceanMaskPath() {
   const parts = [];
@@ -503,13 +523,15 @@ function buildOceanWaves() {
     const pattern = document.createElementNS(NS, 'pattern');
     pattern.setAttribute('id', patternId);
     pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-    pattern.setAttribute('width', '260');
-    pattern.setAttribute('height', '150');
+    pattern.setAttribute('width', '320');
+    pattern.setAttribute('height', '100');
+    oceanWavePatterns.push(pattern);
 
+    // Fine, low-amplitude lines: intentionally understated at normal map zoom.
     const wavePaths = [
-      ['M-260 24 C-220 8 -180 8 -140 24 S-60 40 -20 24 S60 8 100 24 S180 40 220 24 S300 8 340 24', '#effaff', '1.5', '0.48'],
-      ['M-260 82 C-220 66 -180 66 -140 82 S-60 98 -20 82 S60 66 100 82 S180 98 220 82 S300 66 340 82', '#a9dcf5', '1.2', '0.34'],
-      ['M-260 132 C-220 120 -180 120 -140 132 S-60 144 -20 132 S60 120 100 132 S180 144 220 132 S300 120 340 132', '#effaff', '1.1', '0.27']
+      ['M-320 16 C-240 10 -160 10 -80 16 S80 22 160 16 S320 10 400 16 S560 22 640 16', '#effaff', '0.85', '0.22'],
+      ['M-320 50 C-240 45 -160 45 -80 50 S80 55 160 50 S320 45 400 50 S560 55 640 50', '#bfe8fa', '0.75', '0.16'],
+      ['M-320 84 C-240 79 -160 79 -80 84 S80 89 160 84 S320 79 400 84 S560 89 640 84', '#effaff', '0.8', '0.18']
     ];
     wavePaths.forEach(([d, color, width, opacity]) => {
       const path = document.createElementNS(NS, 'path');
@@ -522,16 +544,6 @@ function buildOceanWaves() {
       pattern.appendChild(path);
     });
 
-    if (!reducedMotion) {
-      const drift = document.createElementNS(NS, 'animateTransform');
-      drift.setAttribute('attributeName', 'patternTransform');
-      drift.setAttribute('type', 'translate');
-      drift.setAttribute('from', '0 0');
-      drift.setAttribute('to', '260 0');
-      drift.setAttribute('dur', '60s');
-      drift.setAttribute('repeatCount', 'indefinite');
-      pattern.appendChild(drift);
-    }
     defs.appendChild(pattern);
     svg.appendChild(defs);
 
@@ -540,7 +552,7 @@ function buildOceanWaves() {
     waves.setAttribute('height', String(mapHeight));
     waves.setAttribute('fill', `url(#${patternId})`);
     waves.setAttribute('mask', `url(#${maskId})`);
-    waves.setAttribute('opacity', '0.78');
+    waves.setAttribute('opacity', '0.52');
     svg.appendChild(waves);
 
     const bounds = [[0, copy * mapWidth], [mapHeight, (copy + 1) * mapWidth]];
@@ -552,6 +564,7 @@ function buildOceanWaves() {
     oceanWaveLayers.push(overlay);
   }
   oceanWavesBuilt = true;
+  startOceanWaveAnimation();
 }
 
 const WRAP_COPIES = 3;     // copies on each side
