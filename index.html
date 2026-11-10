@@ -1721,7 +1721,24 @@ function zoomIsland() {
   if (t) showLayers(t.layers); else setStatus('No island with that name.');
 }
 $('sZoom').addEventListener('click', zoomIsland);
-$('sIsland').addEventListener('keydown', (e) => { if (e.key === 'Enter') { closeLists(); zoomIsland(); } });
+const searchInputs = ['sIsland', 'sOrg', 'sOwner'];
+searchInputs.forEach((id, index) => {
+  $(id).addEventListener('keydown', (e) => {
+    if (!$('searchFrame').classList.contains('open')) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      const next = (index + step + searchInputs.length) % searchInputs.length;
+      $(searchInputs[next]).focus();
+      $(searchInputs[next]).select();
+      return;
+    }
+    if (e.key === 'Enter' && id === 'sIsland') {
+      closeLists();
+      zoomIsland();
+    }
+  });
+});
 const panels = ['searchFrame', 'settingsFrame'];
 function togglePanel(id) { panels.forEach((p) => $(p).classList.toggle('open', p === id && !$(p).classList.contains('open'))); closeLists(); }
 $('searchBtn').addEventListener('click', () => {
