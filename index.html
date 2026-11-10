@@ -173,8 +173,12 @@ button.list-btn { font: inherit; text-transform: uppercase; cursor: pointer; }
 a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-color: var(--sfg); }
 .island-popup-content {
   box-sizing: border-box;
-  width: min(68vw, 480px);
-  min-width: min(220px, 68vw);
+  width: max-content;
+  max-width: min(68vw, 480px);
+  min-width: 0;
+  margin: 0 auto;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 .island-civilian-toggle { display:inline-block; margin-top:8px; padding:5px 9px; border:1px solid currentColor; border-radius:4px; background:transparent; color:inherit; font:inherit; cursor:pointer; }
 .island-civilian-list { margin-top:7px; padding-left:18px; }
@@ -211,7 +215,7 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 .live-item { display: block; margin-bottom: 8px; padding: 6px; font-size: 13px; color: var(--ltx); text-decoration: none; border: 1px solid var(--ltx); }
 .live-head { font-weight: 700; }
 .map-flag { object-fit: contain; }
-#themeBtn { left: calc(24px + var(--fab)); bottom: calc(28px + env(safe-area-inset-bottom, 0px)); background: var(--bg); color: var(--fg); border: 1px solid var(--fg); }
+#themeBtn { left: 14px; bottom: calc(28px + env(safe-area-inset-bottom, 0px) + var(--fab) + 10px); background: var(--bg); color: var(--fg); border: 1px solid var(--fg); }
 #loadError { position: fixed; z-index: 1000; left: 50%; top: 10px; transform: translateX(-50%); width: min(420px, calc(100vw - 40px)); box-sizing: border-box; padding: 10px 14px; text-align: center; background: var(--bg); color: var(--fg); border: 1px solid var(--fg); border-radius: 6px; font-size: 14px; }
 
 /* ===== Bottom-right buttons, top to bottom: Search, Discord, VRChat, Settings ===== */
@@ -1694,7 +1698,7 @@ function wireClick(target, layer) {
     }
     const infoLength = box.textContent.trim().length;
     if (infoLength < 90) box.classList.add('short-info');
-    L.popup({ maxWidth: 500, minWidth: 220 }).setLatLng(e.latlng).setContent(box).openOn(map);
+    L.popup({ maxWidth: 500, minWidth: 0 }).setLatLng(e.latlng).setContent(box).openOn(map);
   });
 }
 function collect() {
