@@ -1827,7 +1827,7 @@ export default {
 
         {
           name: "worldactivity",
-          description: "Rank crews by VRChat world visit growth",
+          description: "Rank crews by historical net visit change; show online players separately",
           type: 1,
           options: [
             {
