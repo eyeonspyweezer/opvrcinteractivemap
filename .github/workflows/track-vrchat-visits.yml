@@ -40,6 +40,7 @@ jobs:
           git add island-world-visits.tsv island-world-visit-history.tsv island-visits.tsv
           if ! git diff --cached --quiet; then
             git commit -m "Update VRChat world visit statistics [skip ci]"
+            git pull --rebase origin main
             git push
           else
             echo "No visit-stat changes to commit."
