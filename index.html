@@ -1614,8 +1614,26 @@ async function loadCivilianList() {
   } catch (error) { console.warn('Civilian list unavailable:', error); civilianListCache = new Map(); }
   return civilianListCache;
 }
+
+// ===== Optional click sounds (leave URLs blank until sound files are chosen) =====
+const UI_CLICK_SOUND_URL = '';
+const ISLAND_CLICK_SOUND_URL = '';
+function playMapSound(url) {
+  if (!url) return; // Blank URL = intentionally silent.
+  const sound = new Audio(url);
+  sound.preload = 'none';
+  sound.volume = 0.35;
+  sound.play().catch(() => {});
+}
+document.addEventListener('click', (event) => {
+  if (event.target.closest('button, a, input[type="button"], input[type="submit"], select, summary, .leaflet-bar a')) {
+    playMapSound(UI_CLICK_SOUND_URL);
+  }
+}, true);
+
 function wireClick(target, layer) {
   target.on('click', async (e) => {
+    playMapSound(ISLAND_CLICK_SOUND_URL);
     if (map.getContainer().classList.contains('drawing')) return;
     const p = layer.feature.properties, raw = resolveOwner(p);
     const isUrl = (u) => /^https?:\/\//i.test(u || '');
