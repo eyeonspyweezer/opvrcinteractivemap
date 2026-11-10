@@ -70,20 +70,43 @@ async function verify(request, body, publicKey) {
 
 // ---------- TSV groups ----------
 async function getGroups() {
-  const groups = await tsv("island-groups.tsv");
-  const metadata = await tsv("crew-links.tsv").catch(() => []);
+  const [groups, metadata, islands] = await Promise.all([
+    tsv("island-groups.tsv"),
+    tsv("crew-links.tsv").catch(() => []),
+    tsv("island-colors.tsv").catch(() => [])
+  ]);
+  const normalize = value => String(value || "").trim().toLowerCase().replace(/^the\\s+/, "").replace(/[^a-z0-9]/g, "");
   const metadataByName = new Map(
-    metadata.map(row => [String(row.Group || "").trim().toLowerCase(), row])
+    metadata.map(row => [normalize(row.Group), row]).filter(([name]) => name)
   );
+
+  // Use the most common mapped island fill color for each crew.
+  const colorsByGroup = new Map();
+  for (const island of islands) {
+    const color = (String(island.Color || "").match(/#[0-9a-f]{6}/i) || [])[0];
+    if (!color) continue;
+    const groupIds = [island.Group1, island.Group2, island.Group3]
+      .map(value => String(value || "").trim())
+      .filter(value => value && value !== "0");
+    for (const groupId of groupIds) {
+      if (!colorsByGroup.has(groupId)) colorsByGroup.set(groupId, new Map());
+      const counts = colorsByGroup.get(groupId);
+      const key = color.toLowerCase();
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
 
   return groups.map((o) => {
     const f = parseInt(o.Flag, 10);
-    const extra = metadataByName.get(String(o.Group || "").trim().toLowerCase()) || {};
+    const extra = metadataByName.get(normalize(o.Group)) || {};
+    const colorCounts = colorsByGroup.get(String(o.ID)) || new Map();
+    const mapColor = [...colorCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || o.Color || "#005aff";
     return {
       id: o.ID || "",
       name: o.Group || "",
       islands: parseInt(o.Islands, 10) || 0,
       flag: Number.isNaN(f) ? -1 : f,
+      mapColor,
       vrchatGroupUrl: extra.VRChatGroupURL || "",
       vrchatGroupId: extra.VRChatGroupID || "",
       discordInvite: extra.DiscordInvite || "",
@@ -1198,6 +1221,11 @@ async function sheetPage(kind, page) {
   };
 }
 
+const discordEmbedColor = value => {
+  const match = String(value || "").match(/^#?([0-9a-f]{6})$/i);
+  return match ? parseInt(match[1], 16) : 0x005aff;
+};
+
 // ---------- /crewlist pagination ----------
 const CREW_PAGE_SIZE = 10;
 const CREW_SORTS = [["islands","Island count"],["az","A–Z"],["za","Z–A"],["vrchatMembers","VRChat members"],["vrchatOnline","VRChat online"],["discordMembers","Discord members"],["growth","Visit growth (7 days)"]];
@@ -1240,7 +1268,7 @@ async function crewListPage(page, sortBy = "islands") {
       ["Visit growth (7 days)",fmt(growth)]
     ];
     for(const [name,value] of optionalFields) if(value!==null) fields.push({name,value,inline:true});
-    return {title:g.name,...(links.length?{description:links.join(" · ")}:{}),color:0x005aff,fields,...(image?{thumbnail:{url:image}}:{})};
+    return {title:g.name,...(links.length?{description:links.join(" · ")}:{}),color:discordEmbedColor(g.mapColor),fields,...(image?{thumbnail:{url:image}}:{})};
   });
   return {embeds,components:[
     {type:1,components:[{type:3,custom_id:`cls_${sortKey}_${p}`,placeholder:"Sort crews by…",options:CREW_SORTS.map(([value,label])=>({label,value,default:value===sortKey}))}]},
@@ -2176,7 +2204,7 @@ export default {
             embeds: [
               {
                 title: `🏴‍☠️ Crew Info: ${g.name}`,
-                color: 0x005aff,
+                color: discordEmbedColor(g.mapColor),
                 fields: [
                   { name: "Group ID", value: g.id || "—", inline: true },
                   { name: "Islands Owned", value: String(g.islands), inline: true },
