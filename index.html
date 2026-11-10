@@ -196,10 +196,9 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
   overflow-wrap: anywhere;
 }
 .island-popup-content > * { margin-left: auto; margin-right: auto; }
-.island-popup-content .island-civilian-list { display: table; text-align: left; }
-.island-civilian-toggle { display:inline-block; margin-top:8px; padding:5px 9px; border:1px solid currentColor; border-radius:4px; background:transparent; color:inherit; font:inherit; cursor:pointer; }
-.island-civilian-list { margin-top:7px; padding-left:18px; }
-.island-civilian-list[hidden] { display:none; }
+.island-popup-content .island-extra-info { margin:9px auto 0; text-align:left; width:fit-content; max-width:100%; }
+.island-extra-info summary { cursor:pointer; text-align:center; padding:5px 9px; border:1px solid currentColor; border-radius:4px; list-style-position:inside; }
+.island-civilian-list { margin:7px 0 0; padding-left:22px; }
 .island-civilian-list li { margin:4px 0; }
 .island-popup-content .pop-name { font-family:'PlayfairDisplay', Georgia, serif; letter-spacing:.02em; }
 
@@ -440,6 +439,7 @@ const GROUP_COLORS = {
 const DEFAULT_GROUP_COLOR = 'rgb(0, 0, 0)';      // known crew with no Team Color in the sheet
 const SHEET_NO_OWNER_COLOR = 'rgb(0, 146, 70)';        // no owner at all (green)
 const NO_OWNER_COLOR = 'rgb(255, 215, 0)'; // listed in the Islands sheet but no owner yet (yellow)
+const UNKNOWN_ISLAND_COLOR = 'rgb(180, 195, 75)'; // unknown islands (yellow-green)
 const OWNED_NO_CREW_COLOR = 'rgb(128, 0, 128)'; // has owner, but no crew/group in the crew sheet (purple)
 // Polygon fill transparency: 0 = invisible fill, 1 = fully solid. Change this number to adjust all polygons.
 let POLYGON_FILL_OPACITY = Number.isFinite(savedSettings.opacity)
@@ -1058,7 +1058,9 @@ function applyStyle(layer) {
   let col = NO_OWNER_COLOR;
   let stripeId = null;
 
-  if (colors.length >= 2) {
+  if (String(p.name || '').includes('???')) {
+    col = UNKNOWN_ISLAND_COLOR;
+  } else if (colors.length >= 2) {
     stripeId = stripePattern(colors);
     col = colors[0];
   } else if (colors.length === 1) {
@@ -1806,18 +1808,20 @@ function wireClick(target, layer) {
       });
     }
     if (civilians.length) {
-      const toggle = document.createElement('button');
-      toggle.type = 'button'; toggle.className = 'island-civilian-toggle';
-      toggle.textContent = 'Show civilian list (' + civilians.length + ')';
-      const list = document.createElement('ul'); list.className = 'island-civilian-list'; list.hidden = true;
+      const extra = document.createElement('details');
+      extra.className = 'island-extra-info';
+      const summary = document.createElement('summary');
+      summary.textContent = 'Extra Info';
+      const list = document.createElement('ul');
+      list.className = 'island-civilian-list';
       civilians.forEach(person => {
         const item = document.createElement('li');
         if (person.link) { const link = document.createElement('a'); link.href = person.link; link.target = '_blank'; link.rel = 'noopener'; link.textContent = person.name; item.appendChild(link); }
         else item.textContent = person.name;
         list.appendChild(item);
       });
-      toggle.addEventListener('click', () => { list.hidden = !list.hidden; toggle.textContent = (list.hidden ? 'Show' : 'Hide') + ' civilian list (' + civilians.length + ')'; });
-      box.append(toggle, list);
+      extra.append(summary, list);
+      box.appendChild(extra);
     }
     if (bannerUrl) {
       const img = document.createElement('img');
