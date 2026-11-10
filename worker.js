@@ -1614,7 +1614,7 @@ function parseScheduleMessage(message) {
 
   const iso = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
   const monthDay = text.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?\b/i);
-  const relative = text.match(/\b(in|after)\s+(\d{1,3})\s+(days?|weeks?)\b/i);
+  const relative = text.match(/\b(?:in|after)\s+(\d{1,3})\s+(days?|weeks?)\b|\b(\d{1,3})\s+(days?|weeks?)\s+from\s+now\b/i);
   const relativeTomorrow = /\btomorrow\b/i.test(text);
   const relativeToday = /\btoday\b/i.test(text);
   const weekday = text.match(/\b(next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
@@ -1633,7 +1633,9 @@ function parseScheduleMessage(message) {
     }
     dateHint = monthDay[0];
   } else if (relative) {
-    const amount = Number(relative[2]) * (/weeks?/i.test(relative[3]) ? 7 : 1);
+    const amountValue = relative[1] || relative[3];
+    const unitValue = relative[2] || relative[4];
+    const amount = Number(amountValue) * (/weeks?/i.test(unitValue) ? 7 : 1);
     date = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate() + amount));
     dateHint = relative[0];
   } else if (relativeTomorrow || relativeToday) {
@@ -1670,6 +1672,7 @@ function parseScheduleMessage(message) {
   }
   const startsAt = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hour, minute));
   const endsAt = new Date(startsAt.getTime() + (hasTime ? 2 * 3600000 : 86400000));
+  if (endsAt.getTime() <= Date.now()) return null;
   const firstLine = content.split(/\r?\n/).map(x => x.trim()).find(Boolean) || "Scheduled event";
   const title = firstLine.replace(/^[-*#>\s]+/, "").slice(0, 120) || "Scheduled event";
   return {
@@ -1756,6 +1759,36 @@ async function archiveExpiredScheduleEvents(env) {
   await writeScheduleFile(env, SCHEDULE_FILE, remaining, upcoming.sha, "Remove expired scheduled events");
 }
 
+async function scheduleListMessage(env) {
+  const stored = await readScheduleFile(env, SCHEDULE_FILE);
+  const now = Date.now();
+  const events = stored.items
+    .filter(event => Number.isFinite(Date.parse(event.startsAt)) && Date.parse(event.endsAt) > now)
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+
+  if (!events.length) {
+    return { content: "There are no upcoming events in the schedule yet. Use **Add to Schedule** on a Discord message that contains a clear date clue." };
+  }
+
+  const lines = events.slice(0, 20).map((event, index) => {
+    const date = new Date(event.startsAt);
+    const when = new Intl.DateTimeFormat("en-US", event.allDay
+      ? { dateStyle: "medium", timeZone: "UTC" }
+      : { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(date);
+    const source = event.sourceMessageUrl ? ` · [source](${event.sourceMessageUrl})` : "";
+    return `**${index + 1}. ${String(event.title || "Scheduled event").slice(0, 120)}** — ${when} UTC\nBy ${String(event.author || "Unknown author").slice(0, 80)}${source}`;
+  });
+  return {
+    embeds: [{
+      title: "Upcoming OPVRC Events",
+      description: lines.join("\n\n").slice(0, 3900),
+      color: 0x005aff,
+      footer: { text: `${events.length} upcoming event${events.length === 1 ? "" : "s"} · Times shown in UTC` },
+      timestamp: new Date().toISOString()
+    }]
+  };
+}
+
 // ---------- main ----------
 export default {
   async fetch(request, env, ctx) {
@@ -1768,6 +1801,7 @@ export default {
         ...Object.keys(LINKS).map((name) => ({ name, description: DESCRIPTIONS[name], type: 1 })),
         { name: "map", description: "Interactive island map with toggle buttons", type: 1 },
         { name: "Add to Schedule", type: 3 },
+        { name: "schedule", description: "Show upcoming events saved from Discord messages", type: 1 },
         {
           name: "addcrew",
           description: "🔒 Restricted: add a crew and its flag to the crews sheet",
@@ -1937,6 +1971,7 @@ export default {
       const name = i.data.name;
       if (LINKS[name]) return json({ type: 4, data: { content: LINKS[name] } });
       if (name === "map") return json({ type: 4, data: await mapMessage(ALL_ON) });
+      if (name === "schedule") return json({ type: 4, data: await scheduleListMessage(env) });
       if (name === "addcrew" || name === "editcrew") {
         if (!isAdmin(env, i)) return json(notAllowed(i));
         ctx.waitUntil(runCrewCommand(env, i));
