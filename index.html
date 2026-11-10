@@ -1075,7 +1075,7 @@ function applyStyle(layer) {
   const hasVrcWorldLink = Boolean(
     worldIdOf(p.name) ||
     (worldOf(p.name) && worldOf(p.name).link) ||
-    linksOf(p.name).some((u) => /vrchat\\.com\\/home\\/world\\//i.test(u))
+    linksOf(p.name).some((u) => /vrchat\.com\/home\/world\//i.test(u))
   );
   if (col === NO_OWNER_COLOR && !hasVrcWorldLink) col = NO_VRC_WORLD_COLOR;
 
