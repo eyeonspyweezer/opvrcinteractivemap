@@ -330,8 +330,10 @@ body { background: var(--bg); }
   <div class="slist" id="lOwner"></div>
 </div>
 <div id="settingsFrame">
-  <label><input type="checkbox" id="optColors"> Island colors</label>
+  <label><input type="checkbox" id="optColors"> Random island colors</label>
   <label><input type="checkbox" id="optFlags" checked> Flags on the map</label>
+  <label><input type="checkbox" id="optCrewLines"> Connect islands by same crew</label>
+  <label><input type="checkbox" id="optOwnerLines"> Connect islands by same owner</label>
   <label><input type="checkbox" id="optNames" checked> Island names on the map</label>
   <label><input type="checkbox" id="optOwners"> Show island owners next to names</label>
   <label><input type="checkbox" id="optHideUnnamed"> Hide Unnamed Islands</label>
@@ -384,6 +386,7 @@ function saveLocalSettings() {
       theme: document.documentElement.dataset.theme || '',
       colors: OPT.colors, flags: OPT.flags, names: OPT.names,
       owners: OPT.owners, hideUnnamed: OPT.hideUnnamed, hideUnowned: OPT.hideUnowned,
+      crewLines: OPT.crewLines, ownerLines: OPT.ownerLines,
       opacity: POLYGON_FILL_OPACITY
     }));
   } catch (_) {
@@ -397,7 +400,9 @@ const OPT = {
   names: savedBool('names', true),
   owners: savedBool('owners', false),
   hideUnnamed: savedBool('hideUnnamed', false),
-  hideUnowned: savedBool('hideUnowned', false)
+  hideUnowned: savedBool('hideUnowned', false),
+  crewLines: savedBool('crewLines', false),
+  ownerLines: savedBool('ownerLines', false)
 };
 
 // ===== Link/bot filters: ?show=pirates,marines  (no ?show = everything) =====
@@ -520,6 +525,7 @@ map.on(L.Draw.Event.CREATED, (e) => userMarks.addLayer(e.layer));
 map.on(L.Draw.Event.DRAWSTART, () => map.getContainer().classList.add('drawing'));
 map.on(L.Draw.Event.DRAWSTOP, () => map.getContainer().classList.remove('drawing'));
 const drawnItems = new L.FeatureGroup().addTo(map);
+const relationshipLines = new L.FeatureGroup().addTo(map);
 // ===== Globe-style wrapping: polygons are also drawn as read-only copies one map width left/right =====
 const ghostItems = new L.FeatureGroup().addTo(map);
 let mapWidth = 0;          // image width, set when the map image loads
@@ -1087,20 +1093,18 @@ function applyStyle(layer) {
   const owner = resolveOwner(p);
   const colors = groupColorsOf(owner);
 
-  let col = NO_OWNER_COLOR;
+  let col = OPT.colors ? p.color : NO_OWNER_COLOR;
   let stripeId = null;
 
-  if (String(p.name || '').includes('???')) {
+  if (!OPT.colors && String(p.name || '').includes('???')) {
     col = UNKNOWN_ISLAND_COLOR;
-  } else if (colors.length >= 2) {
+  } else if (!OPT.colors && colors.length >= 2) {
     stripeId = stripePattern(colors);
     col = colors[0];
-  } else if (colors.length === 1) {
+  } else if (!OPT.colors && colors.length === 1) {
     col = colors[0];
-  } else if (ownerMap.has(islandKey(p.name))) {
+  } else if (!OPT.colors && ownerMap.has(islandKey(p.name))) {
     col = SHEET_NO_OWNER_COLOR; // in the Islands sheet, no owner yet
-  } else if (OPT.colors) {
-    col = p.color; // random hash only when toggle is ON and no owner
   }
 
   const hasVrcWorldLink = Boolean(
@@ -1130,6 +1134,45 @@ function applyStyle(layer) {
   
 }
 const restyleAll = () => drawnItems.eachLayer(applyStyle);
+
+// Optional relationship lines. Crew links are blue/solid; owner links are purple/dashed.
+function rebuildRelationshipLines() {
+  relationshipLines.clearLayers();
+  if (!OPT.crewLines && !OPT.ownerLines) return;
+  const crewGroups = new Map(), ownerGroups = new Map();
+  drawnItems.eachLayer(layer => {
+    if (isGoneStatus(layer) || layer._sunk || layer._destroyed || layer._hidden) return;
+    const p = layer.feature?.properties;
+    if (!p) return;
+    const center = turf.pointOnFeature(layer.toGeoJSON()).geometry.coordinates;
+    const point = [center[1], center[0]];
+    if (OPT.crewLines) {
+      groupsForIsland(p.name, resolveOwner(p)).forEach(name => {
+        const key = norm(name);
+        if (!key) return;
+        if (!crewGroups.has(key)) crewGroups.set(key, []);
+        crewGroups.get(key).push(point);
+      });
+    }
+    if (OPT.ownerLines) {
+      ownersOf(resolveOwner(p)).forEach(name => {
+        const key = ownerKey(name);
+        if (!key) return;
+        if (!ownerGroups.has(key)) ownerGroups.set(key, []);
+        ownerGroups.get(key).push(point);
+      });
+    }
+  });
+  const drawGroups = (groups, style) => groups.forEach(points => {
+    if (points.length < 2) return;
+    const unique = [...new Map(points.map(p => [p.join(','), p])).values()];
+    if (unique.length < 2) return;
+    // Connect islands in a chain rather than drawing every possible pair.
+    relationshipLines.addLayer(L.polyline(unique, style));
+  });
+  if (OPT.crewLines) drawGroups(crewGroups, { color: '#168bd2', weight: 2.5, opacity: 0.85 });
+  if (OPT.ownerLines) drawGroups(ownerGroups, { color: '#9b59b6', weight: 2.5, opacity: 0.9, dashArray: '7 6' });
+}
 
 
 
@@ -1259,8 +1302,17 @@ function addIsland(geometry, props) {
 // File names looked up automatically in the same folder as this HTML file
 const AUTO_FILES = { islands: 'islandslist.tsv' };
 
-// A steady "random-looking" color from the island name (the same every reload)
-const hashColor = (str) => { let h = 0; for (const ch of String(str)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360}, 65%, 55%)`; };
+// Generate a fresh, well-spaced color palette for islands each page load.
+const islandColorHues = new Map();
+const islandColorStart = Math.random() * 360;
+function generatedIslandColor(name) {
+  const key = islandKey(name);
+  if (!islandColorHues.has(key)) {
+    const hue = (islandColorStart + islandColorHues.size * 137.508) % 360;
+    islandColorHues.set(key, `hsl(${hue.toFixed(1)}, 68%, 54%)`);
+  }
+  return islandColorHues.get(key);
+}
 function loadIslands(text) {
   const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim());
   const head = lines.shift().split('\t').map((h) => h.trim().toLowerCase());
@@ -1274,12 +1326,13 @@ function loadIslands(text) {
       const coords = JSON.parse(c[iG]);
       addIsland({ type: Array.isArray(coords[0][0][0]) ? 'MultiPolygon' : 'Polygon', coordinates: coords }, {
         index: (c[iI] || '').trim(), name: (c[iN] || c[iI] || '').trim(),
-        color: hashColor((c[iN] || c[iI] || '').trim()), owner: (c[iO] || '').trim(), link: (c[iL] || '').trim()
+        color: generatedIslandColor((c[iN] || c[iI] || '').trim()), owner: (c[iO] || '').trim(), link: (c[iL] || '').trim()
       });
     } catch (err) { console.warn('Skipped row', err); }
   });
   rebuildGhosts();
   buildOceanWaves();
+  rebuildRelationshipLines();
 }
 let ownerIslandLabels = new Map(); // lowercase → display name (after rename)
 
@@ -1304,6 +1357,7 @@ function loadOwners(text) {
   window.__islandDupKeys = dupKeys;
   refreshAll();
   animateSunkIslands(); // Status is stored in the Owner field, so re-check after the sheet loads.
+  rebuildRelationshipLines();
   setStatus(`Loaded ${ownerMap.size} owner rows.`);
 }
 
@@ -1338,6 +1392,7 @@ function loadExtra(text) {
   });
   refreshAll();
   animateSunkIslands(); // Also re-check statuses supplied by the extra Owner sheet.
+  rebuildRelationshipLines();
   setStatus(`Loaded ${hits.size} islands, ${linkMap.size} with links, ${worldIdMap.size} World IDs.`);
 }
 
@@ -1362,6 +1417,7 @@ function loadNations(text) {
   });
   refreshAll();
     setStatus(`Loaded ${rows.length} crew rows, ${nationColor.size} with Team Color, ${nationFlag.size} with flag links.`);
+    rebuildRelationshipLines();
 }
 
 
@@ -2292,12 +2348,16 @@ document.querySelectorAll('.ico').forEach((el) => {
   if (url) { el.style.setProperty('--ico', `url("${url}")`); el.classList.add('has-img'); el.textContent = ''; }
 });
 $('optColors').checked = OPT.colors;
+$('optCrewLines').checked = OPT.crewLines;
+$('optOwnerLines').checked = OPT.ownerLines;
 $('optFlags').checked = OPT.flags;
 $('optNames').checked = OPT.names;
 $('optOwners').checked = OPT.owners;
 $('optHideUnnamed').checked = OPT.hideUnnamed;
 $('optHideUnowned').checked = OPT.hideUnowned;
-$('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked; restyleAll(); saveLocalSettings(); });
+$('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked; restyleAll(); rebuildFlags(); saveLocalSettings(); });
+$('optCrewLines').addEventListener('change', (e) => { OPT.crewLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
+$('optOwnerLines').addEventListener('change', (e) => { OPT.ownerLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
 $('optFlags').addEventListener('change', (e) => { OPT.flags = e.target.checked; rebuildFlags(); saveLocalSettings(); });
 $('optNames').addEventListener('change', (e) => { OPT.names = e.target.checked; rebuildLabels(); saveLocalSettings(); });
 $('optOwners').addEventListener('change', (e) => { OPT.owners = e.target.checked; rebuildLabels(); saveLocalSettings(); });
