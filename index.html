@@ -442,6 +442,27 @@ LIST_BUTTONS.forEach((b) => {
 
 // ===== Map =====
 const map = L.map('map', { crs: L.CRS.Simple, maxZoom: 4, minZoom: -5 });
+const LAST_MAP_VIEW_KEY = 'opvrc:last-map-view:v1';
+function restoreLastMapView(defaultCenter, defaultZoom) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_MAP_VIEW_KEY) || 'null');
+    if (!saved || !Number.isFinite(saved.lat) || !Number.isFinite(saved.lng) || !Number.isFinite(saved.zoom)) return;
+    const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), saved.zoom));
+    map.setView([saved.lat, saved.lng], zoom, { animate: false });
+  } catch (_) {
+    // Storage may be unavailable; keep the normal default map view.
+  }
+}
+function saveLastMapView() {
+  try {
+    const center = map.getCenter();
+    localStorage.setItem(LAST_MAP_VIEW_KEY, JSON.stringify({
+      lat: center.lat, lng: center.lng, zoom: map.getZoom()
+    }));
+  } catch (_) {
+    // Ignore private-mode or storage restrictions.
+  }
+}
 map.createPane('wavePane');
 map.getPane('wavePane').style.zIndex = '350';
 map.getPane('wavePane').style.pointerEvents = 'none';
@@ -1317,6 +1338,9 @@ let tileLayer = null;
     map.setView([height / 2, width / 2], fitZoom);
     map.setMaxBounds([[0, -1e9], [height, 1e9]]);
     map.options.maxBoundsViscosity = 1;
+    restoreLastMapView([height / 2, width / 2], fitZoom);
+    map.off('moveend', saveLastMapView);
+    map.on('moveend', saveLastMapView);
     rebuildGhosts();
     buildOceanWaves();
     requestAnimationFrame(() => animateSunkIslands());
