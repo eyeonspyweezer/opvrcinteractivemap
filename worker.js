@@ -1600,8 +1600,8 @@ async function crewNameChoices(query) {
 /* ---------- Discord Add to Schedule ---------- */
 // Only messages with an explicit date clue are eligible. The user always sees
 // a preview and must confirm before anything is saved.
-const SCHEDULE_FILE = "scheduled-events.json";
-const SCHEDULE_ARCHIVE_FILE = "scheduled-events-archive.json";
+const SCHEDULE_FILE = "scheduled-events.txt";
+const SCHEDULE_ARCHIVE_FILE = "scheduled-events-archive.txt";
 
 function parseScheduleMessage(message) {
   const content = String(message.content || "").trim();
@@ -1649,7 +1649,7 @@ function parseScheduleMessage(message) {
     return null;
   }
 
-  if (!date || Number.isNaN(date.getTime()) || date.getUTCDate() === 0) return null;
+  if (!date || Number.isNaN(date.getTime())) return null;\n  const expectedDate = dateHint === iso?.[0] ? [Number(iso[1]), Number(iso[2]), Number(iso[3])] : null;\n  if (expectedDate && (date.getUTCFullYear() !== expectedDate[0] || date.getUTCMonth() + 1 !== expectedDate[1] || date.getUTCDate() !== expectedDate[2])) return null;
   const timeMatch = text.match(/\\b(\\d{1,2})(?::([0-5]\\d))?\\s*(a\\.?m\\.?|p\\.?m\\.?)\\b/i) ||
     text.match(/\\b([01]?\\d|2[0-3]):([0-5]\\d)\\b/);
   let hour = 0, minute = 0, hasTime = false;
@@ -1748,8 +1748,10 @@ async function archiveExpiredScheduleEvents(env) {
   const remaining = upcoming.items.filter(item => Date.parse(item.endsAt) > now);
   const archiveIds = new Set(archived.items.map(item => item.sourceMessageId));
   const newArchive = expired.filter(item => !archiveIds.has(item.sourceMessageId)).map(item => ({ ...item, status: "archived", archivedAt: new Date().toISOString() }));
-  await writeScheduleFile(env, SCHEDULE_FILE, remaining, upcoming.sha, "Remove expired scheduled events");
+  // Archive first: if the second write fails, the next cron run can safely
+  // retry removal without losing the event from both files.
   await writeScheduleFile(env, SCHEDULE_ARCHIVE_FILE, [...archived.items, ...newArchive], archived.sha, "Archive expired scheduled events");
+  await writeScheduleFile(env, SCHEDULE_FILE, remaining, upcoming.sha, "Remove expired scheduled events");
 }
 
 // ---------- main ----------
