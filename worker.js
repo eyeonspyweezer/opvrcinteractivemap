@@ -745,18 +745,19 @@ async function historicalActivityResponse(kind, durationValue = "7d") {
         const groups = await getGroups();
         const memberRows = await getVrcGroupBatch(groups);
         const growthRows = memberRows
-          .filter(row => Number.isFinite(Number(row.avg_daily_growth_90d)))
+          .filter(row => row.avg_daily_growth_90d !== null && row.avg_daily_growth_90d !== undefined && Number.isFinite(Number(row.avg_daily_growth_90d)))
           .sort((a, b) => Number(b.avg_daily_growth_90d) - Number(a.avg_daily_growth_90d));
         const memberLines = growthRows.slice(0, 15).map((row, index) => {
           const daily = Number(row.avg_daily_growth_90d);
           const estimate = Math.round(daily * 90);
           const sign = value => value > 0 ? "+" : "";
-          return `**${index + 1}. ${row.name}** — ${Number(row.member_count || 0).toLocaleString("en-US")} members · **${sign(daily)}${daily.toFixed(2)}/day** · ~${sign(estimate)}${estimate.toLocaleString("en-US")} over 90d`;
+          const groupName = row.vrc_search_url ? `[${row.name}](${row.vrc_search_url})` : row.name;
+          return `**${index + 1}. ${groupName}** — ${Number(row.member_count || 0).toLocaleString("en-US")} members · **${sign(daily)}${daily.toFixed(2)}/day** · ~${sign(estimate)}${estimate.toLocaleString("en-US")} over 90d`;
         });
         const memberSection = memberLines.length
           ? memberLines.join("\n")
           : "No linked groups currently have enough membership snapshots to calculate growth.";
-        response.embeds[0].description = (response.embeds[0].description + `\n\n**VRChat Group Membership — 90-day average growth**\n${memberSection}`).slice(0, 5900);
+        response.embeds[0].description = (response.embeds[0].description + `\n\n**VRChat Group Membership — 90-day average growth**\n${memberSection}\n\n[Data from VRC Search](https://search.vrcwwt.com/)`).slice(0, 5900);
         response.embeds[0].footer.text += " · Membership stats from VRC Search";
       } catch (error) {
         console.error("VRC Search crew activity lookup failed:", error);
