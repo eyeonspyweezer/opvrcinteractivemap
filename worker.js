@@ -2252,14 +2252,17 @@ export default {
             return `• **${shownOwner}** — ${islandNames}`;
           });
         const ownerText = ownerLines.length
-          ? ownerLines.join("\\n").slice(0, 1024)
+          ? ownerLines.join("\n").slice(0, 1024)
           : "No named island owners are currently listed for this crew.";
 
+        const crewKey = g.name.toLowerCase().replace(/^the\\s+/, "").replace(/[^a-z0-9]/g, "");
         const vrchatUrl = g.vrchatGroupUrl ||
-          (g.vrchatGroupId ? `https://vrchat.com/home/group/${g.vrchatGroupId}` : "");
+          (g.vrchatGroupId ? `https://vrchat.com/home/group/${g.vrchatGroupId}` : "") ||
+          (crewKey === "marines" ? LINKS.marines : crewKey === "revolutionaryarmy" ? LINKS.revolutionary : "");
+        const discordUrl = g.discordInvite || (crewKey === "marines" ? LINKS.marinesdiscord : "");
         const linkLines = [];
         if (vrchatUrl) linkLines.push(`[VRChat group](${vrchatUrl})`);
-        if (g.discordInvite) linkLines.push(`[Discord invite](${g.discordInvite})`);
+        if (discordUrl) linkLines.push(`[Discord invite](${discordUrl})`);
 
         const fields = [
           { name: "Islands", value: String(g.islands), inline: true },
@@ -2285,7 +2288,7 @@ export default {
               type: 1,
               components: [
                 ...(vrchatUrl ? [{ type: 2, style: 5, label: "VRChat Group", url: vrchatUrl }] : []),
-                ...(g.discordInvite ? [{ type: 2, style: 5, label: "Discord Invite", url: g.discordInvite }] : [])
+                ...(discordUrl ? [{ type: 2, style: 5, label: "Discord Invite", url: discordUrl }] : [])
               ]
             }] } : {})
           }
