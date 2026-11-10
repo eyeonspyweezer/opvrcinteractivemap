@@ -1059,7 +1059,7 @@ function loadOwnerProfileLinks() {
         const linkCol = headers.indexOf('profile link');
         if (ownerCol < 0 || linkCol < 0) return ownerProfileLinkMap;
         lines.forEach((line) => {
-          const cells = line.split('\\t');
+          const cells = line.split('\t');
           const owner = (cells[ownerCol] || '').trim();
           const url = (cells[linkCol] || '').trim();
           if (owner && /^https?:\/\//i.test(url)) ownerProfileLinkMap.set(ownerKey(owner), url);
