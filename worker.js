@@ -550,12 +550,38 @@ async function buildWorldActivity(durationValue = "7d") {
     islands: [...bucket.islands.values()].sort((a, b) => b.worldVisitGain - a.worldVisitGain)
   })).filter(bucket => bucket.gained !== 0).sort((a, b) => b.gained - a.gained);
 
+  // Island ranking uses the same historical net visit changes, counted once
+  // for each mapped island/world association.
+  const islandBuckets = new Map();
+  for (const item of visitGrowth) {
+    for (const island of item.islands) {
+      if (!islandBuckets.has(island.islandId)) {
+        islandBuckets.set(island.islandId, {
+          id: island.islandId,
+          name: island.islandName,
+          gained: 0,
+          worldIds: new Set()
+        });
+      }
+      const bucket = islandBuckets.get(island.islandId);
+      if (!bucket.worldIds.has(item.id)) {
+        bucket.worldIds.add(item.id);
+        bucket.gained += item.gained;
+      }
+    }
+  }
+  const islandGrowth = [...islandBuckets.values()]
+    .map(bucket => ({ ...bucket, worldIds: [...bucket.worldIds] }))
+    .filter(bucket => bucket.gained !== 0)
+    .sort((a, b) => b.gained - a.gained);
+
   return {
     checkedAt: new Date().toISOString(),
     duration: duration.label,
     comparisonDays: visitGrowth.length ? Math.max(...visitGrowth.map(x => x.comparisonMs || 0)) / 86400000 : 0,
     crewGrowth,
     ownerGrowth,
+    islandGrowth,
     trackedWorldCount: worldIds.size
   };
 }
@@ -575,89 +601,88 @@ async function getWorldActivity(durationValue = "7d") {
 
 function worldActivityMessage(data) {
   const count = value => Number(value || 0).toLocaleString("en-US");
-
-  const islandLink = island => {
-    const firstWorld = island.worldIds?.[0];
-    if (firstWorld) {
-      return `[${island.name}](https://vrchat.com/home/world/${firstWorld})`;
-    }
-    return island.name;
-  };
-
   const crewLines = data.crewGrowth.map((crew, index) => {
-    const islandLinks = crew.islands
-      .slice(0, 8)
-      .map((island, islandIndex) => {
-        const active = island.activePlayers > 0
-          ? ` · ${count(island.activePlayers)} active`
-          : "";
-        return `[#${islandIndex + 1}](https://vrchat.com/home/world/${island.worldIds?.[0] || ""})`;
-      });
-
-    const islandNames = crew.islands
-      .slice(0, 8)
-      .map((island, islandIndex) =>
-        `[#${islandIndex + 1}](https://vrchat.com/home/world/${island.worldIds?.[0] || ""})`
-      );
-
-    const totalActive = crew.activePlayers > 0
-      ? ` / ${count(crew.activePlayers)} active players`
-      : "";
-
-    const sign = crew.gained > 0 ? "+" : crew.gained < 0 ? "" : "";
-    return `**${index + 1}. ${crew.name}** — **${sign}${count(crew.gained)} visits net change**${totalActive} (${islandNames.join(", ")})`;
+    const online = crew.activePlayersKnown
+      ? ` · ${count(crew.activePlayers)} online now`
+      : " · online count unavailable";
+    const islands = crew.islands.slice(0, 8).map((island, n) =>
+      `[#${n + 1}](https://vrchat.com/home/world/${island.worldIds?.[0] || ""})`
+    );
+    const sign = crew.gained > 0 ? "+" : "";
+    return `**${index + 1}. ${crew.name}** — **${sign}${count(crew.gained)} net visits**${online} (${islands.join(", ")})`;
   });
-
-  const description = crewLines.length
-    ? crewLines.join("\\n")
-    : "No non-zero visit changes were found for the selected duration.";
-
-  return {
-    embeds: [{
-      title: "VRChat World Activity — Crew Ranking",
-      description: `Ranked by net visit change over the requested ${data.duration}. Each # is an island link.\\n${data.comparisonDays > 0 && data.comparisonDays < parseWorldActivityDuration(data.duration).ms / 86400000 ? `Only ${data.comparisonDays.toFixed(1)} days of recorded history are currently available.\\n` : ""}\\n${description}`.slice(0, 5900),
-      color: 0x005aff,
-      footer: {
-        text: `Visit tracker: ${data.trackedWorldCount} linked worlds. Rankings use recorded lifetime-visit snapshots.`
-      },
-      timestamp: data.checkedAt
-    }]
-  };
-}
-
-async function worldActivityResponse(durationValue = "7d") {
-  try {
-    return worldActivityMessage(await getWorldActivity(durationValue));
-  } catch (error) {
-    return {
-      content: "⚠️ I couldn't load world activity right now. The cached visit tracker or VRChat API may be temporarily unavailable."
-    };
-  }
-}
-
-function ownerActivityMessage(data) {
-  const count = value => Number(value || 0).toLocaleString("en-US");
-  const ownerLines = (data.ownerGrowth || []).map((owner, index) => {
-    const islandLinks = owner.islands.slice(0, 8).map(island => {
-      const worldId = island.worldIds?.[0];
-      return worldId ? `[${island.name}](https://vrchat.com/home/world/${worldId})` : island.name;
-    });
-    const active = owner.activePlayers > 0 ? ` · ${count(owner.activePlayers)} active players` : "";
-    return `**${index + 1}. ${owner.name}** — **+${count(owner.gained)} visits**${active}\n${islandLinks.join(", ")}`;
-  });
-  const description = ownerLines.length ? ownerLines.join("\n\n") : "No non-zero visit changes were found for the selected duration.";
+  const description = crewLines.length ? crewLines.join("\\n") : "No non-zero visit changes were found for the selected duration.";
   return { embeds: [{
-    title: "VRChat World Activity — Island Owner Ranking",
-    description: `Ranked by visit growth for islands assigned to each Owner in the map data over the last ${data.duration}. This is growth during the selected period, not lifetime visits.\n\n${description}`.slice(0, 5900),
+    title: "VRChat World Activity — Crew Ranking",
+    description: `Ranked by historical net visit change over ${data.duration}. Current online players are a separate snapshot and do not affect ranking.\\n${data.historyNote || ""}\\n\\n${description}`.slice(0, 5900),
     color: 0x005aff,
-    footer: { text: `Visit tracker: ${data.trackedWorldCount} linked worlds. Rankings use recorded lifetime-visit snapshots.` },
+    footer: { text: `Visit history: ${data.trackedWorldCount} linked worlds · live snapshot captured ${data.liveCheckedAt || "unavailable"}` },
     timestamp: data.checkedAt
   }] };
 }
 
+function historicalActivityMessage(data, live, kind) {
+  const count = value => Number(value || 0).toLocaleString("en-US");
+  const rows = kind === "island" ? data.islandGrowth : kind === "owner" ? data.ownerGrowth : data.crewGrowth;
+  const liveRows = kind === "island" ? live.islandRankings : kind === "owner" ? live.ownerRankings : live.crewRankings;
+  const liveByName = new Map(liveRows.map(row => [String(row.name).toLowerCase(), row]));
+  const title = kind === "island" ? "Island" : kind === "owner" ? "Island Owner" : "Crew / Group";
+  const lines = rows.slice(0, 20).map((row, index) => {
+    const current = liveByName.get(String(row.name).toLowerCase());
+    const online = current && current.knownWorlds
+      ? `${count(current.players)} online now`
+      : "online count unavailable";
+    const sign = row.gained > 0 ? "+" : "";
+    const link = kind === "island" && row.worldIds?.[0]
+      ? ` · [VRChat world](https://vrchat.com/home/world/${row.worldIds[0]})`
+      : "";
+    const extra = kind === "island" ? "" : ` · ${row.islands?.length || 0} islands`;
+    return `**${index + 1}. ${row.name}** — **${sign}${count(row.gained)} net visits** · ${online}${extra}${link}`;
+  });
+  const description = lines.length ? lines.join("\\n") : "No non-zero historical visit changes were found for the selected duration.";
+  return { embeds: [{
+    title: `VRChat World Activity — ${title} Ranking`,
+    description: `Ranked by historical net visit change over ${data.duration}. Current online players are shown separately and do not affect ranking.\\n${data.historyNote || ""}\\n\\n${description}`.slice(0, 5900),
+    color: 0x005aff,
+    footer: { text: `Historical visit tracker: ${data.trackedWorldCount} linked worlds · live snapshot captured ${live.checkedAt || "unavailable"}` },
+    timestamp: data.checkedAt
+  }] };
+}
+
+async function historicalActivityResponse(kind, durationValue = "7d") {
+  try {
+    const [data, live] = await Promise.all([getWorldActivity(durationValue), buildLiveActivity()]);
+    const liveRows = kind === "island" ? live.islandRankings : kind === "owner" ? live.ownerRankings : live.crewRankings;
+    const liveByName = new Map(liveRows.map(row => [String(row.name).toLowerCase(), row]));
+    if (kind === "crew") {
+      for (const row of data.crewGrowth) {
+        const current = liveByName.get(String(row.name).toLowerCase());
+        row.activePlayers = current?.players || 0;
+        row.activePlayersKnown = Boolean(current?.knownWorlds);
+      }
+      return worldActivityMessage({
+        ...data,
+        liveCheckedAt: live.checkedAt,
+        historyNote: data.comparisonDays > 0 && data.comparisonDays < parseWorldActivityDuration(durationValue).ms / 86400000
+          ? `Only ${data.comparisonDays.toFixed(1)} days of recorded history are currently available.`
+          : ""
+      });
+    }
+    data.historyNote = data.comparisonDays > 0 && data.comparisonDays < parseWorldActivityDuration(durationValue).ms / 86400000
+      ? `Only ${data.comparisonDays.toFixed(1)} days of recorded history are currently available.`
+      : "";
+    return historicalActivityMessage(data, live, kind);
+  } catch (error) {
+    return { content: `⚠️ Could not load historical activity: ${String(error?.message || error).slice(0, 250)}` };
+  }
+}
+
+async function worldActivityResponse(durationValue = "7d") {
+  return historicalActivityResponse("crew", durationValue);
+}
+
 async function ownerActivityResponse(durationValue = "7d") {
-  try { return ownerActivityMessage(await getWorldActivity(durationValue)); }
-  catch (error) { return { content: "Owner activity could not be loaded. The cached visit tracker or VRChat API may be temporarily unavailable." }; }
+  return historicalActivityResponse("owner", durationValue);
 }
 // ---------- live online-player rankings ----------
 // The GitHub Action refreshes all mapped worlds every 10 minutes. Reading one
@@ -1571,6 +1596,162 @@ async function crewNameChoices(query) {
   }
 }
 
+
+/* ---------- Discord Add to Schedule ---------- */
+// Only messages with an explicit date clue are eligible. The user always sees
+// a preview and must confirm before anything is saved.
+const SCHEDULE_FILE = "scheduled-events.json";
+const SCHEDULE_ARCHIVE_FILE = "scheduled-events-archive.json";
+
+function parseScheduleMessage(message) {
+  const content = String(message.content || "").trim();
+  if (!content) return null;
+  const anchor = new Date(message.timestamp || Date.now());
+  if (Number.isNaN(anchor.getTime())) return null;
+  const text = content.replace(/<t:(\\d+)(?::[tTdDfFR])?>/g, (_, ts) => new Date(Number(ts) * 1000).toISOString());
+  let date = null;
+  let dateHint = "";
+
+  const iso = text.match(/\\b(20\\d{2})-(\\d{1,2})-(\\d{1,2})\\b/);
+  const monthDay = text.match(/\\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(20\\d{2}))?\\b/i);
+  const relative = text.match(/\\b(in|after)\\s+(\\d{1,3})\\s+(days?|weeks?)\\b/i);
+  const relativeTomorrow = /\\btomorrow\\b/i.test(text);
+  const relativeToday = /\\btoday\\b/i.test(text);
+  const weekday = text.match(/\\b(next\\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b/i);
+
+  if (iso) {
+    date = new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
+    dateHint = iso[0];
+  } else if (monthDay) {
+    const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+    const m = months.findIndex(x => x === monthDay[1].slice(0,3).toLowerCase());
+    let year = Number(monthDay[3] || anchor.getUTCFullYear());
+    date = new Date(Date.UTC(year, m, Number(monthDay[2])));
+    if (!monthDay[3] && date.getTime() < Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate())) {
+      date = new Date(Date.UTC(year + 1, m, Number(monthDay[2])));
+    }
+    dateHint = monthDay[0];
+  } else if (relative) {
+    const amount = Number(relative[2]) * (/weeks?/i.test(relative[3]) ? 7 : 1);
+    date = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate() + amount));
+    dateHint = relative[0];
+  } else if (relativeTomorrow || relativeToday) {
+    date = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate() + (relativeTomorrow ? 1 : 0)));
+    dateHint = relativeTomorrow ? "tomorrow" : "today";
+  } else if (weekday) {
+    const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+    const target = days.indexOf(weekday[2].toLowerCase());
+    let delta = (target - anchor.getUTCDay() + 7) % 7;
+    if (delta === 0 || weekday[1]) delta += 7;
+    date = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate() + delta));
+    dateHint = weekday[0];
+  } else {
+    return null;
+  }
+
+  if (!date || Number.isNaN(date.getTime()) || date.getUTCDate() === 0) return null;
+  const timeMatch = text.match(/\\b(\\d{1,2})(?::([0-5]\\d))?\\s*(a\\.?m\\.?|p\\.?m\\.?)\\b/i) ||
+    text.match(/\\b([01]?\\d|2[0-3]):([0-5]\\d)\\b/);
+  let hour = 0, minute = 0, hasTime = false;
+  if (timeMatch) {
+    hour = Number(timeMatch[1]);
+    minute = Number(timeMatch[2] || 0);
+    if (timeMatch[3]) {
+      const pm = /^p/i.test(timeMatch[3]);
+      hour = (hour % 12) + (pm ? 12 : 0);
+    }
+    hasTime = true;
+  } else if (/\\b(noon)\\b/i.test(text)) {
+    hour = 12; hasTime = true;
+  } else if (/\\b(midnight)\\b/i.test(text)) {
+    hour = 0; hasTime = true;
+  }
+  const startsAt = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hour, minute));
+  const endsAt = new Date(startsAt.getTime() + (hasTime ? 2 * 3600000 : 86400000));
+  const firstLine = content.split(/\\r?\\n/).map(x => x.trim()).find(Boolean) || "Scheduled event";
+  const title = firstLine.replace(/^[-*#>\\s]+/, "").slice(0, 120) || "Scheduled event";
+  return {
+    title,
+    startsAt: startsAt.toISOString(),
+    endsAt: endsAt.toISOString(),
+    allDay: !hasTime,
+    dateHint,
+    timeHint: hasTime ? timeMatch?.[0] || (/noon/i.test(text) ? "noon" : "midnight") : "No time stated",
+    author: message.author?.global_name || message.member?.nick || message.author?.username || "Unknown author",
+    sourceMessageUrl: `https://discord.com/channels/${message.guild_id || "@me"}/${message.channel_id}/${message.id}`,
+    sourceMessageId: message.id,
+    sourceChannelId: message.channel_id,
+    createdAt: anchor.toISOString(),
+    content: content.slice(0, 1800),
+    status: "upcoming",
+    detectedAt: new Date().toISOString()
+  };
+}
+
+function githubTextEncode(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(binary);
+}
+
+async function readScheduleFile(env, path) {
+  const headers = { Authorization: `Bearer ${env.GITHUB_TOKEN}`, "User-Agent": "opvrc-map-bot", Accept: "application/vnd.github+json" };
+  const response = await fetch(`${REPO_API}/contents/${path}?ref=main`, { headers });
+  if (response.status === 404) return { items: [], sha: null };
+  if (!response.ok) throw new Error(`Could not read ${path} from GitHub (${response.status}).`);
+  const data = await response.json();
+  const bytes = Uint8Array.from(atob(data.content.replace(/\\n/g, "")), c => c.charCodeAt(0));
+  return { items: JSON.parse(new TextDecoder().decode(bytes)), sha: data.sha };
+}
+
+async function writeScheduleFile(env, path, items, sha, message) {
+  const headers = { Authorization: `Bearer ${env.GITHUB_TOKEN}`, "User-Agent": "opvrc-map-bot", Accept: "application/vnd.github+json", "Content-Type": "application/json" };
+  const response = await fetch(`${REPO_API}/contents/${path}`, {
+    method: "PUT", headers,
+    body: JSON.stringify({ message, content: githubTextEncode(JSON.stringify(items, null, 2) + "\\n"), branch: "main", ...(sha ? { sha } : {}) })
+  });
+  if (!response.ok) throw new Error(`Could not save ${path} to GitHub (${response.status}).`);
+}
+
+async function confirmScheduleMessage(env, interaction) {
+  const parts = String(interaction.data.custom_id || "").split("_");
+  const channelId = parts[2], messageId = parts[3];
+  if (!channelId || !messageId) return { type: 4, data: { flags: 64, content: "This schedule confirmation is invalid. Please run Add to Schedule again." } };
+  const response = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
+    headers: { Authorization: `Bot ${env.DISCORD_TOKEN}` }
+  });
+  if (!response.ok) return { type: 4, data: { flags: 64, content: "I couldn't retrieve the original message. Make sure the bot can read that channel, then try again." } };
+  const message = await response.json();
+  message.channel_id = channelId;
+  const event = parseScheduleMessage(message);
+  if (!event) return { type: 4, data: { flags: 64, content: "I couldn't find a clear date clue in that message. Nothing was saved." } };
+  need(env, ["GITHUB_TOKEN"]);
+  const current = await readScheduleFile(env, SCHEDULE_FILE);
+  if (current.items.some(item => item.sourceMessageId === event.sourceMessageId)) {
+    return { type: 4, data: { flags: 64, content: "That message is already in the schedule." } };
+  }
+  current.items.push(event);
+  await writeScheduleFile(env, SCHEDULE_FILE, current.items, current.sha, "Add scheduled event from Discord");
+  return { type: 7, data: { content: `✅ Added **${event.title}** to the schedule.\\n**When (UTC):** ${event.startsAt}\\n**From:** ${event.author}\\n[Original message](${event.sourceMessageUrl})`, components: [] } };
+}
+
+async function archiveExpiredScheduleEvents(env) {
+  need(env, ["GITHUB_TOKEN"]);
+  const [upcoming, archived] = await Promise.all([
+    readScheduleFile(env, SCHEDULE_FILE),
+    readScheduleFile(env, SCHEDULE_ARCHIVE_FILE)
+  ]);
+  const now = Date.now();
+  const expired = upcoming.items.filter(item => Date.parse(item.endsAt) <= now);
+  if (!expired.length) return;
+  const remaining = upcoming.items.filter(item => Date.parse(item.endsAt) > now);
+  const archiveIds = new Set(archived.items.map(item => item.sourceMessageId));
+  const newArchive = expired.filter(item => !archiveIds.has(item.sourceMessageId)).map(item => ({ ...item, status: "archived", archivedAt: new Date().toISOString() }));
+  await writeScheduleFile(env, SCHEDULE_FILE, remaining, upcoming.sha, "Remove expired scheduled events");
+  await writeScheduleFile(env, SCHEDULE_ARCHIVE_FILE, [...archived.items, ...newArchive], archived.sha, "Archive expired scheduled events");
+}
+
 // ---------- main ----------
 export default {
   async fetch(request, env, ctx) {
@@ -1581,7 +1762,7 @@ export default {
       if (url.searchParams.get("key") !== env.REGISTER_KEY) return new Response("no", { status: 403 });
       const commands = [
         ...Object.keys(LINKS).map((name) => ({ name, description: DESCRIPTIONS[name], type: 1 })),
-        { name: "map", description: "Interactive island map with toggle buttons", type: 1 },
+        { name: "map", description: "Interactive island map with toggle buttons", type: 1 },\n        { name: "Add to Schedule", type: 3 },
         {
           name: "addcrew",
           description: "🔒 Restricted: add a crew and its flag to the crews sheet",
@@ -1654,18 +1835,21 @@ export default {
         },
         {
           name: "islandactivity",
-          description: "Rank islands by current online players across their linked worlds",
-          type: 1
+          description: "Rank islands by historical net visit change; show online players separately",
+          type: 1,
+          options: [{ type: 3, name: "duration", description: "How far back to compare recorded visits", required: false, choices: worldActivityDurationOptions() }]
         },
         {
           name: "crewactivity",
-          description: "Rank crews and groups by current online players across their islands",
-          type: 1
+          description: "Rank crews and groups by historical net visit change; show online players separately",
+          type: 1,
+          options: [{ type: 3, name: "duration", description: "How far back to compare recorded visits", required: false, choices: worldActivityDurationOptions() }]
         },
         {
           name: "owneractivity",
-          description: "Rank island owners by current online players across their islands",
-          type: 1
+          description: "Rank island owners by historical net visit change; show online players separately",
+          type: 1,
+          options: [{ type: 3, name: "duration", description: "How far back to compare recorded visits", required: false, choices: worldActivityDurationOptions() }]
         },
         {
           name: "island",
@@ -1722,6 +1906,27 @@ export default {
 
     if (i.type === 1) return json({ type: 1 }); // ping
 
+    // Discord message context-menu command
+    if (i.type === 2 && i.data.type === 3 && i.data.name === "Add to Schedule") {
+      const message = i.data.resolved?.messages?.[i.data.target_id];
+      const event = message ? parseScheduleMessage({ ...message, channel_id: i.channel_id, guild_id: i.guild_id }) : null;
+      if (!event) {
+        return json({ type: 4, data: { flags: 64, content: "I couldn't find a clear date clue (for example, 'tomorrow', 'in 3 days', 'next Friday', or 'November 18') in that message. Nothing was added." } });
+      }
+      return json({ type: 4, data: {
+        flags: 64,
+        embeds: [{
+          title: "Schedule preview — please confirm",
+          description: `**${event.title}**\\n**Date/time (UTC):** ${event.startsAt}\\n**Time clue:** ${event.timeHint}\\n**Date clue:** ${event.dateHint}\\n**Author:** ${event.author}\\n[Original message](${event.sourceMessageUrl})\\n\\nThis is a best-effort date reading. Confirm only if it looks right.`,
+          color: 0x005aff
+        }],
+        components: [{ type: 1, components: [
+          { type: 2, style: 3, label: "Add", custom_id: `schedule_add_${i.channel_id}_${i.data.target_id}` },
+          { type: 2, style: 2, label: "Cancel", custom_id: "schedule_cancel" }
+        ] }]
+      } } };
+    }
+
     // slash commands
     if (i.type === 2) {
       const name = i.data.name;
@@ -1777,23 +1982,11 @@ export default {
         return json({ type: 4, data: await crewListPage(0) });
       }
 
-      if (name === "worldactivity") {
+      if (["worldactivity", "islandactivity", "crewactivity", "owneractivity"].includes(name)) {
+        const kind = name === "islandactivity" ? "island" : name === "owneractivity" ? "owner" : "crew";
         const duration = String(i.data.options?.find((o) => o.name === "duration")?.value || "7d");
         ctx.waitUntil((async () => {
-          const data = await worldActivityResponse(duration);
-          await fetch(`https://discord.com/api/v10/webhooks/${env.DISCORD_APP_ID}/${i.token}/messages/@original`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data)
-          });
-        })());
-        return json({ type: 5 });
-      }
-
-      if (name === "islandactivity" || name === "crewactivity" || name === "owneractivity") {
-        const kind = name === "islandactivity" ? "island" : name === "crewactivity" ? "crew" : "owner";
-        ctx.waitUntil((async () => {
-          const data = await liveActivityResponse(kind);
+          const data = await historicalActivityResponse(kind, duration);
           await fetch(`https://discord.com/api/v10/webhooks/${env.DISCORD_APP_ID}/${i.token}/messages/@original`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -1863,6 +2056,18 @@ export default {
       return json({ type: 8, data: { choices } });
     }
 
+    // schedule preview buttons
+    if (i.type === 3 && i.data.custom_id === "schedule_cancel") {
+      return json({ type: 7, data: { content: "Schedule addition cancelled.", components: [] } });
+    }
+    if (i.type === 3 && i.data.custom_id.startsWith("schedule_add_")) {
+      try {
+        return json(await confirmScheduleMessage(env, i));
+      } catch (error) {
+        return json({ type: 4, data: { flags: 64, content: `⚠️ Could not save the event: ${String(error?.message || error).slice(0, 250)}` } });
+      }
+    }
+
     // buttons + dropdown
     if (i.type === 3) {
       if (i.data.custom_id.startsWith("gs_")) {
@@ -1912,6 +2117,10 @@ export default {
 
     return new Response("unknown", { status: 400 });
   },
+
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(archiveExpiredScheduleEvents(env));
+  }
 };
 
 async function handleRenameIslandCommand(oldName, newName, env) {
