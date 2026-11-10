@@ -630,14 +630,14 @@ function historicalActivityMessage(data, live, kind) {
   const lines = rows.slice(0, 20).map((row, index) => {
     const current = liveByName.get(String(row.name).toLowerCase());
     const online = current && current.knownWorlds
-      ? `${count(current.players)} online now`
-      : "online count unavailable";
+      ? ` · ${count(current.players)} online now`
+      : "";
     const sign = row.gained > 0 ? "+" : "";
     const link = kind === "island" && row.worldIds?.[0]
       ? ` · [VRChat world](https://vrchat.com/home/world/${row.worldIds[0]})`
       : "";
     const extra = kind === "island" ? "" : ` · ${row.islands?.length || 0} islands`;
-    return `**${index + 1}. ${row.name}** — **${sign}${count(row.gained)} net visits** · ${online}${extra}${link}`;
+    return `**${index + 1}. ${row.name}** — **${sign}${count(row.gained)} net visits**${online}${extra}${link}`;
   });
   const description = lines.length ? lines.join("\n") : "No non-zero historical visit changes were found for the selected duration.";
   return { embeds: [{
