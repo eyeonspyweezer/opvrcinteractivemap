@@ -1228,7 +1228,7 @@ const discordEmbedColor = value => {
 
 // Distinct Discord header colors for each crew. World Government uses a deep navy.
 function crewInfoColor(name, fallback) {
-  const key = String(name || "").toLowerCase().replace(/^the\\s+/, "").replace(/[^a-z0-9]/g, "");
+  const key = String(name || "").toLowerCase().replace(/^the\s+/, "").replace(/[^a-z0-9]/g, "");
   const colors = {
     worldgovernment: "#10264f",
     marines: "#1676d2",
