@@ -728,22 +728,22 @@ async function loadStaticIslandData() {
       fetch('island-colors.tsv').then(r => { if (!r.ok) throw new Error('island-colors.tsv HTTP ' + r.status); return r.text(); }),
       fetch('island-groups.tsv').then(r => { if (!r.ok) throw new Error('island-groups.tsv HTTP ' + r.status); return r.text(); })
     ]).then(([islandsText, groupsText]) => {
-      const groupLines = groupsText.replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(Boolean);
-      const gh = groupLines.shift().split('\\t').map(v => v.trim().toLowerCase());
+      const groupLines = groupsText.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+      const gh = groupLines.shift().split('\t').map(v => v.trim().toLowerCase());
       const gi = gh.indexOf('id'), gn = gh.indexOf('group');
       staticGroupNames = new Map();
       groupLines.forEach(line => {
-        const c = line.split('\\t');
+        const c = line.split('\t');
         if (gi >= 0 && gn >= 0 && c[gi] && c[gn]) staticGroupNames.set(c[gi].trim(), c[gn].trim());
       });
-      const lines = islandsText.replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(Boolean);
-      const h = lines.shift().split('\\t').map(v => v.trim().toLowerCase());
+      const lines = islandsText.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+      const h = lines.shift().split('\t').map(v => v.trim().toLowerCase());
       const at = name => h.indexOf(name);
       const id = at('island name'), owner = at('owner');
       const groupCols = ['group1', 'group2', 'group3'].map(at).filter(i => i >= 0);
       staticIslandData = new Map();
       lines.forEach(line => {
-        const c = line.split('\\t'), name = c[id] || '';
+        const c = line.split('\t'), name = c[id] || '';
         if (!name) return;
         const groups = groupCols.map(i => staticGroupNames.get((c[i] || '').trim())).filter(Boolean);
         staticIslandData.set(islandKey(name), { owner: (c[owner] || '').trim(), groups: [...new Set(groups)] });
