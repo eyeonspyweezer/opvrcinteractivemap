@@ -439,6 +439,7 @@ const GROUP_COLORS = {
 const DEFAULT_GROUP_COLOR = 'rgb(0, 0, 0)';      // known crew with no Team Color in the sheet
 const SHEET_NO_OWNER_COLOR = 'rgb(0, 146, 70)';        // no owner at all (green)
 const NO_OWNER_COLOR = 'rgb(255, 215, 0)'; // listed in the Islands sheet but no owner yet (yellow)
+const NO_VRC_WORLD_COLOR = 'rgb(64, 163, 54)'; // 75% green + 25% yellow for yellow islands without a VRChat world link
 const UNKNOWN_ISLAND_COLOR = 'rgb(180, 195, 75)'; // unknown islands (yellow-green)
 const OWNED_NO_CREW_COLOR = 'rgb(128, 0, 128)'; // has owner, but no crew/group in the crew sheet (purple)
 // Polygon fill transparency: 0 = invisible fill, 1 = fully solid. Change this number to adjust all polygons.
@@ -1070,6 +1071,13 @@ function applyStyle(layer) {
   } else if (OPT.colors) {
     col = p.color; // random hash only when toggle is ON and no owner
   }
+
+  const hasVrcWorldLink = Boolean(
+    worldIdOf(p.name) ||
+    (worldOf(p.name) && worldOf(p.name).link) ||
+    linksOf(p.name).some((u) => /vrchat\\.com\\/home\\/world\\//i.test(u))
+  );
+  if (col === NO_OWNER_COLOR && !hasVrcWorldLink) col = NO_VRC_WORLD_COLOR;
 
   setLayerStyle(layer, {
     color: col,
