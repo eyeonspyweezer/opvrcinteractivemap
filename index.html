@@ -288,7 +288,7 @@ body { background: var(--bg); }
   <button id="themeBtn" class="round-btn" type="button" aria-label="Light or dark mode">◐</button>
   <button id="listToggle" class="round-btn" type="button" aria-label="Show or hide list">☰</button>
 </div>
-<div id="worldOnlineBar" role="status" aria-live="polite">
+<div id="worldOnlineBar" role="status" aria-live="polite" hidden>
   <span class="online-number">Loading…</span> players online across owned worlds
   <span class="online-detail">Reading latest VRChat population snapshot</span>
 </div>
@@ -1544,10 +1544,10 @@ async function loadOwnedWorldOnline() {
       : 'Snapshot time unavailable';
     detail.textContent = timeText + (reported < ownedWorldIds.size ? ' · ' + reported + '/' + ownedWorldIds.size + ' worlds reported' : ' · ' + reported + ' worlds');
     bar.title = 'Sum of unique VRChat worlds linked to islands with an owner. Population snapshots refresh about every 10 minutes.';
+    bar.hidden = false;
   } catch (error) {
-    number.textContent = '—';
-    detail.textContent = 'Live player count temporarily unavailable';
-    console.warn('[map] owned-world population total failed:', error);
+    bar.hidden = true;
+    console.warn('[map] owned-world population total unavailable; hiding the top bar:', error);
   }
 }
 loadOwnedWorldOnline();
