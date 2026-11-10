@@ -112,6 +112,7 @@ def fetch_world(world_id):
             return {
                 "world_id": world_id,
                 "world_name": str(data.get("name") or ""),
+                "world_updated_at": str(data.get("updated_at") or ""),
                 "visits": visits,
             }, "ok"
 
@@ -241,6 +242,7 @@ def main():
             latest_rows.append({
                 "World ID": world_id,
                 "World Name": result["world_name"],
+                "World Updated At": result["world_updated_at"],
                 "Lifetime Visits": result["visits"],
                 "Last Checked UTC": now_text,
                 "Status": "ok",
@@ -251,6 +253,7 @@ def main():
             latest_rows.append({
                 "World ID": world_id,
                 "World Name": old.get("World Name", ""),
+                "World Updated At": old.get("World Updated At", ""),
                 "Lifetime Visits": old.get("Lifetime Visits", ""),
                 "Last Checked UTC": old.get("Last Checked UTC", ""),
                 "Status": status,
@@ -300,6 +303,7 @@ def main():
         world_out.append({
             "World ID": row["World ID"],
             "World Name": row["World Name"],
+            "World Updated At": row.get("World Updated At", ""),
             "Lifetime Visits": row["Lifetime Visits"],
             "Visits 24h": values["Visits 24h"],
             "Visits 24h Status": values["Visits 24h Status"],
@@ -370,6 +374,7 @@ def main():
         [
             "World ID",
             "World Name",
+            "World Updated At",
             "Lifetime Visits",
             "Visits 24h",
             "Visits 24h Status",
