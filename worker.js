@@ -1894,7 +1894,8 @@ function discordCommandDefinitions() {
   ...Object.keys(LINKS).map((name) => ({ name, description: DESCRIPTIONS[name], type: 1 })),
   { name: "map", description: "Interactive island map with toggle buttons", type: 1 },
   { name: "Add to Schedule", type: 3 },
-  { name: "schedule", description: "Show upcoming events saved from Discord messages", type: 1 },
+  { name: "Add to Video List", type: 3 },
+  { name: "events", description: "Show OPVRC event messages and videos, newest first", type: 1 },
   {
     name: "reminders",
     description: "Set your personal event reminder preferences",
