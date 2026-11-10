@@ -130,7 +130,13 @@ html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay
   font-size: calc(var(--fab) * 0.45); box-shadow: 0 2px 8px rgba(0,0,0,.35); transition: transform .15s;
 }
 .round-btn:hover { transform: scale(1.08); }
-#listToggle { left: 14px; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); background: var(--bg); color: var(--fg); border: 1px solid var(--fg); }
+/* Bottom-left controls stay stacked: theme above the list bar. */
+.left-controls { position: fixed; z-index: 1000; left: calc(14px + env(safe-area-inset-left, 0px)); bottom: calc(28px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; }
+.left-controls .round-btn { position: relative; background: var(--bg); color: var(--fg); border: 1px solid var(--fg); }
+#worldOnlineBar { position: fixed; z-index: 1000; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); box-sizing: border-box; width: max-content; max-width: calc(100vw - 24px); padding: 7px 13px; border: 1px solid var(--fg); border-radius: 8px; background: var(--bg); color: var(--fg); box-shadow: 0 2px 8px rgba(0,0,0,.28); text-align: center; font-size: clamp(12px, 2.8vw, 15px); line-height: 1.25; pointer-events: none; }
+#worldOnlineBar .online-number { font-weight: 800; font-variant-numeric: tabular-nums; }
+#worldOnlineBar .online-detail { display: block; margin-top: 2px; font-size: 10px; opacity: .72; }
+@media (max-width: 420px) { #worldOnlineBar { top: calc(8px + env(safe-area-inset-top, 0px)); padding: 6px 9px; } }
 .black-icon { filter: brightness(0) invert(var(--inv)); }
 #searchFrame input { box-sizing: border-box; width: 100%; margin: 4px 0; padding: 6px; font: inherit; font-size: 16px; background: var(--bg); color: var(--sfg); border: 1px solid var(--fg); border-radius: 4px; }
 .srow { display: flex; gap: 6px; align-items: center; }
@@ -171,15 +177,26 @@ button.list-btn { font: inherit; text-transform: uppercase; cursor: pointer; }
 #imgOverlay[hidden] { display: none; }
 #imgBig { max-width: 90vw; max-height: 90vh; transform-origin: center; user-select: none; -webkit-user-drag: none; cursor: grab; }
 a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-color: var(--sfg); }
+.leaflet-popup-content-wrapper { width: fit-content; max-width: min(72vw, 510px); }
+.leaflet-popup-content {
+  box-sizing: border-box;
+  width: max-content !important;
+  max-width: min(68vw, 480px) !important;
+  min-width: 0 !important;
+  margin: 10px 14px !important;
+  text-align: center;
+}
 .island-popup-content {
   box-sizing: border-box;
   width: max-content;
-  max-width: min(68vw, 480px);
+  max-width: 100%;
   min-width: 0;
   margin: 0 auto;
   text-align: center;
   overflow-wrap: anywhere;
 }
+.island-popup-content > * { margin-left: auto; margin-right: auto; }
+.island-popup-content .island-civilian-list { display: table; text-align: left; }
 .island-civilian-toggle { display:inline-block; margin-top:8px; padding:5px 9px; border:1px solid currentColor; border-radius:4px; background:transparent; color:inherit; font:inherit; cursor:pointer; }
 .island-civilian-list { margin-top:7px; padding-left:18px; }
 .island-civilian-list[hidden] { display:none; }
@@ -215,7 +232,7 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 .live-item { display: block; margin-bottom: 8px; padding: 6px; font-size: 13px; color: var(--ltx); text-decoration: none; border: 1px solid var(--ltx); }
 .live-head { font-weight: 700; }
 .map-flag { object-fit: contain; }
-#themeBtn { left: 14px; bottom: calc(28px + env(safe-area-inset-bottom, 0px) + var(--fab) + 10px); background: var(--bg); color: var(--fg); border: 1px solid var(--fg); }
+
 #loadError { position: fixed; z-index: 1000; left: 50%; top: 10px; transform: translateX(-50%); width: min(420px, calc(100vw - 40px)); box-sizing: border-box; padding: 10px 14px; text-align: center; background: var(--bg); color: var(--fg); border: 1px solid var(--fg); border-radius: 6px; font-size: 14px; }
 
 /* ===== Bottom-right buttons, top to bottom: Search, Discord, VRChat, Settings ===== */
@@ -267,9 +284,14 @@ body { background: var(--bg); }
   <table><thead><tr><th id="bSortName" style="cursor:pointer">Name</th><th id="bSortNum" class="bnum" style="cursor:pointer">Bounty</th></tr></thead><tbody id="bountyBody"></tbody></table>
 </div>
 <div id="imgOverlay" hidden><img id="imgBig" alt="" draggable="false"></div>
-<button id="listToggle" class="round-btn" type="button" aria-label="Show or hide list">☰</button>
-
-<button id="themeBtn" class="round-btn" type="button" aria-label="Light or dark mode">◐</button>
+<div class="left-controls">
+  <button id="themeBtn" class="round-btn" type="button" aria-label="Light or dark mode">◐</button>
+  <button id="listToggle" class="round-btn" type="button" aria-label="Show or hide list">☰</button>
+</div>
+<div id="worldOnlineBar" role="status" aria-live="polite">
+  <span class="online-number">Loading…</span> players online across owned worlds
+  <span class="online-detail">Reading latest VRChat population snapshot</span>
+</div>
 <div id="loadError" hidden>The island data (islandslist.tsv) could not be loaded. Please contact the website owner, comrade_dave</div>
 
 <!-- NOTE: the icons are set with the ICONS list at the top of the script (URLs of your white images). The emoji below show until then. -->
@@ -1474,6 +1496,62 @@ async function loadLive() {
 }
 loadLive();
 setInterval(loadLive, 300000);
+
+// ===== Live player total across uniquely linked owned worlds =====
+async function loadOwnedWorldOnline() {
+  const bar = $('worldOnlineBar');
+  const number = bar.querySelector('.online-number');
+  const detail = bar.querySelector('.online-detail');
+  try {
+    const [islandResponse, populationResponse] = await Promise.all([
+      fetch('island-colors.tsv?v=' + Date.now(), { cache: 'no-store' }),
+      fetch('island-world-populations.tsv?v=' + Date.now(), { cache: 'no-store' })
+    ]);
+    if (!islandResponse.ok || !populationResponse.ok) throw new Error('Population files unavailable');
+    const parseTsv = (value) => {
+      const lines = value.replace(/^\uFEFF/, '').trim().split(/\r?\n/);
+      const headers = lines.shift().split('\t');
+      return lines.filter(Boolean).map(line => {
+        const cells = line.split('\t');
+        return Object.fromEntries(headers.map((header, i) => [header, cells[i] || '']));
+      });
+    };
+    const islands = parseTsv(await islandResponse.text());
+    const populations = parseTsv(await populationResponse.text());
+    const worldPattern = /wrld_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+    const ownedWorldIds = new Set();
+    islands.forEach(island => {
+      if (!String(island.Owner || '').trim() || String(island.Unowned || '') === '1') return;
+      const links = String(island.Link || '') + ' ' + String(island.WorldId || '');
+      (links.match(worldPattern) || []).forEach(id => ownedWorldIds.add(id.toLowerCase()));
+    });
+    const populationById = new Map(populations.map(row => [String(row['World ID'] || '').toLowerCase(), row]));
+    let total = 0, reported = 0, latest = '';
+    ownedWorldIds.forEach(id => {
+      const row = populationById.get(id);
+      if (!row || row.Status !== 'ok' || row['Total Players'] === '') return;
+      const value = Number(row['Total Players']);
+      if (!Number.isFinite(value) || value < 0) return;
+      total += value;
+      reported++;
+      if (row['Checked At UTC'] && (!latest || row['Checked At UTC'] > latest)) latest = row['Checked At UTC'];
+    });
+    if (!ownedWorldIds.size || !reported) throw new Error('No owned-world population data reported yet');
+    number.textContent = (reported < ownedWorldIds.size ? 'At least ' : '') + total.toLocaleString();
+    const checked = latest ? new Date(latest) : null;
+    const timeText = checked && !Number.isNaN(checked.getTime())
+      ? 'Snapshot: ' + checked.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      : 'Snapshot time unavailable';
+    detail.textContent = timeText + (reported < ownedWorldIds.size ? ' · ' + reported + '/' + ownedWorldIds.size + ' worlds reported' : ' · ' + reported + ' worlds');
+    bar.title = 'Sum of unique VRChat worlds linked to islands with an owner. Population snapshots refresh about every 10 minutes.';
+  } catch (error) {
+    number.textContent = '—';
+    detail.textContent = 'Live player count temporarily unavailable';
+    console.warn('[map] owned-world population total failed:', error);
+  }
+}
+loadOwnedWorldOnline();
+setInterval(loadOwnedWorldOnline, 300000);
 // ===== Discord hover info (invite code = the part after discord.gg/) =====
 const DISCORD_INVITE = 'bpj4Gu4MX';
 async function loadDiscord() {
