@@ -1225,21 +1225,22 @@ async function crewListPage(page, sortBy = "islands") {
   });
   const pages=Math.max(1,Math.ceil(groups.length/CREW_PAGE_SIZE)), p=Math.min(Math.max(page,0),pages-1);
   const slice=groups.slice(p*CREW_PAGE_SIZE,(p+1)*CREW_PAGE_SIZE);
-  const fmt=v=>v===null||v===undefined||v===""||!Number.isFinite(Number(v))?"Unavailable":Number(v).toLocaleString("en-US");
+  const fmt=v=>v===null||v===undefined||v===""||!Number.isFinite(Number(v))?null:Number(v).toLocaleString("en-US");
   const embeds=slice.map(g=>{
     const growth=growthByName.has(g.name.toLowerCase())?growthByName.get(g.name.toLowerCase()):null;
     const links=[];
     if(g.vrchatGroupUrl) links.push("[VRChat group]("+g.vrchatGroupUrl+")");
     if(g.discordInvite) links.push("[Discord invite]("+g.discordInvite+")");
     const image=g.flagUrl||flagUrl(g.flag);
-    return {title:g.name,description:links.join(" · ")||"No group links listed.",color:0x005aff,
-      fields:[
-        {name:"Islands",value:String(g.islands),inline:true},
-        {name:"VRChat members",value:fmt(g.vrchatMembers),inline:true},
-        {name:"VRChat online",value:fmt(g.vrchatOnline),inline:true},
-        {name:"Discord members",value:fmt(g.discordMembers),inline:true},
-        {name:"Visit growth (7 days)",value:fmt(growth),inline:true}
-      ],...(image?{thumbnail:{url:image}}:{})};
+    const fields=[{name:"Islands",value:String(g.islands),inline:true}];
+    const optionalFields=[
+      ["VRChat members",fmt(g.vrchatMembers)],
+      ["VRChat online",fmt(g.vrchatOnline)],
+      ["Discord members",fmt(g.discordMembers)],
+      ["Visit growth (7 days)",fmt(growth)]
+    ];
+    for(const [name,value] of optionalFields) if(value!==null) fields.push({name,value,inline:true});
+    return {title:g.name,...(links.length?{description:links.join(" · ")}:{}),color:0x005aff,fields,...(image?{thumbnail:{url:image}}:{})};
   });
   return {embeds,components:[
     {type:1,components:[{type:3,custom_id:`cls_${sortKey}_${p}`,placeholder:"Sort crews by…",options:CREW_SORTS.map(([value,label])=>({label,value,default:value===sortKey}))}]},
@@ -1764,34 +1765,35 @@ async function archiveExpiredScheduleEvents(env) {
   await writeScheduleFile(env, SCHEDULE_FILE, remaining, upcoming.sha, "Remove expired scheduled events");
 }
 
-async function scheduleListMessage(env) {
-  const stored = await readScheduleFile(env, SCHEDULE_FILE);
+const VIDEO_FILE = "opvrc-videos.json";
+
+async function eventsListMessage(env) {
+  const [stored, videos] = await Promise.all([
+    readScheduleFile(env, SCHEDULE_FILE),
+    readScheduleFile(env, VIDEO_FILE)
+  ]);
   const now = Date.now();
-  const events = stored.items
+  const messages = stored.items
     .filter(event => Number.isFinite(Date.parse(event.startsAt)) && Date.parse(event.endsAt) > now)
-    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
-
-  if (!events.length) {
-    return { content: "There are no upcoming events in the schedule yet. Use **Add to Schedule** on a Discord message that contains a clear date clue." };
-  }
-
-  const lines = events.slice(0, 20).map((event, index) => {
-    const date = new Date(event.startsAt);
-    const when = new Intl.DateTimeFormat("en-US", event.allDay
-      ? { dateStyle: "medium", timeZone: "UTC" }
-      : { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(date);
-    const source = event.sourceMessageUrl ? ` · [source](${event.sourceMessageUrl})` : "";
-    return `**${index + 1}. ${String(event.title || "Scheduled event").slice(0, 120)}** — ${when} UTC\nBy ${String(event.author || "Unknown author").slice(0, 80)}${source}`;
+    .map(event => ({ ...event, type: "message", sortAt: Date.parse(event.startsAt) }));
+  const videoItems = videos.items
+    .filter(video => video.url)
+    .map(video => ({ ...video, type: "video", sortAt: Date.parse(video.publishedAt || video.addedAt || video.createdAt) || 0 }));
+  const items = [...messages, ...videoItems].sort((a,b) => b.sortAt-a.sortAt);
+  if (!items.length) return { content: "There are no OPVRC events or videos saved yet. Use **Add to Schedule** for dated messages or **Add to Video List** on a message containing video links or attachments." };
+  const lines = items.slice(0, 20).map((item,index) => {
+    if (item.type === "video") {
+      const date = item.publishedAt || item.addedAt || item.createdAt;
+      const when = date && Number.isFinite(Date.parse(date)) ? new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(date)) : "Date unknown";
+      const source = item.sourceMessageUrl ? ` · [Discord source](${item.sourceMessageUrl})` : "";
+      return `**[VIDEO] ${index+1}. ${String(item.title || "Untitled video").slice(0,120)}** — ${when} UTC\n${String(item.platform || "Video").slice(0,30)} · [Watch video](${item.url})${source}`;
+    }
+    const date = new Date(item.startsAt);
+    const when = new Intl.DateTimeFormat("en-US", item.allDay ? {dateStyle:"medium",timeZone:"UTC"} : {dateStyle:"medium",timeStyle:"short",timeZone:"UTC"}).format(date);
+    const source = item.sourceMessageUrl ? ` · [source](${item.sourceMessageUrl})` : "";
+    return `**[MESSAGE] ${index+1}. ${String(item.title || "Scheduled event").slice(0,120)}** — ${when} UTC\nBy ${String(item.author || "Unknown author").slice(0,80)}${source}`;
   });
-  return {
-    embeds: [{
-      title: "Upcoming OPVRC Events",
-      description: lines.join("\n\n").slice(0, 3900),
-      color: 0x005aff,
-      footer: { text: `${events.length} upcoming event${events.length === 1 ? "" : "s"} · Times shown in UTC` },
-      timestamp: new Date().toISOString()
-    }]
-  };
+  return { embeds:[{title:"OPVRC Events",description:lines.join("\n\n").slice(0,3900),color:0x005aff,footer:{text:`${messages.length} message events · ${videoItems.length} videos · newest first`},timestamp:new Date().toISOString()}] };
 }
 
 
@@ -2103,12 +2105,41 @@ export default {
       } });
     }
 
+    if (i.type === 2 && i.data.type === 3 && i.data.name === "Add to Video List") {
+      const message = i.data.resolved?.messages?.[i.data.target_id];
+      const attachments = Object.values(message?.attachments || {}).filter(a => /video\//i.test(a.content_type || "") || /\.(mp4|mov|webm|m4v)$/i.test(a.filename || ""));
+      const content = String(message?.content || "");
+      const urls = [...content.matchAll(/https?:\/\/[^\s<>]+/g)].map(match => match[0].replace(/[),.!?]+$/,""));
+      const candidates = [...new Set([...urls, ...attachments.map(a => a.url).filter(Boolean)])];
+      if (!message || !candidates.length) return json({type:4,data:{flags:64,content:"I couldn't find video links or video attachments in that message."}});
+      need(env, ["GITHUB_TOKEN"]);
+      const stored = await readScheduleFile(env, VIDEO_FILE);
+      const sourceMessageUrl = `https://discord.com/channels/${i.guild_id || "@me"}/${i.channel_id}/${message.id}`;
+      const addedAt = message.timestamp || new Date().toISOString();
+      let added = 0;
+      for (const url of candidates) {
+        if (stored.items.some(item => item.url === url)) continue;
+        const attachment = attachments.find(a => a.url === url);
+        const platform = /youtube\.com|youtu\.be/i.test(url) ? "YouTube" : /tiktok\.com/i.test(url) ? "TikTok" : /discord(app)?\.com\/attachments/i.test(url) ? "Discord" : "External";
+        stored.items.push({
+          type:"video", category:"OPVRC Events", url, platform,
+          title: attachment?.filename || (platform === "YouTube" ? "YouTube video" : platform === "TikTok" ? "TikTok video" : "Video"),
+          thumbnail: null, publishedAt: addedAt, addedAt,
+          sourceMessageUrl, sourceMessageId: message.id,
+          author: message.author?.global_name || message.author?.username || "Unknown"
+        });
+        added++;
+      }
+      if (added) await writeScheduleFile(env, VIDEO_FILE, stored.items, stored.sha, "Add videos to OPVRC Events");
+      return json({type:4,data:{flags:64,content:added ? `Added **${added}** video link/attachment(s) to **OPVRC Events**. Items are tagged as `video` and sorted by date in /events.` : "Those video links are already saved."}});
+    }
+
     // slash commands
     if (i.type === 2) {
       const name = i.data.name;
       if (LINKS[name]) return json({ type: 4, data: { content: LINKS[name] } });
       if (name === "map") return json({ type: 4, data: await mapMessage(ALL_ON) });
-      if (name === "schedule") return json({ type: 4, data: await scheduleListMessage(env) });
+      if (name === "events") return json({ type: 4, data: await eventsListMessage(env) });
       if (name === "reminders") return json({ type: 4, data: await scheduleRemindersCommand(env, i) });
       if (name === "addcrew" || name === "editcrew") {
         if (!isAdmin(env, i)) return json(notAllowed(i));
