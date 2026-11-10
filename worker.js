@@ -2110,7 +2110,7 @@ export default {
       const message = i.data.resolved?.messages?.[i.data.target_id];
       const attachments = Object.values(message?.attachments || {}).filter(a => /video\//i.test(a.content_type || "") || /\.(mp4|mov|webm|m4v)$/i.test(a.filename || ""));
       const content = String(message?.content || "");
-      const urls = [...content.matchAll(/https?:\/\/[^\s<>]+/g)].map(match => match[0].replace(/[),.!?]+$/,""));
+      const urls = [...content.matchAll(/https?:\/\/[^\s<>]+/g)].map(match => match[0].replace(/[),.!?]+$/,"")).filter(url => /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|facebook\.com|fb\.watch|vimeo\.com|twitch\.tv|x\.com|twitter\.com|kick\.com/i.test(url));
       const candidates = [...new Set([...urls, ...attachments.map(a => a.url).filter(Boolean)])];
       if (!message || !candidates.length) return json({type:4,data:{flags:64,content:"I couldn't find video links or video attachments in that message."}});
       need(env, ["GITHUB_TOKEN"]);
@@ -2132,7 +2132,7 @@ export default {
         added++;
       }
       if (added) await writeScheduleFile(env, VIDEO_FILE, stored.items, stored.sha, "Add videos to OPVRC Events");
-      return json({type:4,data:{flags:64,content:added ? `Added **${added}** video link/attachment(s) to **OPVRC Events**. Items are tagged as `video` and sorted by date in /events.` : "Those video links are already saved."}});
+      return json({type:4,data:{flags:64,content:added ? `Added **${added}** video link/attachment(s) to **OPVRC Events**. Items are tagged VIDEO and sorted by date in /events.` : "Those video links are already saved."}});
     }
 
     // slash commands
