@@ -198,6 +198,13 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 .island-popup-content > * { margin-left: auto; margin-right: auto; }
 .island-popup-content .island-extra-info { margin:9px auto 0; text-align:left; width:fit-content; max-width:100%; }
 .island-extra-info summary { cursor:pointer; text-align:center; padding:5px 9px; border:1px solid currentColor; border-radius:4px; list-style-position:inside; }
+.island-extra-content { margin-top:8px; text-align:left; }
+.island-extra-heading { margin:9px 0 4px; font-weight:700; border-bottom:1px solid currentColor; }
+.island-extra-heading:first-child { margin-top:0; }
+.island-extra-line { margin:4px 0; }
+.island-world-list { margin:5px 0 0; padding-left:20px; }
+.island-world-list li { margin:7px 0; }
+.island-world-meta { margin-top:2px; font-size:12px; opacity:.82; }
 .island-civilian-list { margin:7px 0 0; padding-left:22px; }
 .island-civilian-list li { margin:4px 0; }
 .island-popup-content .pop-name { font-family:'PlayfairDisplay', Georgia, serif; letter-spacing:.02em; }
@@ -1763,6 +1770,63 @@ async function loadCivilianList() {
   return civilianListCache;
 }
 
+let islandExtraStatsPromise = null;
+async function loadIslandExtraStats() {
+  if (!islandExtraStatsPromise) {
+    islandExtraStatsPromise = (async () => {
+      const readTsv = async (path) => {
+        try {
+          const response = await fetch(path + '?v=' + Date.now(), { cache: 'no-store' });
+          if (!response.ok) return [];
+          const lines = (await response.text()).replace(/^\\uFEFF/, '').trim().split(/\\r?\\n/);
+          if (!lines.length || !lines[0]) return [];
+          const headers = lines.shift().split('\\t').map(x => x.trim());
+          return lines.filter(Boolean).map(line => {
+            const cells = line.split('\\t');
+            return Object.fromEntries(headers.map((header, i) => [header, cells[i] || '']));
+          });
+        } catch (_) { return []; }
+      };
+      const [islands, worldRows, islandRows] = await Promise.all([
+        readTsv('island-colors.tsv'),
+        readTsv('island-world-visits.tsv'),
+        readTsv('island-visits.tsv')
+      ]);
+      const worldStats = new Map(worldRows.map(row => [String(row['World ID'] || '').toLowerCase(), row]));
+      const islandTotals = new Map(islandRows.map(row => [islandKey(row['Island Name']), row]));
+      const worldsByIsland = new Map();
+      const worldPattern = /wrld_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+      islands.forEach(row => {
+        const key = islandKey(row['Island Name']);
+        if (!key) return;
+        const ids = [...new Set((String(row.Link || '') + ' ' + String(row.WorldId || '')).match(worldPattern) || [])];
+        if (ids.length) worldsByIsland.set(key, ids.map(id => ({
+          id: id.toLowerCase(),
+          stats: worldStats.get(id.toLowerCase()) || null
+        })));
+      });
+      return { worldsByIsland, worldStats, islandTotals };
+    })();
+  }
+  return islandExtraStatsPromise;
+}
+function formatWorldDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString([], {
+    year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+  }) + ' UTC';
+}
+function appendInfoLine(parent, label, value) {
+  if (value === '' || value === null || value === undefined) return;
+  const line = document.createElement('div');
+  line.className = 'island-extra-line';
+  const strong = document.createElement('strong');
+  strong.textContent = label + ': ';
+  line.append(strong, document.createTextNode(String(value)));
+  parent.appendChild(line);
+}
+
 // ===== Optional click sounds (leave URLs blank until sound files are chosen) =====
 const UI_CLICK_SOUND_URL = '';
 const ISLAND_CLICK_SOUND_URL = '';
@@ -1785,13 +1849,17 @@ function wireClick(target, layer) {
     if (map.getContainer().classList.contains('drawing')) return;
     const p = layer.feature.properties, raw = resolveOwner(p);
     const isUrl = (u) => /^https?:\/\//i.test(u || '');
-    await Promise.all([loadIslandBackgrounds(), loadCivilianList()]);
+    await Promise.all([loadIslandBackgrounds(), loadCivilianList(), loadIslandExtraStats()]);
     const bannerUrl = islandBackgrounds.get(islandKey(p.name)) || '';
     const links = linksOf(p.name);
     const w = links.length ? null : worldOf(p.name);
     const nameHref = links[0] || (w && w.link) || '';
     const ownerHref = linkOf(raw);
     const civilians = civilianListCache.get(islandKey(p.name)) || [];
+    const extraStats = await loadIslandExtraStats();
+    const islandKeyName = islandKey(p.name);
+    const islandWorlds = extraStats.worldsByIsland.get(islandKeyName) || [];
+    const islandVisits = extraStats.islandTotals.get(islandKeyName) || null;
     // Always show island details on click, even when the owner/name has no link or image.
     const box = document.createElement('div');
     box.className = 'island-popup-content';
@@ -1815,20 +1883,93 @@ function wireClick(target, layer) {
         box.appendChild(a);
       });
     }
-    if (civilians.length) {
+    if (civilians.length || islandWorlds.length || islandVisits) {
       const extra = document.createElement('details');
       extra.className = 'island-extra-info';
       const summary = document.createElement('summary');
       summary.textContent = 'Extra Info';
-      const list = document.createElement('ul');
-      list.className = 'island-civilian-list';
-      civilians.forEach(person => {
-        const item = document.createElement('li');
-        if (person.link) { const link = document.createElement('a'); link.href = person.link; link.target = '_blank'; link.rel = 'noopener'; link.textContent = person.name; item.appendChild(link); }
-        else item.textContent = person.name;
-        list.appendChild(item);
-      });
-      extra.append(summary, list);
+      const content = document.createElement('div');
+      content.className = 'island-extra-content';
+
+      if (islandVisits) {
+        const growth = [];
+        for (const [field, statusField, label] of [
+          ['Visits 24h', 'Visits 24h Status', '24h'],
+          ['Visits 7d', 'Visits 7d Status', '7d'],
+          ['Visits 30d', 'Visits 30d Status', '30d']
+        ]) {
+          if (islandVisits[statusField] === 'ok' && islandVisits[field] !== '') {
+            growth.push(label + ': +' + Number(islandVisits[field]).toLocaleString());
+          }
+        }
+        if (growth.length) {
+          const heading = document.createElement('div');
+          heading.className = 'island-extra-heading';
+          heading.textContent = 'Visitor net growth (all linked worlds)';
+          content.appendChild(heading);
+          appendInfoLine(content, 'Visitors', growth.join(' · '));
+        }
+      }
+
+      if (islandWorlds.length) {
+        const heading = document.createElement('div');
+        heading.className = 'island-extra-heading';
+        heading.textContent = 'VRChat Worlds (' + islandWorlds.length + ')';
+        content.appendChild(heading);
+        const list = document.createElement('ul');
+        list.className = 'island-world-list';
+        islandWorlds.forEach(world => {
+          const item = document.createElement('li');
+          const record = world.stats || {};
+          const worldLink = document.createElement('a');
+          worldLink.href = 'https://vrchat.com/home/world/' + world.id + '/info';
+          worldLink.target = '_blank';
+          worldLink.rel = 'noopener';
+          worldLink.textContent = record['World Name'] || world.id;
+          item.appendChild(worldLink);
+
+          const details = [];
+          if (record['World Updated At']) details.push('World last updated: ' + formatWorldDate(record['World Updated At']));
+          if (record['Lifetime Visits'] !== undefined && record['Lifetime Visits'] !== '') {
+            details.push('Lifetime visits: ' + Number(record['Lifetime Visits']).toLocaleString());
+          }
+          for (const [field, statusField, label] of [
+            ['Visits 24h', 'Visits 24h Status', '24h'],
+            ['Visits 7d', 'Visits 7d Status', '7d'],
+            ['Visits 30d', 'Visits 30d Status', '30d']
+          ]) {
+            if (record[statusField] === 'ok' && record[field] !== '') {
+              details.push('+' + Number(record[field]).toLocaleString() + ' (' + label + ')');
+            }
+          }
+          if (details.length) {
+            const sub = document.createElement('div');
+            sub.className = 'island-world-meta';
+            sub.textContent = details.join(' · ');
+            item.appendChild(sub);
+          }
+          list.appendChild(item);
+        });
+        content.appendChild(list);
+      }
+
+      if (civilians.length) {
+        const heading = document.createElement('div');
+        heading.className = 'island-extra-heading';
+        heading.textContent = 'Civilians';
+        content.appendChild(heading);
+        const list = document.createElement('ul');
+        list.className = 'island-civilian-list';
+        civilians.forEach(person => {
+          const item = document.createElement('li');
+          if (person.link) { const link = document.createElement('a'); link.href = person.link; link.target = '_blank'; link.rel = 'noopener'; link.textContent = person.name; item.appendChild(link); }
+          else item.textContent = person.name;
+          list.appendChild(item);
+        });
+        content.appendChild(list);
+      }
+
+      extra.append(summary, content);
       box.appendChild(extra);
     }
     if (bannerUrl) {
