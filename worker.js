@@ -304,7 +304,7 @@ let worldActivityInFlight = null;
 
 function parseWorldActivityDuration(value) {
   const v = String(value || "7d").trim().toLowerCase();
-  const m = v.match(/^(\\d+(?:\\.\\d+)?)(m|h|d|w)$/);
+  const m = v.match(/^(\d+(?:\.\d+)?)(m|h|d|w)$/);
   if (!m) return { label: "7 days", ms: 7 * 86400000 };
 
   const amount = Number(m[1]);
