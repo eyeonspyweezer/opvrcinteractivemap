@@ -482,12 +482,19 @@ async function buildWorldActivity(durationValue = "7d") {
         buckets.set(key, {
           name: key,
           gained: 0,
+          worldIds: new Set(),
           islandMap: new Map()
         });
       }
 
       const bucket = buckets.get(key);
-      bucket.gained += item.gained;
+
+      // A single VRChat world can be linked to several map islands.
+      // Count that world's net visit change only once per crew.
+      if (!bucket.worldIds.has(item.id)) {
+        bucket.worldIds.add(item.id);
+        bucket.gained += item.gained;
+      }
 
       if (!bucket.islandMap.has(island.islandId)) {
         bucket.islandMap.set(island.islandId, {
