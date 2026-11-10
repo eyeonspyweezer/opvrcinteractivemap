@@ -611,10 +611,10 @@ function worldActivityMessage(data) {
     const sign = crew.gained > 0 ? "+" : "";
     return `**${index + 1}. ${crew.name}** — **${sign}${count(crew.gained)} net visits**${online} (${islands.join(", ")})`;
   });
-  const description = crewLines.length ? crewLines.join("\\n") : "No non-zero visit changes were found for the selected duration.";
+  const description = crewLines.length ? crewLines.join("\n") : "No non-zero visit changes were found for the selected duration.";
   return { embeds: [{
     title: "VRChat World Activity — Crew Ranking",
-    description: `Ranked by historical net visit change over ${data.duration}. Current online players are a separate snapshot and do not affect ranking.\\n${data.historyNote || ""}\\n\\n${description}`.slice(0, 5900),
+    description: `Ranked by historical net visit change over ${data.duration}. Current online players are a separate snapshot and do not affect ranking.\n${data.historyNote || ""}\n\n${description}`.slice(0, 5900),
     color: 0x005aff,
     footer: { text: `Visit history: ${data.trackedWorldCount} linked worlds · live snapshot captured ${data.liveCheckedAt || "unavailable"}` },
     timestamp: data.checkedAt
@@ -639,10 +639,10 @@ function historicalActivityMessage(data, live, kind) {
     const extra = kind === "island" ? "" : ` · ${row.islands?.length || 0} islands`;
     return `**${index + 1}. ${row.name}** — **${sign}${count(row.gained)} net visits** · ${online}${extra}${link}`;
   });
-  const description = lines.length ? lines.join("\\n") : "No non-zero historical visit changes were found for the selected duration.";
+  const description = lines.length ? lines.join("\n") : "No non-zero historical visit changes were found for the selected duration.";
   return { embeds: [{
     title: `VRChat World Activity — ${title} Ranking`,
-    description: `Ranked by historical net visit change over ${data.duration}. Current online players are shown separately and do not affect ranking.\\n${data.historyNote || ""}\\n\\n${description}`.slice(0, 5900),
+    description: `Ranked by historical net visit change over ${data.duration}. Current online players are shown separately and do not affect ranking.\n${data.historyNote || ""}\n\n${description}`.slice(0, 5900),
     color: 0x005aff,
     footer: { text: `Historical visit tracker: ${data.trackedWorldCount} linked worlds · live snapshot captured ${live.checkedAt || "unavailable"}` },
     timestamp: data.checkedAt
@@ -1923,7 +1923,7 @@ export default {
         flags: 64,
         embeds: [{
           title: "Schedule preview — please confirm",
-          description: `**${event.title}**\\n**Date/time (UTC):** ${event.startsAt}\\n**Time clue:** ${event.timeHint}\\n**Date clue:** ${event.dateHint}\\n**Author:** ${event.author}\\n[Original message](${event.sourceMessageUrl})\\n\\nThis is a best-effort date reading. Confirm only if it looks right.`,
+          description: `**${event.title}**\n**Date/time (UTC):** ${event.startsAt}\n**Time clue:** ${event.timeHint}\n**Date clue:** ${event.dateHint}\n**Author:** ${event.author}\n[Original message](${event.sourceMessageUrl})\n\nThis is a best-effort date reading. Confirm only if it looks right.`,
           color: 0x005aff
         }],
         components: [{ type: 1, components: [
