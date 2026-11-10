@@ -1578,7 +1578,7 @@ function wireClick(target, layer) {
     const nameHref = links[0] || (w && w.link) || '';
     const ownerHref = linkOf(raw);
     const civilians = civilianListCache.get(islandKey(p.name)) || [];
-    if (!isUrl(nameHref) && !isUrl(ownerHref) && !bannerUrl && !civilians.length) return;
+    // Always show island details on click, even when the owner/name has no link or image.
     const box = document.createElement('div');
     box.className = 'island-popup-content';
     const nm = document.createElement(isUrl(nameHref) ? 'a' : 'div');
