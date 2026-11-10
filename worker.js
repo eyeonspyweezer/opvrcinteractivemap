@@ -118,6 +118,57 @@ async function getGroups() {
   });
 }
 
+// ---------- VRC Search public group data ----------
+const VRC_SEARCH_API = "https://search.vrcwwt.com/api";
+const VRC_SEARCH_HEADERS = {
+  "Accept": "application/json",
+  "User-Agent": "OPVRC Interactive Map Discord Bot/1.0 (+https://github.com/eyeonspyweezer/opvrcinteractivemap)"
+};
+const vrcSearchCache = new Map();
+
+async function vrcSearchJson(path, ttlMs = 15 * 60 * 1000) {
+  const key = String(path);
+  const cached = vrcSearchCache.get(key);
+  if (cached && Date.now() - cached.savedAt < ttlMs) return cached.data;
+  const response = await fetch(`${VRC_SEARCH_API}${path}`, { headers: VRC_SEARCH_HEADERS });
+  if (!response.ok) {
+    throw new Error(`VRC Search returned ${response.status}${response.status === 403 ? " (check the API User-Agent)" : ""}.`);
+  }
+  const data = await response.json();
+  vrcSearchCache.set(key, { savedAt: Date.now(), data });
+  return data;
+}
+
+async function getVrcGroupDetails(groupId) {
+  if (!/^grp_[a-f0-9-]+$/i.test(String(groupId || ""))) return null;
+  return vrcSearchJson(`/groups/${encodeURIComponent(groupId)}`);
+}
+
+async function getVrcGroupBatch(groups) {
+  const ids = [...new Set(groups.map(g => String(g.vrchatGroupId || "").trim()).filter(id => /^grp_[a-f0-9-]+$/i.test(id)))];
+  if (!ids.length) return [];
+  if (ids.length > 100) throw new Error("More than 100 linked VRChat groups; split the lookup into batches.");
+  const data = await vrcSearchJson(`/groups?ids=${encodeURIComponent(ids.join(","))}`);
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+function vrcMemberHistoryLines(detail) {
+  const points = (detail?.member_history?.points || [])
+    .filter(point => Number.isFinite(Number(point.ts)) && Number.isFinite(Number(point.new_member_count)))
+    .sort((a, b) => Number(a.ts) - Number(b.ts));
+  if (!points.length) return "No historical membership snapshots are available yet.";
+  return points.slice(-7).map(point => {
+    const rawTs = Number(point.ts);
+    const date = new Date(rawTs < 1e12 ? rawTs * 1000 : rawTs);
+    const dateLabel = Number.isNaN(date.getTime())
+      ? "Unknown date"
+      : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+    const delta = Number(point.delta);
+    const deltaLabel = Number.isFinite(delta) ? ` (${delta > 0 ? "+" : ""}${delta.toLocaleString("en-US")})` : "";
+    return `• ${dateLabel}: **${Number(point.new_member_count).toLocaleString("en-US")}** members${deltaLabel}`;
+  }).join("\n");
+}
+
 // ---------- message builders ----------
 const stamp = () => Math.floor(Date.now() / 300000); // new image URL every 5 minutes so Discord refreshes
 
@@ -683,13 +734,35 @@ async function historicalActivityResponse(kind, durationValue = "7d") {
         row.activePlayers = current?.players || 0;
         row.activePlayersKnown = Boolean(current?.knownWorlds);
       }
-      return worldActivityMessage({
+      const response = worldActivityMessage({
         ...data,
         liveCheckedAt: live.checkedAt,
         historyNote: data.comparisonDays > 0 && data.comparisonDays < parseWorldActivityDuration(durationValue).ms / 86400000
           ? `Only ${data.comparisonDays.toFixed(1)} days of recorded history are currently available.`
           : ""
       });
+      try {
+        const groups = await getGroups();
+        const memberRows = await getVrcGroupBatch(groups);
+        const growthRows = memberRows
+          .filter(row => Number.isFinite(Number(row.avg_daily_growth_90d)))
+          .sort((a, b) => Number(b.avg_daily_growth_90d) - Number(a.avg_daily_growth_90d));
+        const memberLines = growthRows.slice(0, 15).map((row, index) => {
+          const daily = Number(row.avg_daily_growth_90d);
+          const estimate = Math.round(daily * 90);
+          const sign = value => value > 0 ? "+" : "";
+          return `**${index + 1}. ${row.name}** — ${Number(row.member_count || 0).toLocaleString("en-US")} members · **${sign(daily)}${daily.toFixed(2)}/day** · ~${sign(estimate)}${estimate.toLocaleString("en-US")} over 90d`;
+        });
+        const memberSection = memberLines.length
+          ? memberLines.join("\n")
+          : "No linked groups currently have enough membership snapshots to calculate growth.";
+        response.embeds[0].description = (response.embeds[0].description + `\n\n**VRChat Group Membership — 90-day average growth**\n${memberSection}`).slice(0, 5900);
+        response.embeds[0].footer.text += " · Membership stats from VRC Search";
+      } catch (error) {
+        console.error("VRC Search crew activity lookup failed:", error);
+        response.embeds[0].description = (response.embeds[0].description + "\n\n**VRChat group membership growth**\nMembership statistics are temporarily unavailable.").slice(0, 5900);
+      }
+      return response;
     }
     data.historyNote = data.comparisonDays > 0 && data.comparisonDays < parseWorldActivityDuration(durationValue).ms / 86400000
       ? `Only ${data.comparisonDays.toFixed(1)} days of recorded history are currently available.`
@@ -2264,14 +2337,38 @@ export default {
         if (vrchatUrl) linkLines.push(`[VRChat group](${vrchatUrl})`);
         if (discordUrl) linkLines.push(`[Discord invite](${discordUrl})`);
 
+        let vrcDetail = null;
+        if (g.vrchatGroupId) {
+          try { vrcDetail = await getVrcGroupDetails(g.vrchatGroupId); }
+          catch (error) { console.error("VRC Search group lookup failed:", error); }
+        }
+
         const fields = [
           { name: "Islands", value: String(g.islands), inline: true },
           { name: "Island owners", value: ownerText, inline: false }
         ];
         if (linkLines.length) fields.push({ name: "Links", value: linkLines.join(" · "), inline: false });
-        if (g.vrchatMembers.trim()) fields.push({ name: "VRChat members", value: Number(g.vrchatMembers).toLocaleString("en-US"), inline: true });
-        if (g.vrchatOnline.trim()) fields.push({ name: "VRChat online", value: Number(g.vrchatOnline).toLocaleString("en-US"), inline: true });
+        const vrcMemberCount = Number(vrcDetail?.member_count);
+        if (Number.isFinite(vrcMemberCount) && vrcMemberCount >= 0) {
+          fields.push({ name: "VRChat group members", value: vrcMemberCount.toLocaleString("en-US"), inline: true });
+          const onlineCount = Number(vrcDetail?.online_member_count);
+          if (Number.isFinite(onlineCount) && onlineCount >= 0) {
+            fields.push({ name: "VRChat online", value: onlineCount.toLocaleString("en-US"), inline: true });
+          }
+          const dailyGrowth = Number(vrcDetail?.avg_daily_growth_90d);
+          if (Number.isFinite(dailyGrowth)) {
+            fields.push({ name: "Member growth (90-day avg.)", value: `${dailyGrowth > 0 ? "+" : ""}${dailyGrowth.toFixed(2)} members/day`, inline: true });
+          }
+          fields.push({
+            name: "Membership history",
+            value: vrcMemberHistoryLines(vrcDetail).slice(0, 1024),
+            inline: false
+          });
+        } else if (g.vrchatMembers.trim()) {
+          fields.push({ name: "VRChat members (sheet snapshot)", value: Number(g.vrchatMembers).toLocaleString("en-US"), inline: true });
+        }
         if (g.discordMembers.trim()) fields.push({ name: "Discord members", value: Number(g.discordMembers).toLocaleString("en-US"), inline: true });
+        if (vrcDetail?.vrc_search_url) fields.push({ name: "Membership data", value: `[Data from VRC Search](${vrcDetail.vrc_search_url})`, inline: false });
 
         // Prefer the crew's uploaded flag artwork; numeric index is an internal fallback only.
         const fUrl = g.flagUrl || flagUrl(g.flag);
