@@ -483,8 +483,6 @@ function buildOceanWaves() {
   if (!landPath) return;
 
   const NS = 'http://www.w3.org/2000/svg';
-  const reducedMotion = window.matchMedia &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   for (let copy = -WRAP_COPIES; copy <= WRAP_COPIES; copy++) {
     const svg = document.createElementNS(NS, 'svg');
