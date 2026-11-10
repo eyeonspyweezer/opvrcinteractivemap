@@ -1628,20 +1628,20 @@ async function loadCivilianList() {
   try {
     const response = await fetch('civilians.tsv', { cache: 'no-cache' });
     if (!response.ok) throw new Error('HTTP ' + response.status);
-    const lines = (await response.text()).replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(Boolean);
-    const header = lines.shift().split('\\t').map(x => x.trim().toLowerCase());
+    const lines = (await response.text()).replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+    const header = lines.shift().split('\t').map(x => x.trim().toLowerCase());
     const islandCol = header.indexOf('island'), nameCol = header.indexOf('name'), linkCol = header.indexOf('link');
     const map = new Map();
     if (islandCol < 0 || nameCol < 0) return (civilianListCache = map);
     lines.forEach(line => {
-      const cols = line.split('\\t');
+      const cols = line.split('\t');
       const island = String(cols[islandCol] || '').trim();
       const name = String(cols[nameCol] || '').trim();
       const link = String(cols[linkCol] || '').trim();
       if (!island || !name) return;
       const key = islandKey(island);
       if (!map.has(key)) map.set(key, []);
-      map.get(key).push({ name, link: /^https?:\\/\\//i.test(link) ? link : '' });
+      map.get(key).push({ name, link: /^https?:\/\//i.test(link) ? link : '' });
     });
     civilianListCache = map;
   } catch (error) { console.warn('Civilian list unavailable:', error); civilianListCache = new Map(); }
