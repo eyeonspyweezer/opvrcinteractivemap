@@ -1608,16 +1608,16 @@ function parseScheduleMessage(message) {
   if (!content) return null;
   const anchor = new Date(message.timestamp || Date.now());
   if (Number.isNaN(anchor.getTime())) return null;
-  const text = content.replace(/<t:(\\d+)(?::[tTdDfFR])?>/g, (_, ts) => new Date(Number(ts) * 1000).toISOString());
+  const text = content.replace(/<t:(\d+)(?::[tTdDfFR])?>/g, (_, ts) => new Date(Number(ts) * 1000).toISOString());
   let date = null;
   let dateHint = "";
 
-  const iso = text.match(/\\b(20\\d{2})-(\\d{1,2})-(\\d{1,2})\\b/);
-  const monthDay = text.match(/\\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(20\\d{2}))?\\b/i);
-  const relative = text.match(/\\b(in|after)\\s+(\\d{1,3})\\s+(days?|weeks?)\\b/i);
-  const relativeTomorrow = /\\btomorrow\\b/i.test(text);
-  const relativeToday = /\\btoday\\b/i.test(text);
-  const weekday = text.match(/\\b(next\\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b/i);
+  const iso = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
+  const monthDay = text.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?\b/i);
+  const relative = text.match(/\b(in|after)\s+(\d{1,3})\s+(days?|weeks?)\b/i);
+  const relativeTomorrow = /\btomorrow\b/i.test(text);
+  const relativeToday = /\btoday\b/i.test(text);
+  const weekday = text.match(/\b(next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
 
   if (iso) {
     date = new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
@@ -1649,9 +1649,9 @@ function parseScheduleMessage(message) {
     return null;
   }
 
-  if (!date || Number.isNaN(date.getTime())) return null;\n  const expectedDate = dateHint === iso?.[0] ? [Number(iso[1]), Number(iso[2]), Number(iso[3])] : null;\n  if (expectedDate && (date.getUTCFullYear() !== expectedDate[0] || date.getUTCMonth() + 1 !== expectedDate[1] || date.getUTCDate() !== expectedDate[2])) return null;
-  const timeMatch = text.match(/\\b(\\d{1,2})(?::([0-5]\\d))?\\s*(a\\.?m\\.?|p\\.?m\\.?)\\b/i) ||
-    text.match(/\\b([01]?\\d|2[0-3]):([0-5]\\d)\\b/);
+  if (!date || Number.isNaN(date.getTime())) return null;\n  if (iso && (date.getUTCFullYear() !== Number(iso[1]) || date.getUTCMonth() + 1 !== Number(iso[2]) || date.getUTCDate() !== Number(iso[3]))) return null;
+  const timeMatch = text.match(/\b(\d{1,2})(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)\b/i) ||
+    text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
   let hour = 0, minute = 0, hasTime = false;
   if (timeMatch) {
     hour = Number(timeMatch[1]);
@@ -1661,15 +1661,15 @@ function parseScheduleMessage(message) {
       hour = (hour % 12) + (pm ? 12 : 0);
     }
     hasTime = true;
-  } else if (/\\b(noon)\\b/i.test(text)) {
+  } else if (/\b(noon)\b/i.test(text)) {
     hour = 12; hasTime = true;
-  } else if (/\\b(midnight)\\b/i.test(text)) {
+  } else if (/\b(midnight)\b/i.test(text)) {
     hour = 0; hasTime = true;
   }
   const startsAt = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hour, minute));
   const endsAt = new Date(startsAt.getTime() + (hasTime ? 2 * 3600000 : 86400000));
-  const firstLine = content.split(/\\r?\\n/).map(x => x.trim()).find(Boolean) || "Scheduled event";
-  const title = firstLine.replace(/^[-*#>\\s]+/, "").slice(0, 120) || "Scheduled event";
+  const firstLine = content.split(/\r?\n/).map(x => x.trim()).find(Boolean) || "Scheduled event";
+  const title = firstLine.replace(/^[-*#>\s]+/, "").slice(0, 120) || "Scheduled event";
   return {
     title,
     startsAt: startsAt.toISOString(),
@@ -1701,7 +1701,7 @@ async function readScheduleFile(env, path) {
   if (response.status === 404) return { items: [], sha: null };
   if (!response.ok) throw new Error(`Could not read ${path} from GitHub (${response.status}).`);
   const data = await response.json();
-  const bytes = Uint8Array.from(atob(data.content.replace(/\\n/g, "")), c => c.charCodeAt(0));
+  const bytes = Uint8Array.from(atob(data.content.replace(/\n/g, "")), c => c.charCodeAt(0));
   return { items: JSON.parse(new TextDecoder().decode(bytes)), sha: data.sha };
 }
 
@@ -1709,7 +1709,7 @@ async function writeScheduleFile(env, path, items, sha, message) {
   const headers = { Authorization: `Bearer ${env.GITHUB_TOKEN}`, "User-Agent": "opvrc-map-bot", Accept: "application/vnd.github+json", "Content-Type": "application/json" };
   const response = await fetch(`${REPO_API}/contents/${path}`, {
     method: "PUT", headers,
-    body: JSON.stringify({ message, content: githubTextEncode(JSON.stringify(items, null, 2) + "\\n"), branch: "main", ...(sha ? { sha } : {}) })
+    body: JSON.stringify({ message, content: githubTextEncode(JSON.stringify(items, null, 2) + "\n"), branch: "main", ...(sha ? { sha } : {}) })
   });
   if (!response.ok) throw new Error(`Could not save ${path} to GitHub (${response.status}).`);
 }
@@ -1733,7 +1733,7 @@ async function confirmScheduleMessage(env, interaction) {
   }
   current.items.push(event);
   await writeScheduleFile(env, SCHEDULE_FILE, current.items, current.sha, "Add scheduled event from Discord");
-  return { type: 7, data: { content: `✅ Added **${event.title}** to the schedule.\\n**When (UTC):** ${event.startsAt}\\n**From:** ${event.author}\\n[Original message](${event.sourceMessageUrl})`, components: [] } };
+  return { type: 7, data: { content: `✅ Added **${event.title}** to the schedule.\n**When (UTC):** ${event.startsAt}\n**From:** ${event.author}\n[Original message](${event.sourceMessageUrl})`, components: [] } };
 }
 
 async function archiveExpiredScheduleEvents(env) {
