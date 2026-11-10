@@ -1226,6 +1226,35 @@ const discordEmbedColor = value => {
   return match ? parseInt(match[1], 16) : 0x005aff;
 };
 
+// Distinct Discord header colors for each crew. World Government uses a deep navy.
+function crewInfoColor(name, fallback) {
+  const key = String(name || "").toLowerCase().replace(/^the\\s+/, "").replace(/[^a-z0-9]/g, "");
+  const colors = {
+    worldgovernment: "#10264f",
+    marines: "#1676d2",
+    revolutionaryarmy: "#b52b3a",
+    rocks pirates: "#30343b",
+    rockspirates: "#30343b",
+    starpirates: "#7046a8",
+    thrillerbarkpirates: "#573b75",
+    vaelpirates: "#167d78",
+    rogerpirates: "#b58a32",
+    tazmanianpirates: "#c56b2b",
+    bloodsailpirates: "#8f2638",
+    frostbitepirates: "#4d9bb8",
+    infamousstrawhatpirates: "#d18b25",
+    moonlightpirates: "#667b9a",
+    requiempirates: "#49305f",
+    strawhats: "#c64236",
+    unknownpirates: "#59636f",
+    olympuspirates: "#6f8d45",
+    yingyongpirates: "#887b57",
+    akazayapirates: "#a34835",
+    donquixotepirates: "#a52b50"
+  };
+  return discordEmbedColor(colors[key] || fallback);
+}
+
 // ---------- /crewlist pagination ----------
 const CREW_PAGE_SIZE = 10;
 const CREW_SORTS = [["islands","Island count"],["az","A–Z"],["za","Z–A"],["vrchatMembers","VRChat members"],["vrchatOnline","VRChat online"],["discordMembers","Discord members"],["growth","Visit growth (7 days)"]];
@@ -2204,7 +2233,7 @@ export default {
             embeds: [
               {
                 title: `🏴‍☠️ Crew Info: ${g.name}`,
-                color: discordEmbedColor(g.mapColor),
+                color: crewInfoColor(g.name, g.mapColor),
                 fields: [
                   { name: "Group ID", value: g.id || "—", inline: true },
                   { name: "Islands Owned", value: String(g.islands), inline: true },
