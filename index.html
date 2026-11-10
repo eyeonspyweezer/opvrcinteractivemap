@@ -1053,8 +1053,8 @@ function loadOwnerProfileLinks() {
     ownerProfileLinksPromise = fetch('owner-links.tsv', { cache: 'no-cache' })
       .then((response) => { if (!response.ok) throw new Error('HTTP ' + response.status); return response.text(); })
       .then((text) => {
-        const lines = text.replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(Boolean);
-        const headers = (lines.shift() || '').split('\\t').map((x) => x.trim().toLowerCase());
+        const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+        const headers = (lines.shift() || '').split('\t').map((x) => x.trim().toLowerCase());
         const ownerCol = headers.indexOf('owner');
         const linkCol = headers.indexOf('profile link');
         if (ownerCol < 0 || linkCol < 0) return ownerProfileLinkMap;
@@ -1062,7 +1062,7 @@ function loadOwnerProfileLinks() {
           const cells = line.split('\\t');
           const owner = (cells[ownerCol] || '').trim();
           const url = (cells[linkCol] || '').trim();
-          if (owner && /^https?:\\/\\//i.test(url)) ownerProfileLinkMap.set(ownerKey(owner), url);
+          if (owner && /^https?:\/\//i.test(url)) ownerProfileLinkMap.set(ownerKey(owner), url);
         });
         return ownerProfileLinkMap;
       })
