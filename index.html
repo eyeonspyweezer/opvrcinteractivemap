@@ -312,7 +312,7 @@ body { background: var(--bg); }
         <span><span class="dc-dot on"></span><span id="dcOn"></span></span>
       </div>
     </div>
-    <a id="fabDiscord" class="round-btn" href="https://discord.gg/bpj4Gu4MX" target="_blank" rel="noopener" aria-label="Discord"><img id="dcIcon" class="dc-server" alt=""><span class="ico dc-logo" data-icon="discord">🔗</span></a>
+    <a id="fabDiscord" class="round-btn" href="https://discord.gg/TeunYpsHb6" target="_blank" rel="noopener" aria-label="Discord"><img id="dcIcon" class="dc-server" alt=""><span class="ico dc-logo" data-icon="discord">🔗</span></a>
   </div>
   <a id="fabVrc" class="round-btn" href="https://vrchat.com/home/group/grp_677be38a-564d-432f-be95-f2e319bb4b13" target="_blank" rel="noopener" aria-label="VRChat"><span class="ico" data-icon="vrchat">🌐</span></a>
   <button id="settingsBtn" class="round-btn" type="button" aria-label="Settings"><span class="ico" data-icon="settings">⚙</span></button>
@@ -1626,7 +1626,7 @@ async function loadOwnedWorldOnline() {
 loadOwnedWorldOnline();
 setInterval(loadOwnedWorldOnline, 300000);
 // ===== Discord hover info (invite code = the part after discord.gg/) =====
-const DISCORD_INVITE = 'bpj4Gu4MX';
+const DISCORD_INVITE = 'TeunYpsHb6';
 async function loadDiscord() {
   try {
     const r = await fetch(`https://discord.com/api/v9/invites/${DISCORD_INVITE}?with_counts=true`);
@@ -1867,13 +1867,41 @@ function wireClick(target, layer) {
     nm.className = 'pop-name'; nm.textContent = String(p.name || '');
     if (isUrl(nameHref)) { nm.href = nameHref; nm.target = '_blank'; nm.rel = 'noopener'; }
     box.appendChild(nm);
-    if (raw) {
-      const ol = document.createElement(isUrl(ownerHref) ? 'a' : 'div');
-      ol.textContent = ownerLabel(raw);
-      if (isUrl(ownerHref)) { ol.href = ownerHref; ol.target = '_blank'; ol.rel = 'noopener'; ol.className = 'owner-link'; ol.style.display = 'block'; }
-      const c = ownerTextColor(raw);
+    const islandOwners = ownersOf(raw).filter(Boolean);
+    islandOwners.forEach((owner, index) => {
+      const ownerUrl = linkOf(owner);
+      const ol = document.createElement(isUrl(ownerUrl) ? 'a' : 'div');
+      ol.className = 'pop-owner';
+      ol.textContent = (index === 0 ? 'Owner: ' : '') + (aliasOf(owner) || owner);
+      if (isUrl(ownerUrl)) { ol.href = ownerUrl; ol.target = '_blank'; ol.rel = 'noopener'; ol.classList.add('owner-link'); }
+      const c = ownerTextColor(owner);
       if (c) { ol.style.color = c; ol.style.textDecorationColor = c; }
       box.appendChild(ol);
+    });
+    const popupGroups = isGoneStatus(layer) ? [] : preferMarines([
+      ...new Set(groupsForIsland(p.name, raw).filter((g) => g && !/ Kingdom$/i.test(g)))
+    ]);
+    if (popupGroups.length) {
+      const groupRow = document.createElement('div');
+      groupRow.className = 'pop-group';
+      const label = document.createElement('span');
+      label.className = 'tip-label';
+      label.textContent = 'Group: ';
+      groupRow.appendChild(label);
+      popupGroups.forEach((group, index) => {
+        if (index) groupRow.appendChild(document.createTextNode(', '));
+        const groupUrl = groupLinkOf(group);
+        const groupName = document.createElement(isUrl(groupUrl) ? 'a' : 'span');
+        groupName.textContent = group;
+        if (isUrl(groupUrl)) {
+          groupName.href = groupUrl;
+          groupName.target = '_blank';
+          groupName.rel = 'noopener';
+          groupName.className = 'owner-link';
+        }
+        groupRow.appendChild(groupName);
+      });
+      box.appendChild(groupRow);
     }
     if (links.length > 1) {
       const t = document.createElement('div'); t.className = 'pop-more'; t.textContent = 'More links:'; box.appendChild(t);
