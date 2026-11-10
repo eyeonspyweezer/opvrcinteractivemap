@@ -176,22 +176,23 @@ button.list-btn { font: inherit; text-transform: uppercase; cursor: pointer; }
 a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-color: var(--sfg); }
 .island-popup-content {
   box-sizing: border-box;
-  width: min(68vw, 640px);
+  width: min(68vw, 480px);
   min-width: min(220px, 68vw);
 }
 .island-banner {
   display: block;
   width: 100%;
-  max-width: 100%;
-  aspect-ratio: 16 / 5;
-  height: auto;
+  max-width: 420px;
+  height: 132px;
+  max-height: 132px;
   margin-top: 9px;
   object-fit: cover;
   object-position: center;
   border-radius: 4px;
 }
 .island-popup-content.short-info .island-banner {
-  aspect-ratio: 16 / 9;
+  height: 160px;
+  max-height: 160px;
 }
 
 
@@ -1526,7 +1527,7 @@ function wireClick(target, layer) {
     }
     const infoLength = box.textContent.trim().length;
     if (infoLength < 90) box.classList.add('short-info');
-    L.popup({ maxWidth: 680, minWidth: 220 }).setLatLng(e.latlng).setContent(box).openOn(map);
+    L.popup({ maxWidth: 500, minWidth: 220 }).setLatLng(e.latlng).setContent(box).openOn(map);
   });
 }
 function collect() {
