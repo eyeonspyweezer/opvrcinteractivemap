@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html data-theme="light">
 <head>
 <meta property="og:title" content="OPVRC Island Map">
 <meta property="og:description" content="One Piece VRChat Map with most crews and islands, operated by comrade_dave based on mostly VRGoofy's list (Join the group and discord!)">
@@ -32,15 +32,12 @@
 }
 
 :root { --bg: rgb(227, 201, 152); --fg: rgb(59, 38, 20); --fab: clamp(48px, 6vmin, 64px); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: rgb(25, 25, 25); --fg: #fff; } }
 :root[data-theme="dark"] { --bg: rgb(25, 25, 25); --fg: #fff; }
 @media (pointer: coarse) { :root { --fab: clamp(52px, 13vmin, 68px); } }
 :root { --sfg: rgb(62,44,42); --inv: 0; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sfg: #fff; --inv: 1; } }
 :root[data-theme="dark"] { --sfg: #fff; --inv: 1; }
 /* Left list: light mode = dark background with light buttons; dark mode = same dark color for both */
 :root { --lbg: var(--fg); --ltx: var(--bg); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --lbg: var(--bg); --ltx: var(--fg); } }
 :root[data-theme="dark"] { --lbg: var(--bg); --ltx: var(--fg); }
 
 html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay', 'Helvetica Neue', Arial, sans-serif; font-weight: 700; }
@@ -62,6 +59,10 @@ html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay
 
 .leaflet-tooltip {
   font-family: inherit;
+  background: var(--bg) !important;
+  color: var(--fg) !important;
+  border: 1px solid var(--fg) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
   width: max-content !important;
   max-width: min(320px, 70vw);
   white-space: normal;
@@ -93,9 +94,6 @@ html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay
 
 /* The draw/edit icons are black images, so in dark mode they get inverted to white. The background is set to the opposite color so it ends up as dark. */
 :root[data-theme="dark"] .leaflet-draw-toolbar > a { filter: invert(1); background-color: rgb(230, 230, 230); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .leaflet-draw-toolbar > a { filter: invert(1); background-color: rgb(230, 230, 230); }
-}
 
 #panel, #sideList {
   position: fixed; z-index: 1000; box-sizing: border-box;
@@ -153,7 +151,6 @@ html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--bg); color: var(--sfg); border-radius: 0; }
 /* Link color for island names (popup). Change the two colors here if you prefer black. */
 :root { --link: rgb(0, 70, 200); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --link: #6aa6ff; } }
 :root[data-theme="dark"] { --link: #6aa6ff; }
 :root { --sidew: clamp(150px, 22vw, 260px); }
 @media (pointer: coarse) { :root { --sidew: clamp(140px, 40vw, 220px); } }
@@ -1074,7 +1071,7 @@ function tipContent(layer) {
 
 function addIsland(geometry, props) {
   const layer = L.geoJSON({ type: 'Feature', properties: props, geometry }).getLayers()[0];
-  layer.bindTooltip(tipContent, { sticky: true });
+  layer.bindTooltip(() => tipContent(layer), { sticky: true, direction: 'auto', opacity: 1 });
   wireHoverImage(layer, layer);
   wireClick(layer, layer);
   drawnItems.addLayer(layer);
