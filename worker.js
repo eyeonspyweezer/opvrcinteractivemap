@@ -1627,6 +1627,7 @@ function parseScheduleMessage(message) {
     const m = months.findIndex(x => x === monthDay[1].slice(0,3).toLowerCase());
     let year = Number(monthDay[3] || anchor.getUTCFullYear());
     date = new Date(Date.UTC(year, m, Number(monthDay[2])));
+    if (date.getUTCMonth() !== m || date.getUTCDate() !== Number(monthDay[2])) return null;
     if (!monthDay[3] && date.getTime() < Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate())) {
       date = new Date(Date.UTC(year + 1, m, Number(monthDay[2])));
     }
@@ -1724,6 +1725,7 @@ async function confirmScheduleMessage(env, interaction) {
   if (!response.ok) return { type: 4, data: { flags: 64, content: "I couldn't retrieve the original message. Make sure the bot can read that channel, then try again." } };
   const message = await response.json();
   message.channel_id = channelId;
+  message.guild_id = interaction.guild_id || null;
   const event = parseScheduleMessage(message);
   if (!event) return { type: 4, data: { flags: 64, content: "I couldn't find a clear date clue in that message. Nothing was saved." } };
   need(env, ["GITHUB_TOKEN"]);
