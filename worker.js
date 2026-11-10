@@ -1766,7 +1766,8 @@ export default {
       if (url.searchParams.get("key") !== env.REGISTER_KEY) return new Response("no", { status: 403 });
       const commands = [
         ...Object.keys(LINKS).map((name) => ({ name, description: DESCRIPTIONS[name], type: 1 })),
-        { name: "map", description: "Interactive island map with toggle buttons", type: 1 },\n        { name: "Add to Schedule", type: 3 },
+        { name: "map", description: "Interactive island map with toggle buttons", type: 1 },
+        { name: "Add to Schedule", type: 3 },
         {
           name: "addcrew",
           description: "🔒 Restricted: add a crew and its flag to the crews sheet",
