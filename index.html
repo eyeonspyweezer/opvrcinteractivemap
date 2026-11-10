@@ -488,12 +488,17 @@ LIST_BUTTONS.forEach((b) => {
 // ===== Map =====
 const map = L.map('map', { crs: L.CRS.Simple, maxZoom: 4, minZoom: -5 });
 const LAST_MAP_VIEW_KEY = 'opvrc:last-map-view:v1';
+function canonicalMapX(x) {
+  if (!mapWidth) return x;
+  // Store coordinates against the original map, never against a visual wrap copy.
+  return ((x % mapWidth) + mapWidth) % mapWidth;
+}
 function restoreLastMapView(defaultCenter, defaultZoom) {
   try {
     const saved = JSON.parse(localStorage.getItem(LAST_MAP_VIEW_KEY) || 'null');
     if (!saved || !Number.isFinite(saved.lat) || !Number.isFinite(saved.lng) || !Number.isFinite(saved.zoom)) return;
     const zoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), saved.zoom));
-    map.setView([saved.lat, saved.lng], zoom, { animate: false });
+    map.setView([saved.lat, canonicalMapX(saved.lng)], zoom, { animate: false });
   } catch (_) {
     // Storage may be unavailable; keep the normal default map view.
   }
@@ -502,7 +507,7 @@ function saveLastMapView() {
   try {
     const center = map.getCenter();
     localStorage.setItem(LAST_MAP_VIEW_KEY, JSON.stringify({
-      lat: center.lat, lng: center.lng, zoom: map.getZoom()
+      lat: center.lat, lng: canonicalMapX(center.lng), zoom: map.getZoom()
     }));
   } catch (_) {
     // Ignore private-mode or storage restrictions.
@@ -1466,7 +1471,9 @@ let tileLayer = null;
     const fitZoom = Math.log2(map.getSize().y / height);
     map.setMinZoom(fitZoom);
     map.setView([height / 2, width / 2], fitZoom);
-    map.setMaxBounds([[0, -1e9], [height, 1e9]]);
+    // Polygons are rendered once as source data plus WRAP_COPIES visual ghosts
+    // on either side. Keep panning inside that rendered range so islands cannot vanish.
+    map.setMaxBounds([[0, -WRAP_COPIES * width], [height, (WRAP_COPIES + 1) * width]]);
     map.options.maxBoundsViscosity = 1;
     restoreLastMapView([height / 2, width / 2], fitZoom);
     map.off('moveend', saveLastMapView);
