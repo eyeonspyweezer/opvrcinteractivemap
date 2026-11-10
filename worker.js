@@ -2219,28 +2219,75 @@ export default {
       }
       if (name === "crewinfo") {
         const v = String(i.data.options?.[0]?.value ?? "");
-        const groups = await getGroups();
+        const [groups, islands, ownerLinks] = await Promise.all([
+          getGroups(),
+          tsv("island-colors.tsv"),
+          getOwnerLinks()
+        ]);
         const g =
           groups.find((x) => x.id === v) ||
           groups.find((x) => x.name.toLowerCase() === v.toLowerCase()) ||
           groups.find((x) => x.name.toLowerCase().includes(v.toLowerCase()));
         if (!g) return json({ type: 4, data: { content: `I couldn't find a group called "${v}".` } });
-        const fUrl = flagUrl(g.flag);
+
+        // Collect distinct owners of islands assigned to this crew, including
+        // secondary crew assignments (Group2 / Group3).
+        const ownerIslands = new Map();
+        for (const island of islands) {
+          const belongs = [island.Group1, island.Group2, island.Group3]
+            .some(id => String(id || "").trim() === String(g.id));
+          if (!belongs) continue;
+          const owner = String(island.Owner || "").trim();
+          if (!owner || /^(unowned|—|unknown)$/i.test(owner)) continue;
+          if (!ownerIslands.has(owner)) ownerIslands.set(owner, []);
+          ownerIslands.get(owner).push(islandDisplayName(island));
+        }
+
+        const ownerLines = [...ownerIslands.entries()]
+          .sort((a,b) => a[0].localeCompare(b[0]))
+          .map(([owner, names]) => {
+            const data = ownerLinks[owner.toLowerCase()] || {};
+            const shownOwner = data.link ? `[${owner}](${data.link})` : owner;
+            const islandNames = names.slice(0, 5).join(", ") + (names.length > 5 ? `, +${names.length - 5} more` : "");
+            return `• **${shownOwner}** — ${islandNames}`;
+          });
+        const ownerText = ownerLines.length
+          ? ownerLines.join("\\n").slice(0, 1024)
+          : "No named island owners are currently listed for this crew.";
+
+        const vrchatUrl = g.vrchatGroupUrl ||
+          (g.vrchatGroupId ? `https://vrchat.com/home/group/${g.vrchatGroupId}` : "");
+        const linkLines = [];
+        if (vrchatUrl) linkLines.push(`[VRChat group](${vrchatUrl})`);
+        if (g.discordInvite) linkLines.push(`[Discord invite](${g.discordInvite})`);
+
+        const fields = [
+          { name: "Islands", value: String(g.islands), inline: true },
+          { name: "Island owners", value: ownerText, inline: false }
+        ];
+        if (linkLines.length) fields.push({ name: "Links", value: linkLines.join(" · "), inline: false });
+        if (g.vrchatMembers.trim()) fields.push({ name: "VRChat members", value: Number(g.vrchatMembers).toLocaleString("en-US"), inline: true });
+        if (g.vrchatOnline.trim()) fields.push({ name: "VRChat online", value: Number(g.vrchatOnline).toLocaleString("en-US"), inline: true });
+        if (g.discordMembers.trim()) fields.push({ name: "Discord members", value: Number(g.discordMembers).toLocaleString("en-US"), inline: true });
+
+        // Prefer the crew's uploaded flag artwork; numeric index is an internal fallback only.
+        const fUrl = g.flagUrl || flagUrl(g.flag);
         return json({
           type: 4,
           data: {
-            embeds: [
-              {
-                title: `🏴‍☠️ Crew Info: ${g.name}`,
-                color: crewInfoColor(g.name, g.mapColor),
-                fields: [
-                  { name: "Group ID", value: g.id || "—", inline: true },
-                  { name: "Islands Owned", value: String(g.islands), inline: true },
-                  { name: "Flag ID/Index", value: g.flag >= 0 ? String(g.flag) : "Using custom file", inline: true },
-                ],
-                ...(fUrl ? { thumbnail: { url: fUrl } } : {}),
-              }
-            ]
+            embeds: [{
+              title: `🏴‍☠️ Crew Info: ${g.name}`,
+              color: crewInfoColor(g.name, g.mapColor),
+              fields,
+              ...(fUrl ? { thumbnail: { url: fUrl } } : {})
+            }],
+            ...(linkLines.length ? { components: [{
+              type: 1,
+              components: [
+                ...(vrchatUrl ? [{ type: 2, style: 5, label: "VRChat Group", url: vrchatUrl }] : []),
+                ...(g.discordInvite ? [{ type: 2, style: 5, label: "Discord Invite", url: g.discordInvite }] : [])
+              ]
+            }] } : {})
           }
         });
       }
