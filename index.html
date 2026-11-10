@@ -413,6 +413,9 @@ LIST_BUTTONS.forEach((b) => {
 
 // ===== Map =====
 const map = L.map('map', { crs: L.CRS.Simple, maxZoom: 4, minZoom: -5 });
+map.createPane('wavePane');
+map.getPane('wavePane').style.zIndex = '350';
+map.getPane('wavePane').style.pointerEvents = 'none';
 map.setView([0, 0], 0);
 map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
 map.zoomControl.setPosition('topright');
@@ -431,6 +434,126 @@ const drawnItems = new L.FeatureGroup().addTo(map);
 const ghostItems = new L.FeatureGroup().addTo(map);
 let mapWidth = 0;          // image width, set when the map image loads
 let mapHeight = 0;         // image height, used for sunk-island sea-color matching
+
+// ===== Subtle animated ocean waves (masked by the island polygons) =====
+let oceanWaveLayers = [];
+let oceanWavesBuilt = false;
+
+function oceanMaskPath() {
+  const parts = [];
+  const addCoordinates = (coords) => {
+    if (!Array.isArray(coords) || !coords.length) return;
+    if (Array.isArray(coords[0]) && typeof coords[0][0] === 'number') {
+      parts.push('M' + coords.map(([x, y]) => `${x} ${mapHeight - y}`).join(' L') + ' Z');
+      return;
+    }
+    coords.forEach(addCoordinates);
+  };
+
+  drawnItems.eachLayer((layer) => {
+    const geometry = layer.toGeoJSON().geometry;
+    if (geometry && geometry.coordinates) addCoordinates(geometry.coordinates);
+  });
+  return parts.join(' ');
+}
+
+function buildOceanWaves() {
+  if (oceanWavesBuilt || !mapWidth || !mapHeight || !drawnItems.getLayers().length) return;
+  const landPath = oceanMaskPath();
+  if (!landPath) return;
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const reducedMotion = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  for (let copy = -WRAP_COPIES; copy <= WRAP_COPIES; copy++) {
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${mapWidth} ${mapHeight}`);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('width', String(mapWidth));
+    svg.setAttribute('height', String(mapHeight));
+
+    const defs = document.createElementNS(NS, 'defs');
+    const mask = document.createElementNS(NS, 'mask');
+    const suffix = String(copy + WRAP_COPIES);
+    const maskId = `oceanLandMask${suffix}`;
+    const patternId = `oceanWavePattern${suffix}`;
+    mask.setAttribute('id', maskId);
+    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+    mask.setAttribute('maskContentUnits', 'userSpaceOnUse');
+    mask.setAttribute('x', '0');
+    mask.setAttribute('y', '0');
+    mask.setAttribute('width', String(mapWidth));
+    mask.setAttribute('height', String(mapHeight));
+    mask.setAttribute('mask-type', 'luminance');
+
+    const waterBase = document.createElementNS(NS, 'rect');
+    waterBase.setAttribute('width', String(mapWidth));
+    waterBase.setAttribute('height', String(mapHeight));
+    waterBase.setAttribute('fill', 'white');
+
+    const land = document.createElementNS(NS, 'path');
+    land.setAttribute('d', landPath);
+    land.setAttribute('fill', 'black');
+    land.setAttribute('fill-rule', 'evenodd');
+    land.setAttribute('clip-rule', 'evenodd');
+    mask.append(waterBase, land);
+    defs.appendChild(mask);
+
+    const pattern = document.createElementNS(NS, 'pattern');
+    pattern.setAttribute('id', patternId);
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    pattern.setAttribute('width', '260');
+    pattern.setAttribute('height', '150');
+
+    const wavePaths = [
+      ['M-260 24 C-220 8 -180 8 -140 24 S-60 40 -20 24 S60 8 100 24 S180 40 220 24 S300 8 340 24', '#effaff', '1.5', '0.48'],
+      ['M-260 82 C-220 66 -180 66 -140 82 S-60 98 -20 82 S60 66 100 82 S180 98 220 82 S300 66 340 82', '#a9dcf5', '1.2', '0.34'],
+      ['M-260 132 C-220 120 -180 120 -140 132 S-60 144 -20 132 S60 120 100 132 S180 144 220 132 S300 120 340 132', '#effaff', '1.1', '0.27']
+    ];
+    wavePaths.forEach(([d, color, width, opacity]) => {
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', color);
+      path.setAttribute('stroke-width', width);
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('opacity', opacity);
+      pattern.appendChild(path);
+    });
+
+    if (!reducedMotion) {
+      const drift = document.createElementNS(NS, 'animateTransform');
+      drift.setAttribute('attributeName', 'patternTransform');
+      drift.setAttribute('type', 'translate');
+      drift.setAttribute('from', '0 0');
+      drift.setAttribute('to', '260 0');
+      drift.setAttribute('dur', '60s');
+      drift.setAttribute('repeatCount', 'indefinite');
+      pattern.appendChild(drift);
+    }
+    defs.appendChild(pattern);
+    svg.appendChild(defs);
+
+    const waves = document.createElementNS(NS, 'rect');
+    waves.setAttribute('width', String(mapWidth));
+    waves.setAttribute('height', String(mapHeight));
+    waves.setAttribute('fill', `url(#${patternId})`);
+    waves.setAttribute('mask', `url(#${maskId})`);
+    waves.setAttribute('opacity', '0.78');
+    svg.appendChild(waves);
+
+    const bounds = [[0, copy * mapWidth], [mapHeight, (copy + 1) * mapWidth]];
+    const overlay = L.svgOverlay(svg, bounds, {
+      pane: 'wavePane',
+      interactive: false,
+      opacity: 1
+    }).addTo(map);
+    oceanWaveLayers.push(overlay);
+  }
+  oceanWavesBuilt = true;
+}
+
 const WRAP_COPIES = 3;     // copies on each side
 const eachShape = (fn) => { drawnItems.eachLayer(fn); ghostItems.eachLayer(fn); };
 const shiftLL = (ll, dx) => Array.isArray(ll) ? ll.map((x) => shiftLL(x, dx)) : L.latLng(ll.lat, ll.lng + dx);
@@ -1053,6 +1176,7 @@ function loadIslands(text) {
     } catch (err) { console.warn('Skipped row', err); }
   });
   rebuildGhosts();
+  buildOceanWaves();
 }
 let ownerIslandLabels = new Map(); // lowercase → display name (after rename)
 
@@ -1185,6 +1309,7 @@ let tileLayer = null;
     map.setMaxBounds([[0, -1e9], [height, 1e9]]);
     map.options.maxBoundsViscosity = 1;
     rebuildGhosts();
+    buildOceanWaves();
     requestAnimationFrame(() => animateSunkIslands());
   };
   image.onerror = () => setStatus(`Could not load image: ${imageUrl}`);
