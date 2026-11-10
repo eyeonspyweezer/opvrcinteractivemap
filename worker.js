@@ -1650,7 +1650,8 @@ function parseScheduleMessage(message) {
     return null;
   }
 
-  if (!date || Number.isNaN(date.getTime())) return null;\n  if (iso && (date.getUTCFullYear() !== Number(iso[1]) || date.getUTCMonth() + 1 !== Number(iso[2]) || date.getUTCDate() !== Number(iso[3]))) return null;
+  if (!date || Number.isNaN(date.getTime())) return null;
+  if (iso && (date.getUTCFullYear() !== Number(iso[1]) || date.getUTCMonth() + 1 !== Number(iso[2]) || date.getUTCDate() !== Number(iso[3]))) return null;
   const timeMatch = text.match(/\b(\d{1,2})(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)\b/i) ||
     text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
   let hour = 0, minute = 0, hasTime = false;
