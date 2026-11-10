@@ -1684,7 +1684,6 @@ function parseScheduleMessage(message) {
     sourceMessageId: message.id,
     sourceChannelId: message.channel_id,
     createdAt: anchor.toISOString(),
-    content: content.slice(0, 1800),
     status: "upcoming",
     detectedAt: new Date().toISOString()
   };
