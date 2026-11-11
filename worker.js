@@ -2412,7 +2412,25 @@ export default {
     }
 
     if (i.type === 2 && i.data.type === 3 && i.data.name === "Add Quote") {
-      return await addQuoteFromMessage(env, i);
+      // Acknowledge immediately; GitHub reads/writes can exceed Discord's 3-second deadline.
+      ctx.waitUntil((async () => {
+        let data;
+        try {
+          const result = await addQuoteFromMessage(env, i);
+          data = result?.data || { flags: 64, content: "I couldn't save that quote." };
+        } catch (error) {
+          console.error("Add Quote failed:", error);
+          data = { flags: 64, content: "❌ I couldn't save that quote. Please try again." };
+        }
+        const followupUrl = `https://discord.com/api/v10/webhooks/${env.DISCORD_APP_ID}/${i.token}/messages/@original`;
+        const response = await fetch(followupUrl, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+        if (!response.ok) console.error("Add Quote response update failed:", response.status, (await response.text()).slice(0, 300));
+      })());
+      return json({ type: 5, data: { flags: 64 } });
     }
 
     if (i.type === 2 && i.data.type === 3 && i.data.name === "Add to Video List") {
