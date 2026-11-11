@@ -1997,6 +1997,37 @@ async function loadFormerInfo() {
   return formerInfoCache;
 }
 
+let announcementArchivePromise = null;
+async function getLastAnnouncementMention(islandName) {
+  if (!announcementArchivePromise) {
+    announcementArchivePromise = fetch('https://raw.githubusercontent.com/eyeonspyweezer/goofymarinenewspb/main/discord-archive.txt', { cache: 'no-cache' })
+      .then(response => { if (!response.ok) throw new Error('HTTP ' + response.status); return response.text(); })
+      .then(text => text.split(/(?=^\\[\\d{4}-\\d{2}-\\d{2}T)/m).filter(block => /^\\[\\d{4}-\\d{2}-\\d{2}T/.test(block))
+        .map(block => {
+          const match = block.match(/^\\[([^\\]]+)\\]/);
+          return match ? { date: new Date(match[1]), body: block.slice(block.indexOf(']') + 1) } : null;
+        }).filter(entry => entry && !Number.isNaN(entry.date.getTime())));
+  }
+  try {
+    const entries = await announcementArchivePromise;
+    const escaped = String(islandName || '').trim().replace(/[.*+?^${}()|[\\]\\\\]/g, '\\  formerInfoCache = map;
+  return formerInfoCache;
+}
+
+let civilianListCache = null;');
+    if (!escaped) return null;
+    const pattern = new RegExp('(^|[^a-z0-9])' + escaped + '($|[^a-z0-9])', 'i');
+    let latest = null;
+    for (const entry of entries) {
+      if (pattern.test(entry.body) && (!latest || entry.date > latest)) latest = entry.date;
+    }
+    return latest;
+  } catch (error) {
+    console.warn('Announcement archive unavailable:', error);
+    return null;
+  }
+}
+
 let civilianListCache = null;
 async function loadCivilianList() {
   if (civilianListCache) return civilianListCache;
@@ -2111,6 +2142,7 @@ function wireClick(target, layer) {
     const ownerHref = linkOf(raw);
     const civilians = civilianListCache.get(islandKey(p.name)) || [];
     const formerInfo = (await loadFormerInfo()).get(islandKey(p.name)) || '';
+    const lastAnnouncementMention = await getLastAnnouncementMention(p.name);
     const extraStats = await loadIslandExtraStats();
     const islandKeyName = islandKey(p.name);
     const islandWorlds = extraStats.worldsByIsland.get(islandKeyName) || [];
@@ -2166,7 +2198,7 @@ function wireClick(target, layer) {
         box.appendChild(a);
       });
     }
-    if (civilians.length || islandWorlds.length || islandVisits || formerInfo) {
+    if (civilians.length || islandWorlds.length || islandVisits || formerInfo || lastAnnouncementMention) {
       const extra = document.createElement('details');
       extra.className = 'island-extra-info';
       const summary = document.createElement('summary');
@@ -2212,7 +2244,13 @@ function wireClick(target, layer) {
           item.appendChild(worldLink);
 
           const details = [];
-          if (record['World Updated At']) details.push('World last updated: ' + formatWorldDate(record['World Updated At']));
+          if (record['World Updated At']) {
+            const updatedAt = new Date(record['World Updated At']);
+            const ageDays = (Date.now() - updatedAt.getTime()) / 86400000;
+            if (!Number.isNaN(updatedAt.getTime()) && ageDays >= 0 && ageDays <= 365) {
+              details.push('World last updated: ' + formatWorldDate(record['World Updated At']));
+            }
+          }
           if (record['Lifetime Visits'] !== undefined && record['Lifetime Visits'] !== '') {
             details.push('Lifetime visits: ' + Number(record['Lifetime Visits']).toLocaleString());
           }
@@ -2239,13 +2277,22 @@ function wireClick(target, layer) {
       if (formerInfo) {
         const heading = document.createElement('div');
         heading.className = 'island-extra-heading';
-        heading.textContent = 'Former Info';
+        heading.textContent = 'Misc. Info';
         content.appendChild(heading);
         const note = document.createElement('div');
         note.className = 'island-extra-line';
         note.style.whiteSpace = 'pre-wrap';
         note.textContent = formerInfo;
         content.appendChild(note);
+      }
+
+      if (lastAnnouncementMention) {
+        const heading = document.createElement('div');
+        heading.className = 'island-extra-heading';
+        heading.textContent = 'Last Mentioned in Announcements';
+        content.appendChild(heading);
+        const days = Math.max(0, Math.floor((Date.now() - lastAnnouncementMention.getTime()) / 86400000));
+        appendInfoLine(content, 'Last mentioned', days === 0 ? 'Today' : days === 1 ? '1 day ago' : days + ' days ago');
       }
 
       if (civilians.length) {
