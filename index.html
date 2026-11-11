@@ -408,20 +408,33 @@ function finishLoadingScreen() {
   }, 220);
 }
 async function loadLoadingQuote() {
+  const quoteBox = $('loadingQuote');
+  quoteBox.hidden = true;
   try {
     const response = await fetch(QUOTES_FILE + '?v=' + Date.now(), { cache: 'no-store' });
     if (!response.ok) throw new Error('quotes.txt HTTP ' + response.status);
-    const lines = (await response.text()).replace(/^\uFEFF/, '').split(/\r?\n/)
-      .map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+    const lines = (await response.text()).replace(/^\\uFEFF/, '').split(/\\r?\\n/)
+      .filter(line => line.trim() && !line.trim().startsWith('#'));
     if (!lines.length) return;
-    const fields = lines[Math.floor(Math.random() * lines.length)].split('\t');
+    const fields = lines[Math.floor(Math.random() * lines.length)].split('\\t');
     const quote = fields[0] || '';
     const displayName = fields[1] || '';
     const username = fields[2] || '';
-    $('loadingQuote .quote-text').textContent = quote;
+    const messageUrl = fields[4] || '';
+    const quoteText = $('loadingQuote .quote-text');
+    quoteText.textContent = quote;
+    if (/^https:\\/\\/discord\\.com\\/channels\\//i.test(messageUrl)) {
+      const quoteLink = document.createElement('a');
+      quoteLink.href = messageUrl;
+      quoteLink.target = '_blank';
+      quoteLink.rel = 'noopener noreferrer';
+      quoteLink.textContent = quote;
+      quoteText.replaceChildren(quoteLink);
+    }
     $('loadingQuote .quote-author').textContent = displayName
       ? '— ' + displayName + (username ? ' (@' + username + ')' : '')
       : '';
+    quoteBox.hidden = false;
     setLoadingProgress(25, 'Loading map quote…');
   } catch (error) {
     console.warn('[quotes] failed:', error);
