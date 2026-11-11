@@ -608,7 +608,7 @@ LIST_BUTTONS.forEach((b) => {
 });
 
 // ===== Map =====
-const map = L.map('map', { crs: L.CRS.Simple, maxZoom: 8, minZoom: -5 });
+const map = L.map('map', { crs: L.CRS.Simple, maxZoom: 12, minZoom: -5 });
 const LAST_MAP_VIEW_KEY = 'opvrc:last-map-view:v1';
 function canonicalMapX(x) {
   if (!mapWidth) return x;
