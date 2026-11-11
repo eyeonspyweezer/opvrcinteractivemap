@@ -1647,7 +1647,7 @@ let tileLayer = null;
         const mod = (n, m) => ((n % m) + m) % m;
         const pattern = ctx.createPattern(image, 'repeat-x');
         if (!pattern) return tile;
-        pattern.setTransform(new DOMMatrix([scale, 0, 0, scale, -mod(coords.x * size.x, width * scale), -coords.y * size.y]));
+        pattern.setTransform(new DOMMatrix([scale, 0, 0, scale, -mod(coords.x * size.x, width * scale), -mod(coords.y * size.y, height * scale)]));
         ctx.fillStyle = pattern;
         ctx.fillRect(0, 0, size.x, size.y);
         return tile;
