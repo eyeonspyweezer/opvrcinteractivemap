@@ -222,6 +222,20 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 .island-extra-heading { margin:9px 0 4px; font-weight:700; border-bottom:1px solid currentColor; }
 .island-extra-heading:first-child { margin-top:0; }
 .island-extra-line { margin:4px 0; }
+.announcement-last-mentioned { position:relative; display:inline-block; cursor:help; }
+.announcement-hover-card {
+  display:none; position:absolute; z-index:1000; left:0; top:100%; width:min(340px, 78vw);
+  max-height:260px; overflow:auto; padding:12px; margin-top:6px; border-radius:8px;
+  background:#232428; color:#f2f3f5; border:1px solid #45464d; box-shadow:0 8px 24px #0008;
+  text-decoration:none; white-space:normal; font-size:12px; line-height:1.45;
+}
+.announcement-last-mentioned:hover .announcement-hover-card,
+.announcement-last-mentioned:focus .announcement-hover-card,
+.announcement-last-mentioned:focus-within .announcement-hover-card { display:block; }
+.announcement-hover-author { font-weight:700; font-size:13px; margin-bottom:3px; }
+.announcement-hover-date { color:#b5bac1; font-size:11px; margin-bottom:8px; }
+.announcement-hover-message { white-space:pre-wrap; overflow-wrap:anywhere; }
+.announcement-hover-card a { display:inline-block; margin-top:9px; color:#00a8fc; }
 .island-world-list { margin:5px 0 0; padding-left:20px; }
 .island-world-list li { margin:7px 0; }
 .island-world-meta { margin-top:2px; font-size:12px; opacity:.82; }
@@ -652,6 +666,18 @@ function restoreLastMapView(defaultCenter, defaultZoom) {
     map.setView([saved.lat, canonicalMapX(saved.lng)], zoom, { animate: false });
   } catch (_) {
     // Storage may be unavailable; keep the normal default map view.
+  }
+}
+function updateMapFitZoom(mapHeight, fallbackCenter) {
+  map.invalidateSize({ pan: false });
+  const viewportHeight = map.getSize().y;
+  if (!viewportHeight || !mapHeight) return;
+  const fitZoom = Math.log2(viewportHeight / mapHeight);
+  const currentZoom = map.getZoom();
+  map.setMinZoom(fitZoom);
+  if (currentZoom < fitZoom) {
+    const center = map.getCenter();
+    map.setView([fallbackCenter ? fallbackCenter[0] : center.lat, center.lng], fitZoom, { animate: false });
   }
 }
 function saveLastMapView() {
@@ -1629,15 +1655,19 @@ let tileLayer = null;
     tileLayer = new Repeating({ tileSize: 256, minZoom: -10 }).addTo(map);
     tileLayer.bringToBack();
     const totalMapHeight = height;
-    const fitZoom = Math.log2(map.getSize().y / totalMapHeight);
-    map.setMinZoom(fitZoom);
-    map.setView([height / 2, width / 2], fitZoom);
     // Keep panning inside the rendered horizontal wrap range.
     map.setMaxBounds([[0, -WRAP_COPIES * width], [height, (WRAP_COPIES + 1) * width]]);
     map.options.maxBoundsViscosity = 1;
-    restoreLastMapView([height / 2, width / 2], fitZoom);
-    map.off('moveend', saveLastMapView);
-    map.on('moveend', saveLastMapView);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      map.invalidateSize({ pan: false });
+      const fitZoom = Math.log2(map.getSize().y / totalMapHeight);
+      map.setMinZoom(fitZoom);
+      map.setView([height / 2, width / 2], fitZoom, { animate: false });
+      restoreLastMapView([height / 2, width / 2], fitZoom);
+      map.off('moveend', saveLastMapView);
+      map.on('moveend', saveLastMapView);
+    }));
+    window.addEventListener('resize', () => updateMapFitZoom(totalMapHeight, [height / 2, width / 2]));
     rebuildGhosts();
     buildOceanWaves();
     requestAnimationFrame(() => animateSunkIslands());
@@ -2044,10 +2074,15 @@ async function getAnnouncementMentions(islandName) {
           const dateMatch = block.match(/^\[([^\]]+)\]/);
           const messageMatch = block.match(/\(message (\d+)\)/i);
           const channelMatch = block.match(/^Channel ID:\s*(\d+)/mi);
-          const body = block.slice(block.indexOf(']') + 1).toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+          const header = block.slice(block.indexOf(']') + 1).split(/\r?\n/, 1)[0].trim();
+          const author = header.replace(/\s+#.*$/, '').trim();
+          const rawBody = block.slice(block.indexOf(']') + 1).replace(/^.*\r?\n/, '').replace(/^Channel ID:.*$/gmi, '').replace(/^Attachment:.*$/gmi, '').replace(/^Embed:.*$/gmi, '').trim();
+          const body = rawBody.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
           return dateMatch ? {
             date: new Date(dateMatch[1]),
             body,
+            message: rawBody,
+            author,
             url: messageMatch && channelMatch ? 'https://discord.com/channels/' + channelMatch[1] + '/' + messageMatch[1] : ''
           } : null;
         }).filter(entry => entry && !Number.isNaN(entry.date.getTime())));
@@ -2059,7 +2094,7 @@ async function getAnnouncementMentions(islandName) {
     const searchText = ' ' + islandKeyText + ' ';
     const matches = entries.filter(entry => (' ' + entry.body + ' ').includes(searchText));
     const latest = matches.reduce((best, entry) => !best || entry.date > best.date ? entry : best, null);
-    return { count: matches.length, latest: latest ? latest.date : null, url: latest ? latest.url : '' };
+    return { count: matches.length, latest: latest || null };
   } catch (error) {
     console.warn('Announcement archive unavailable:', error);
     return { count: 0, latest: null, url: '' };
@@ -2335,11 +2370,33 @@ function wireClick(target, layer) {
         content.appendChild(heading);
         appendInfoLine(content, 'Mentioned', announcementMentions.count + (announcementMentions.count === 1 ? ' time' : ' times'));
         if (announcementMentions.latest) {
-          const days = Math.max(0, Math.floor((Date.now() - announcementMentions.latest.getTime()) / 86400000));
+          const latest = announcementMentions.latest;
+          const days = Math.max(0, Math.floor((Date.now() - latest.date.getTime()) / 86400000));
           const line = document.createElement('div');
-          line.className = 'island-extra-line';
-          line.style.textDecoration = 'underline';
-          line.appendChild(document.createTextNode('Last mentioned: ' + (days === 0 ? 'Today' : days === 1 ? '1 day ago' : days + ' days ago')));
+          line.className = 'island-extra-line announcement-last-mentioned';
+          line.tabIndex = 0;
+          line.textContent = 'Last mentioned: ' + (days === 0 ? 'Today' : days === 1 ? '1 day ago' : days + ' days ago');
+          const preview = document.createElement('div');
+          preview.className = 'announcement-hover-card';
+          const author = document.createElement('div');
+          author.className = 'announcement-hover-author';
+          author.textContent = latest.author || 'Discord announcement';
+          const date = document.createElement('div');
+          date.className = 'announcement-hover-date';
+          date.textContent = latest.date.toLocaleString();
+          const message = document.createElement('div');
+          message.className = 'announcement-hover-message';
+          message.textContent = latest.message || 'Announcement text unavailable.';
+          preview.append(author, date, message);
+          if (latest.url) {
+            const link = document.createElement('a');
+            link.href = latest.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.textContent = 'Open in Discord';
+            preview.appendChild(link);
+          }
+          line.appendChild(preview);
           content.appendChild(line);
         }
       }
