@@ -737,7 +737,7 @@ function buildOceanWaves() {
 }
 
 const WRAP_COPIES = 3;     // copies on each side
-const MAP_FRAME_MARGIN = 120; // background-only space attached to the map's top and bottom edges
+const MAP_FRAME_MARGIN = 0; // no extra top/bottom background margin
 const eachShape = (fn) => { drawnItems.eachLayer(fn); ghostItems.eachLayer(fn); };
 const shiftLL = (ll, dx) => Array.isArray(ll) ? ll.map((x) => shiftLL(x, dx)) : L.latLng(ll.lat, ll.lng + dx);
 const shiftCoords = (c, dx) => typeof c[0] === 'number' ? [c[0] + dx, c[1]] : c.map((x) => shiftCoords(x, dx));
