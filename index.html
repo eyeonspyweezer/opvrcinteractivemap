@@ -251,7 +251,7 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #loadingInner { width: min(620px, 88vw); margin: 0 auto; }
 #loadingTrack { width: 100%; height: 10px; border: 1px solid var(--fg); border-radius: 999px; overflow: hidden; box-sizing: border-box; }
 #loadingBar { width: 8%; height: 100%; background: var(--fg); transition: width .3s ease; }
-#loadingStatus { margin-top: 5px; font-size: 10px; opacity: .62; }
+#loadingStatus { margin-top: 5px; font-size: 11px; opacity: .78; }
 #loadingQuote { margin: 9px auto 0; max-width: 620px; font-size: clamp(13px, 2.5vw, 17px); line-height: 1.35; }
 #loadingQuote .quote-text { display: block; }
 #loadingQuote .quote-author { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 7px; font-size: .78em; opacity: .82; }
@@ -301,6 +301,7 @@ body { background: var(--bg); }
     <div id="loadingTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
       <div id="loadingBar"></div>
     </div>
+    <div id="loadingStatus">8% · Starting…</div>
     <div id="loadingQuote" hidden>
       <span class="quote-text"></span>
       <span class="quote-author">— OPVRC Interactive Map</span>
@@ -396,11 +397,18 @@ const EMBEDDED_QUOTES = [{"quote":"# \"IF ITS ONE ON ONE, ALWAYS BET ON SPED. WH
 let loadingProgress = 8;
 function setLoadingProgress(value, status) {
   loadingProgress = Math.max(0, Math.min(100, value));
+  const rounded = Math.round(loadingProgress);
   const bar = $('loadingBar');
   const track = $('loadingTrack');
+  const label = $('loadingStatus');
   if (bar) bar.style.width = loadingProgress + '%';
-  if (track) track.setAttribute('aria-valuenow', String(Math.round(loadingProgress)));
-  // Loading screen intentionally shows only the progress bar and quote.
+  if (track) track.setAttribute('aria-valuenow', String(rounded));
+  if (label) label.textContent = rounded + '% · ' + (status || 'Loading…');
+}
+function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 let mapReady = false;
 function finishLoadingScreen() {
@@ -923,8 +931,8 @@ let staticIslandDataPromise = null;
 async function loadStaticIslandData() {
   if (!staticIslandDataPromise) {
     staticIslandDataPromise = Promise.all([
-      fetch('island-colors.tsv').then(r => { if (!r.ok) throw new Error('island-colors.tsv HTTP ' + r.status); return r.text(); }),
-      fetch('island-groups.tsv').then(r => { if (!r.ok) throw new Error('island-groups.tsv HTTP ' + r.status); return r.text(); })
+      fetchWithTimeout('island-colors.tsv').then(r => { if (!r.ok) throw new Error('island-colors.tsv HTTP ' + r.status); return r.text(); }),
+      fetchWithTimeout('island-groups.tsv').then(r => { if (!r.ok) throw new Error('island-groups.tsv HTTP ' + r.status); return r.text(); })
     ]).then(([islandsText, groupsText]) => {
       const groupLines = groupsText.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
       const gh = groupLines.shift().split('\t').map(v => v.trim().toLowerCase());
@@ -1597,7 +1605,7 @@ function sheetUrl(link) {
   return `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=tsv&gid=${g ? g[1] : 0}`;
 }
 async function sheetText(link) {
-  const r = await fetch(sheetUrl(link));
+  const r = await fetchWithTimeout(sheetUrl(link));
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.text();
 }
@@ -1735,21 +1743,29 @@ big.addEventListener('pointerup', endPtr);
 big.addEventListener('pointercancel', endPtr);
 
 async function loadLive() {
-  console.log('[map] loadLive running, version bounty-v5');
-  setLoadingProgress(40, 'Loading island data…');
+  console.log('[map] loadLive running, version bounty-v6');
+  setLoadingProgress(12, 'Loading island data…');
   await loadStaticIslandData();
+  setLoadingProgress(28, 'Island data loaded; preparing sheets…');
   const box = $('listLive');
   const pieces = {};
-  for (const key of Object.keys(SHEETS)) {
-    if (!SHEETS[key]) continue;
+  const sheetKeys = Object.keys(SHEETS).filter(key => SHEETS[key]);
+  for (let index = 0; index < sheetKeys.length; index++) {
+    const key = sheetKeys[index];
+    const progress = 30 + Math.round((index / Math.max(sheetKeys.length, 1)) * 65);
+    setLoadingProgress(progress, 'Loading ' + key + ' (' + (index + 1) + '/' + sheetKeys.length + ')…');
     try {
       if (key === 'owners') loadOwners(await sheetText(SHEETS[key]));
       else if (key === 'nations') loadNations(await sheetText(SHEETS[key]));
       else if (key === 'extra') loadExtra(await sheetText(SHEETS[key]));
       else if (key === 'bounty') await loadBounty();
       else pieces[key] = await sheetRows(SHEETS[key]);
-    } catch (err) { console.warn('Sheet failed:', key, err); }
+    } catch (err) {
+      console.warn('Sheet failed:', key, err);
+      setLoadingProgress(Math.min(96, progress + 1), key + ' unavailable; continuing…');
+    }
   }
+  setLoadingProgress(97, 'Finishing map…');
   if (pieces.worlds) worldMap = new Map(pieces.worlds.filter((r) => r.island).map((r) => [r.island.toLowerCase(), { link: r['world link'], players: r.players }]));
   box.textContent = '';
   liveSection('Announcements', (pieces.announcements || []).slice(0, 10).map((r) => liveItem(r.title, [r.date, r.text].filter(Boolean).join(' - '), r.link)));
