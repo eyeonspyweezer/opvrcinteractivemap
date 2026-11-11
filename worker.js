@@ -1978,6 +1978,38 @@ async function eventsListMessage(env) {
 }
 
 
+
+async function videosListMessage(env) {
+  const stored = await readScheduleFile(env, VIDEO_FILE);
+  const videos = stored.items
+    .filter(video => video.url)
+    .sort((a, b) => (Date.parse(b.publishedAt || b.addedAt || b.createdAt) || 0) - (Date.parse(a.publishedAt || a.addedAt || a.createdAt) || 0));
+  if (!videos.length) {
+    return { content: "There are no videos saved yet. Use **Add to Video List** on a Discord message containing YouTube, TikTok, or other video links or attachments." };
+  }
+  const lines = videos.slice(0, 20).map((video, index) => {
+    const dateValue = video.publishedAt || video.addedAt || video.createdAt;
+    const date = dateValue && Number.isFinite(Date.parse(dateValue))
+      ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(dateValue))
+      : "Date unknown";
+    const title = String(video.title || "Untitled video").slice(0, 120);
+    const platform = String(video.platform || "Video").slice(0, 30);
+    const submitter = String(video.author || "Unknown").slice(0, 60);
+    const source = video.sourceMessageUrl ? ` · [Discord source](${video.sourceMessageUrl})` : "";
+    return `**${index + 1}. ${title}** — ${date}\n${platform} · [Watch video](${video.url})\nAdded by ${submitter}${source}`;
+  });
+  return {
+    embeds: [{
+      title: "OPVRC Video Archive",
+      description: lines.join("\n\n").slice(0, 3900),
+      color: 0x005aff,
+      footer: { text: `${videos.length} saved videos · newest first${videos.length > 20 ? " · showing latest 20" : ""}` },
+      timestamp: new Date().toISOString()
+    }]
+  };
+}
+
+
 async function scheduleRemindersCommand(env, interaction) {
   need(env, ["GITHUB_TOKEN"]);
   const userId = interaction.member?.user?.id || interaction.user?.id;
@@ -2078,6 +2110,7 @@ function discordCommandDefinitions() {
   { name: "Add to Video List", type: 3 },
   { name: "Add Quote", type: 3 },
   { name: "events", description: "Show OPVRC event messages and videos, newest first", type: 1 },
+  { name: "videos", description: "Show the OPVRC YouTube and social video archive, newest first", type: 1 },
   {
     name: "reminders",
     description: "Set your personal event reminder preferences",
@@ -2394,6 +2427,7 @@ export default {
       if (LINKS[name]) return json({ type: 4, data: { content: LINKS[name] } });
       if (name === "map") return json({ type: 4, data: await mapMessage(ALL_ON) });
       if (name === "events") return json({ type: 4, data: await eventsListMessage(env) });
+      if (name === "videos") return json({ type: 4, data: await videosListMessage(env) });
       if (name === "reminders") return json({ type: 4, data: await scheduleRemindersCommand(env, i) });
       if (name === "addcrew" || name === "editcrew") {
         if (!isAdmin(env, i)) return json(notAllowed(i));
