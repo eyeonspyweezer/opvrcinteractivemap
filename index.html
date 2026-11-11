@@ -410,6 +410,7 @@ body { background: var(--bg); }
   <label><input type="checkbox" id="optIslandAxisTravel"> Two-axis island travel animation</label>
   <label><input type="checkbox" id="optNames" checked> Island names on the map</label>
   <label><input type="checkbox" id="optOwners"> Show island owners next to names</label>
+  <label><input type="checkbox" id="optHideNonCanon"> Hide Non-Canon islands</label>
   <label><input type="checkbox" id="optHideUnnamed"> Hide Unnamed Islands</label>
   <label><input type="checkbox" id="optHideUnowned"> Hide unowned islands</label>
   <label><input type="checkbox" id="optBlendUnowned"> Blend unknown islands (??? names) into nearby map color</label>
@@ -552,7 +553,7 @@ function saveLocalSettings() {
     localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify({
       theme: document.documentElement.dataset.theme || '',
       colors: OPT.colors, flags: OPT.flags, names: OPT.names,
-      owners: OPT.owners, hideUnnamed: OPT.hideUnnamed, hideUnowned: OPT.hideUnowned,
+      owners: OPT.owners, hideNonCanon: OPT.hideNonCanon, hideUnnamed: OPT.hideUnnamed, hideUnowned: OPT.hideUnowned,
       blendUnowned: OPT.blendUnowned,
       crewLines: OPT.crewLines, ownerLines: OPT.ownerLines,
       opacity: POLYGON_FILL_OPACITY,
@@ -568,6 +569,7 @@ const OPT = {
   flags: savedBool('flags', !lowResources),
   names: savedBool('names', true),
   owners: savedBool('owners', false),
+  hideNonCanon: savedBool('hideNonCanon', false),
   hideUnnamed: savedBool('hideUnnamed', false),
   hideUnowned: savedBool('hideUnowned', false),
   blendUnowned: savedBool('blendUnowned', false),
@@ -959,6 +961,7 @@ function shouldHide(layer) {
   const name = String(layer.feature.properties.name || '');
   if (SHOW && !layerKinds(layer).some((k) => SHOW.has(k))) return true;
   if (SHOW_CREW && !layerCrews(layer).includes(norm(SHOW_CREW))) return true;
+  if (OPT.hideNonCanon && /non[-\s]?canon/i.test(name)) return true;
   if (OPT.hideUnnamed && name.includes('???')) return true;
   if (OPT.hideUnowned) {
     const owner = resolveOwner(layer.feature.properties);
@@ -2786,6 +2789,7 @@ $('optIslandAxisTravel').checked = OPT.islandAxisTravel;
 $('optFlags').checked = OPT.flags;
 $('optNames').checked = OPT.names;
 $('optOwners').checked = OPT.owners;
+$('optHideNonCanon').checked = OPT.hideNonCanon;
 $('optHideUnnamed').checked = OPT.hideUnnamed;
 $('optHideUnowned').checked = OPT.hideUnowned;
 $('optBlendUnowned').checked = OPT.blendUnowned;
@@ -2796,6 +2800,7 @@ $('optIslandAxisTravel').addEventListener('change', (e) => { OPT.islandAxisTrave
 $('optFlags').addEventListener('change', (e) => { OPT.flags = e.target.checked; rebuildFlags(); saveLocalSettings(); });
 $('optNames').addEventListener('change', (e) => { OPT.names = e.target.checked; rebuildLabels(); saveLocalSettings(); });
 $('optOwners').addEventListener('change', (e) => { OPT.owners = e.target.checked; rebuildLabels(); saveLocalSettings(); });
+$('optHideNonCanon').addEventListener('change', (e) => { OPT.hideNonCanon = e.target.checked; rebuildVisibility(); saveLocalSettings(); });
 $('optHideUnnamed').addEventListener('change', (e) => { OPT.hideUnnamed = e.target.checked; rebuildVisibility(); saveLocalSettings(); });
 $('optHideUnowned').addEventListener('change', (e) => { OPT.hideUnowned = e.target.checked; rebuildVisibility(); saveLocalSettings(); });
 $('optBlendUnowned').addEventListener('change', (e) => { OPT.blendUnowned = e.target.checked; restyleAll(); saveLocalSettings(); });
