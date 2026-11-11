@@ -1971,6 +1971,25 @@ async function addQuoteFromMessage(env, interaction) {
 
 const VIDEO_FILE = "opvrc-videos.json";
 
+// Fetch public YouTube metadata without an API key. oEmbed supplies the
+// title, channel display name, and thumbnail; it does not expose publish date.
+async function getYouTubeMetadata(url) {
+  try {
+    const endpoint = "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(url);
+    const response = await fetch(endpoint, { headers: { "Accept": "application/json" } });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return {
+      title: String(data.title || "").trim(),
+      channelName: String(data.author_name || "").trim(),
+      thumbnail: String(data.thumbnail_url || "").trim() || null
+    };
+  } catch (error) {
+    console.error("YouTube metadata lookup failed:", error);
+    return null;
+  }
+}
+
 async function eventsListMessage(env) {
   const [stored, videos] = await Promise.all([
     readScheduleFile(env, SCHEDULE_FILE),
@@ -2449,10 +2468,13 @@ export default {
         if (stored.items.some(item => item.url === url)) continue;
         const attachment = attachments.find(a => a.url === url);
         const platform = /youtube\.com|youtu\.be/i.test(url) ? "YouTube" : /tiktok\.com/i.test(url) ? "TikTok" : /discord(app)?\.com\/attachments/i.test(url) ? "Discord" : "External";
+        const youtube = platform === "YouTube" ? await getYouTubeMetadata(url) : null;
         stored.items.push({
           type:"video", category:"OPVRC Events", url, platform,
-          title: attachment?.filename || (platform === "YouTube" ? "YouTube video" : platform === "TikTok" ? "TikTok video" : "Video"),
-          thumbnail: null, publishedAt: addedAt, addedAt,
+          title: youtube?.title || attachment?.filename || (platform === "YouTube" ? "YouTube video" : platform === "TikTok" ? "TikTok video" : "Video"),
+          thumbnail: youtube?.thumbnail || null,
+          ...(youtube?.channelName ? { channelName: youtube.channelName } : {}),
+          addedAt,
           sourceMessageUrl, sourceMessageId: message.id,
           author: message.author?.global_name || message.author?.username || "Unknown"
         });
