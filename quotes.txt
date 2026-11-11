@@ -1,4 +1,4 @@
 # OPVRC loading-screen quotes
-# Format: quote<TAB>Discord display name<TAB>Discord username<TAB>message ID<TAB>original Discord message URL<TAB>added timestamp
+# Format: quote<TAB>Discord display name<TAB>Discord username<TAB>message ID<TAB>original Discord message URL<TAB>added timestamp<TAB>quote author ID<TAB>quote author avatar URL<TAB>submitter ID<TAB>submitter avatar URL<TAB>submitter display name
 # Quotes are added manually through Discord: right-click a message > Apps > Add Quote.
 # The map displays only the quote text; the quote text itself links to the original Discord message.
