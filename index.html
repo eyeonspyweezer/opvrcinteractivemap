@@ -1973,6 +1973,30 @@ function wireHoverImage(target, sourceLayer) {
   });
 }
 
+let formerInfoCache = null;
+async function loadFormerInfo() {
+  if (formerInfoCache) return formerInfoCache;
+  const map = new Map();
+  try {
+    const response = await fetch('island-former-info.tsv?v=' + Date.now(), { cache: 'no-store' });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const lines = (await response.text()).replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(Boolean);
+    const header = lines.shift().split('\\t').map(x => x.trim().toLowerCase());
+    const islandCol = header.indexOf('island name');
+    const formerCol = header.indexOf('former info');
+    if (islandCol >= 0 && formerCol >= 0) {
+      lines.forEach(line => {
+        const cols = line.split('\\t');
+        const island = String(cols[islandCol] || '').trim();
+        const former = String(cols[formerCol] || '').trim();
+        if (island && former) map.set(islandKey(island), former);
+      });
+    }
+  } catch (error) { console.warn('Former Info unavailable:', error); }
+  formerInfoCache = map;
+  return formerInfoCache;
+}
+
 let civilianListCache = null;
 async function loadCivilianList() {
   if (civilianListCache) return civilianListCache;
@@ -2079,13 +2103,14 @@ function wireClick(target, layer) {
     if (map.getContainer().classList.contains('drawing')) return;
     const p = layer.feature.properties, raw = resolveOwner(p);
     const isUrl = (u) => /^https?:\/\//i.test(u || '');
-    await Promise.all([loadIslandBackgrounds(), loadCivilianList(), loadIslandExtraStats(), loadOwnerProfileLinks()]);
+    await Promise.all([loadIslandBackgrounds(), loadCivilianList(), loadFormerInfo(), loadIslandExtraStats(), loadOwnerProfileLinks()]);
     const bannerUrl = islandBackgrounds.get(islandKey(p.name)) || '';
     const links = linksOf(p.name);
     const w = links.length ? null : worldOf(p.name);
     const nameHref = links[0] || (w && w.link) || '';
     const ownerHref = linkOf(raw);
     const civilians = civilianListCache.get(islandKey(p.name)) || [];
+    const formerInfo = (await loadFormerInfo()).get(islandKey(p.name)) || '';
     const extraStats = await loadIslandExtraStats();
     const islandKeyName = islandKey(p.name);
     const islandWorlds = extraStats.worldsByIsland.get(islandKeyName) || [];
@@ -2141,7 +2166,7 @@ function wireClick(target, layer) {
         box.appendChild(a);
       });
     }
-    if (civilians.length || islandWorlds.length || islandVisits) {
+    if (civilians.length || islandWorlds.length || islandVisits || formerInfo) {
       const extra = document.createElement('details');
       extra.className = 'island-extra-info';
       const summary = document.createElement('summary');
@@ -2209,6 +2234,18 @@ function wireClick(target, layer) {
           list.appendChild(item);
         });
         content.appendChild(list);
+      }
+
+      if (formerInfo) {
+        const heading = document.createElement('div');
+        heading.className = 'island-extra-heading';
+        heading.textContent = 'Former Info';
+        content.appendChild(heading);
+        const note = document.createElement('div');
+        note.className = 'island-extra-line';
+        note.style.whiteSpace = 'pre-wrap';
+        note.textContent = formerInfo;
+        content.appendChild(note);
       }
 
       if (civilians.length) {
