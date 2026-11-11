@@ -405,10 +405,8 @@ let mapReady = false;
 function finishLoadingScreen() {
   mapReady = true;
   setLoadingProgress(100, 'Ready');
-  setTimeout(() => {
-    $('loadingScreen')?.classList.add('hidden');
-    loadOwnedWorldOnline();
-  }, 220);
+  // Keep the loading bar and quote on screen for testing.
+  loadOwnedWorldOnline();
 }
 async function loadLoadingQuote() {
   const quoteBox = $('loadingQuote');
@@ -1797,7 +1795,7 @@ Promise.all([loadLoadingQuote(), loadLive()])
   .catch((error) => {
     console.error('[map] initial load failed:', error);
     setLoadingProgress(100, 'Map loaded with some unavailable data');
-    setTimeout(() => $('loadingScreen')?.classList.add('hidden'), 500);
+    // Keep the loading bar and fallback quote visible even if a data source fails.
   });
 setInterval(loadLive, 300000);
 
