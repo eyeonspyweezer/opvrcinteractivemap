@@ -1932,6 +1932,21 @@ function discordAvatarUrl(user) {
   }
 }
 
+function cleanDiscordQuoteText(value) {
+  let text = String(value || "").replace(/\r\n?/g, "\n");
+  text = text.replace(/\`\`\`(?:[a-z0-9_+-]+)?\s*/gi, "");
+  text = text.replace(/\`([^\`]+)\`/g, "$1");
+  text = text.replace(/^\s{0,3}#{1,6}\s+/gm, "");
+  text = text.replace(/\|\|/g, "");
+  text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
+  text = text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  text = text.replace(/<((?:https?:\/\/|www\.)[^>]+)>/gi, "$1");
+  text = text.replace(/(\*\*|__|~~)(?=\S)([\s\S]*?\S)\1/g, "$2");
+  text = text.replace(/(^|[\s(])([*_])(?=\S)([^*_]*?\S)\2(?=$|[\s).,!?:;])/g, "$1$3");
+  text = text.replace(/\\([\\\`*_[\]~|])/g, "$1");
+  return text.replace(/\n+/g, " ").replace(/[ \t]+/g, " ").trim();
+}
+
 function quoteTsvLine(quote, displayName, username, messageId, messageUrl, addedAt, quoteAuthorId, quoteAuthorAvatar, submitterId, submitterAvatar, submitterName) {
   const clean = value => String(value || "").replace(/[\r\n\t]+/g, " ").trim();
   return [clean(quote), clean(displayName), clean(username), clean(messageId), clean(messageUrl), clean(addedAt), clean(quoteAuthorId), clean(quoteAuthorAvatar), clean(submitterId), clean(submitterAvatar), clean(submitterName)].join("\t");
@@ -1939,7 +1954,7 @@ function quoteTsvLine(quote, displayName, username, messageId, messageUrl, added
 
 async function addQuoteFromMessage(env, interaction) {
   const message = interaction.data.resolved?.messages?.[interaction.data.target_id];
-  const quote = String(message?.content || "").trim();
+  const quote = cleanDiscordQuoteText(message?.content || "");
   if (!message || !quote) {
     return { type: 4, data: { flags: 64, content: "I couldn't find text in that message to save as a quote." } };
   }
@@ -1949,7 +1964,7 @@ async function addQuoteFromMessage(env, interaction) {
   need(env, ["GITHUB_TOKEN"]);
   const current = await readQuotesFile(env);
   const lines = current.text.split(/\r?\n/).filter(line => line.trim() && !line.trim().startsWith("#"));
-  const normalized = quote.toLowerCase().replace(/\s+/g, " ").trim();
+  const normalized = cleanDiscordQuoteText(quote).toLowerCase();
   if (lines.some(line => line.split("\t")[0].toLowerCase().replace(/\s+/g, " ").trim() === normalized)) {
     return { type: 4, data: { flags: 64, content: "That quote is already in the quote list." } };
   }
