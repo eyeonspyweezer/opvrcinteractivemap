@@ -17,8 +17,6 @@ small{color:#aaa}.warning{color:#ffc66d}pre{white-space:pre-wrap;overflow-wrap:a
 <h1>OPVRC Discord Bot — Debug Tester</h1>
 <p>Runs selected read-only command handlers directly on the Worker. It does not post to Discord.</p>
 <p class="warning">Write commands and message context menus are intentionally disabled here.</p>
-<label for="key">Tester key (TEST_KEY)</label>
-<input id="key" type="password" autocomplete="off" placeholder="Enter the private tester key">
 <label for="command">Command</label>
 <select id="command">
 <option value="map">/map</option>
@@ -50,10 +48,9 @@ const WORKER="https://opvrcdiscordbot.dragonddavegorby.workers.dev";
 const $=id=>document.getElementById(id);
 $("run").addEventListener("click",async()=>{
   const button=$("run"),out=$("output"),status=$("status");
-  if(!$("key").value.trim()){status.textContent="Enter the tester key first.";return;}
   button.disabled=true;status.textContent="Running…";out.textContent="";
   try{
-    const response=await fetch(WORKER+"/test",{method:"POST",headers:{"Content-Type":"application/json","X-Test-Key":$("key").value},body:JSON.stringify({command:$("command").value,value:$("value").value})});
+    const response=await fetch(WORKER+"/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:$("command").value,value:$("value").value})});
     const text=await response.text();
     let data;try{data=JSON.parse(text)}catch{data={raw:text}}
     status.textContent="HTTP "+response.status+(data.ok?" — test completed":" — test failed");
