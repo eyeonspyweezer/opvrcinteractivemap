@@ -2337,6 +2337,9 @@ function collect() {
         }
         return;
       }
+      // Do not flag islands explicitly marked Sunk or Destroyed as missing.
+      const sheetOwnerStatus = String(ownerMap.get(k) || '').trim();
+      if (/^(?:Sunk|Destroyed)\\s*\\(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}\\)/i.test(sheetOwnerStatus)) return;
       islands.push({
         label,
         layers: [],
