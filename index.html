@@ -2029,29 +2029,34 @@ async function loadFormerInfo() {
 }
 
 let announcementArchivePromise = null;
-async function getLastAnnouncementMention(islandName) {
+async function getAnnouncementMentions(islandName) {
   if (!announcementArchivePromise) {
     announcementArchivePromise = fetch('https://raw.githubusercontent.com/eyeonspyweezer/goofymarinenewspb/main/discord-archive.txt', { cache: 'no-cache' })
       .then(response => { if (!response.ok) throw new Error('HTTP ' + response.status); return response.text(); })
-      .then(text => text.split(/(?=^\[\d{4}-\d{2}-\d{2}T)/m).filter(block => /^\[\d{4}-\d{2}-\d{2}T/.test(block))
+      .then(text => text.split(/(?=^\\[\\d{4}-\\d{2}-\\d{2}T)/m).filter(block => /^\\[\\d{4}-\\d{2}-\\d{2}T/.test(block))
         .map(block => {
-          const match = block.match(/^\[([^\]]+)\]/);
-          return match ? { date: new Date(match[1]), body: block.slice(block.indexOf(']') + 1).toLowerCase().replace(/[^a-z0-9]+/g, ' ') } : null;
+          const dateMatch = block.match(/^\\[([^\\]]+)\\]/);
+          const messageMatch = block.match(/\\(message (\\d+)\\)/i);
+          const channelMatch = block.match(/^Channel ID:\\s*(\\d+)/mi);
+          const body = block.slice(block.indexOf(']') + 1).toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+          return dateMatch ? {
+            date: new Date(dateMatch[1]),
+            body,
+            url: messageMatch && channelMatch ? 'https://discord.com/channels/' + channelMatch[1] + '/' + messageMatch[1] : ''
+          } : null;
         }).filter(entry => entry && !Number.isNaN(entry.date.getTime())));
   }
   try {
     const entries = await announcementArchivePromise;
     const islandKeyText = String(islandName || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    if (!islandKeyText) return null;
+    if (!islandKeyText) return { count: 0, latest: null, url: '' };
     const searchText = ' ' + islandKeyText + ' ';
-    let latest = null;
-    for (const entry of entries) {
-      if (entry.body.includes(searchText) && (!latest || entry.date > latest)) latest = entry.date;
-    }
-    return latest;
+    const matches = entries.filter(entry => (' ' + entry.body + ' ').includes(searchText));
+    const latest = matches.reduce((best, entry) => !best || entry.date > best.date ? entry : best, null);
+    return { count: matches.length, latest: latest ? latest.date : null, url: latest ? latest.url : '' };
   } catch (error) {
     console.warn('Announcement archive unavailable:', error);
-    return null;
+    return { count: 0, latest: null, url: '' };
   }
 }
 
@@ -2169,7 +2174,7 @@ function wireClick(target, layer) {
     const ownerHref = linkOf(raw);
     const civilians = civilianListCache.get(islandKey(p.name)) || [];
     const formerInfo = (await loadFormerInfo()).get(islandKey(p.name)) || '';
-    const lastAnnouncementMention = await getLastAnnouncementMention(p.name);
+    const announcementMentions = await getAnnouncementMentions(p.name);
     const extraStats = await loadIslandExtraStats();
     const islandKeyName = islandKey(p.name);
     const islandWorlds = extraStats.worldsByIsland.get(islandKeyName) || [];
@@ -2313,13 +2318,30 @@ function wireClick(target, layer) {
         content.appendChild(note);
       }
 
-      if (lastAnnouncementMention) {
+      if (announcementMentions.count > 0) {
         const heading = document.createElement('div');
         heading.className = 'island-extra-heading';
-        heading.textContent = 'Last Mentioned in Announcements';
+        heading.textContent = 'Announcements';
         content.appendChild(heading);
-        const days = Math.max(0, Math.floor((Date.now() - lastAnnouncementMention.getTime()) / 86400000));
-        appendInfoLine(content, 'Last mentioned', days === 0 ? 'Today' : days === 1 ? '1 day ago' : days + ' days ago');
+        appendInfoLine(content, 'Mentioned', announcementMentions.count + (announcementMentions.count === 1 ? ' time' : ' times'));
+        if (announcementMentions.latest) {
+          const days = Math.max(0, Math.floor((Date.now() - announcementMentions.latest.getTime()) / 86400000));
+          const line = document.createElement('div');
+          line.className = 'island-extra-line';
+          const label = document.createElement('strong');
+          label.textContent = 'Last mentioned: ';
+          line.appendChild(label);
+          line.appendChild(document.createTextNode(days === 0 ? 'Today' : days === 1 ? '1 day ago' : days + ' days ago'));
+          if (announcementMentions.url) {
+            const link = document.createElement('a');
+            link.href = announcementMentions.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.textContent = ' (view announcement)';
+            line.appendChild(link);
+          }
+          content.appendChild(line);
+        }
       }
 
       if (civilians.length) {
