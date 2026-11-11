@@ -1460,14 +1460,21 @@ function addIsland(geometry, props) {
 // File names looked up automatically in the same folder as this HTML file
 const AUTO_FILES = { islands: 'islandslist.tsv' };
 
-// Generate a fresh, well-spaced color palette for islands each page load.
+// Generate a fresh, varied color palette for islands each page load.
+// Golden-angle hue spacing avoids clustering; alternating saturation/lightness
+// makes nearby greens and other similar hues easier to tell apart.
 const islandColorHues = new Map();
 const islandColorStart = Math.random() * 360;
+const islandColorSaturations = [78, 92, 62, 84, 70, 96];
+const islandColorLightness = [50, 62, 42, 56, 68, 46, 60, 38];
 function generatedIslandColor(name) {
   const key = islandKey(name);
   if (!islandColorHues.has(key)) {
-    const hue = (islandColorStart + islandColorHues.size * 137.508) % 360;
-    islandColorHues.set(key, `hsl(${hue.toFixed(1)}, 68%, 54%)`);
+    const index = islandColorHues.size;
+    const hue = (islandColorStart + index * 137.508) % 360;
+    const saturation = islandColorSaturations[index % islandColorSaturations.length];
+    const lightness = islandColorLightness[Math.floor(index / islandColorSaturations.length) % islandColorLightness.length];
+    islandColorHues.set(key, `hsl(${hue.toFixed(1)}, ${saturation}%, ${lightness}%)`);
   }
   return islandColorHues.get(key);
 }
