@@ -1,0 +1,3 @@
+# OPVRC loading-screen quotes
+# Format: quote<TAB>Discord display name<TAB>Discord username<TAB>message ID<TAB>added timestamp
+# Add quotes through Discord with the "Add Quote" message context-menu action.
