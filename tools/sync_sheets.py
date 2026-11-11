@@ -56,8 +56,19 @@ def download_bytes(url):
 
 def fetch_tsv(sheet_id):
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=tsv&gid={GID}"
-    text = _get(url).decode("utf-8", errors="replace")
-    return list(csv.reader(io.StringIO(text), delimiter="\t"))
+    body = _get(url).decode("utf-8-sig", errors="replace").strip()
+    if not body:
+        raise ValueError(f"Google Sheets export was empty (sheet {sheet_id}, gid {GID}).")
+    if body.lstrip().lower().startswith(("<!doctype html", "<html")):
+        raise ValueError(
+            f"Google Sheets returned an HTML page instead of TSV for sheet {sheet_id}. "
+            "Make sure the spreadsheet is shared so the GitHub Actions runner can view it."
+        )
+    rows = list(csv.reader(io.StringIO(body), delimiter="\\t"))
+    if not rows or not any(cell.strip() for cell in rows[0]):
+        raise ValueError(f"Google Sheets export had no usable header row (sheet {sheet_id}).")
+    print(f"Fetched Google Sheet {sheet_id}: {len(rows)} rows")
+    return rows
 
 
 def sync_backgrounds():
@@ -104,6 +115,8 @@ def sync_backgrounds():
             kept = " (kept existing picture)" if entry and (BG_DIR / entry["file"]).exists() else ""
             print(f"  FAILED {name}: {e}{kept}")
 
+    if vis_col is None:
+        raise ValueError("Could not find the Visual column in the island background spreadsheet.")
     if manifest:
         BG_DIR.mkdir(exist_ok=True)
         BG_MANIFEST.write_text(json.dumps(manifest, indent=1, sort_keys=True, ensure_ascii=False))
@@ -244,11 +257,20 @@ def sync_crew_metadata():
           ", ".join(key for key, index in columns.items() if index is not None))
 
 def main():
+    failures = []
     for step in (sync_backgrounds, sync_former_info, sync_owner_links, sync_crew_metadata):
         try:
             step()
         except Exception as e:
-            print(f"{step.__name__} failed: {e}")
+            failures.append(f"{step.__name__}: {e}")
+            print(f"ERROR - {step.__name__} failed: {e}")
+
+    if failures:
+        raise SystemExit(
+            "Google Sheets sync was incomplete; GitHub Actions will not publish partial results:\\n- "
+            + "\\n- ".join(failures)
+        )
+    print("Google Sheets sync completed successfully.")
 
 
 if __name__ == "__main__":
