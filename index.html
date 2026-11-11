@@ -1645,11 +1645,31 @@ let tileLayer = null;
         const ctx = tile.getContext('2d');
         const scale = Math.pow(2, coords.z);
         const mod = (n, m) => ((n % m) + m) % m;
-        const pattern = ctx.createPattern(image, 'repeat-x');
-        if (!pattern) return tile;
-        pattern.setTransform(new DOMMatrix([scale, 0, 0, scale, -mod(coords.x * size.x, width * scale), -mod(coords.y * size.y, height * scale)]));
-        ctx.fillStyle = pattern;
-        ctx.fillRect(0, 0, size.x, size.y);
+
+        // Draw only the part of the source image covered by this tile.
+        // Repeat horizontally, but never wrap vertically beyond the image.
+        const tileLeft = coords.x * size.x;
+        const tileTop = coords.y * size.y;
+        const drawTop = Math.max(0, -tileTop);
+        const drawBottom = Math.min(size.y, height * scale - tileTop);
+        if (drawBottom <= drawTop) return tile;
+
+        const sourceY = (tileTop + drawTop) / scale;
+        const sourceHeight = (drawBottom - drawTop) / scale;
+        let destX = 0;
+        let sourceX = mod(tileLeft, width * scale) / scale;
+        while (destX < size.x) {
+          const sourceWidth = Math.min(width - sourceX, (size.x - destX) / scale);
+          const destWidth = sourceWidth * scale;
+          if (sourceWidth <= 0 || destWidth <= 0) break;
+          ctx.drawImage(
+            image,
+            sourceX, sourceY, sourceWidth, sourceHeight,
+            destX, drawTop, destWidth, drawBottom - drawTop
+          );
+          destX += destWidth;
+          sourceX = 0;
+        }
         return tile;
       }
     });
