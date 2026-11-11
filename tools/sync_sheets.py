@@ -64,7 +64,7 @@ def fetch_tsv(sheet_id):
             f"Google Sheets returned an HTML page instead of TSV for sheet {sheet_id}. "
             "Make sure the spreadsheet is shared so the GitHub Actions runner can view it."
         )
-    rows = list(csv.reader(io.StringIO(body), delimiter="\\t"))
+    rows = list(csv.reader(io.StringIO(body), delimiter="\t"))
     if not rows or not any(cell.strip() for cell in rows[0]):
         raise ValueError(f"Google Sheets export had no usable header row (sheet {sheet_id}).")
     print(f"Fetched Google Sheet {sheet_id}: {len(rows)} rows")
@@ -267,8 +267,8 @@ def main():
 
     if failures:
         raise SystemExit(
-            "Google Sheets sync was incomplete; GitHub Actions will not publish partial results:\\n- "
-            + "\\n- ".join(failures)
+            "Google Sheets sync was incomplete; GitHub Actions will not publish partial results:\n- "
+            + "\n- ".join(failures)
         )
     print("Google Sheets sync completed successfully.")
 
