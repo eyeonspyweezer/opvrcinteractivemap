@@ -95,6 +95,8 @@ html, body { min-height: 100%; background: var(--bg); }
   position: relative;
   isolation: isolate;
 }
+.hide-flags .leaflet-tooltip .tip-card::before,
+.hide-flags .island-popup-content::before { background-image: none !important; }
 .leaflet-tooltip .tip-card::before,
 .island-popup-content::before {
   content: "";
@@ -402,7 +404,7 @@ body { background: var(--bg); }
 </div>
 <div id="settingsFrame">
   <label><input type="checkbox" id="optColors"> Random island colors</label>
-  <label><input type="checkbox" id="optFlags" checked> Flags on the map</label>
+  <label><input type="checkbox" id="optFlags" checked> Show flags (map, lists, and island info)</label>
   <label><input type="checkbox" id="optCrewLines"> Connect islands by same crew</label>
   <label><input type="checkbox" id="optOwnerLines"> Connect islands by same owner</label>
   <label><input type="checkbox" id="optIslandAxisTravel"> Two-axis island travel animation</label>
@@ -970,6 +972,7 @@ function rebuildVisibility() {
   rebuildRelationshipLines();
 }
 function rebuildFlags() {
+  document.body.classList.toggle('hide-flags', !OPT.flags);
   const run = ++flagRun;
   drawnItems.eachLayer((l) => { l._flagFill = null; });
   restyleAll();
@@ -1284,12 +1287,25 @@ function groupLinkOf(group) {
   return /^https?:\/\//i.test(url) ? url : '';
 }
 
+function randomUnknownIslandColor(name) {
+  // Stable per island so restyling does not make colors flicker.
+  let hash = 2166136261;
+  for (const ch of String(name || 'Unknown island')) {
+    hash ^= ch.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return 'hsl(' + ((hash >>> 0) % 360) + ', 58%, 58%)';
+}
+
 function applyStyle(layer) {
   const p = layer.feature.properties;
   const owner = resolveOwner(p);
   const colors = groupColorsOf(owner);
+  const isUnknownIsland = String(p.name || '').includes('???') || !ownersOf(owner).length;
 
-  let col = OPT.colors ? p.color : NO_OWNER_COLOR;
+  let col = OPT.colors
+    ? (isUnknownIsland ? randomUnknownIslandColor(p.name) : p.color)
+    : NO_OWNER_COLOR;
   let stripeId = null;
 
   if (!OPT.colors && String(p.name || '').includes('???')) {
@@ -1463,7 +1479,7 @@ function tipContent(layer) {
   if (w && w.players) line('Players:', w.players);
 
   const flagUrl = crews.map(flagFor).find(Boolean);
-  if (flagUrl && safeUrl(flagUrl)) {
+  if (OPT.flags && flagUrl && safeUrl(flagUrl)) {
     el.style.setProperty('--island-flag-image', 'url("' + flagUrl.replace(/["\\]/g, '') + '")');
   }
   return el;
@@ -2250,7 +2266,7 @@ function wireClick(target, layer) {
       ...new Set(groupsForIsland(p.name, raw).filter((g) => g && !/ Kingdom$/i.test(g)))
     ]);
     const flagBackdrop = popupGroups.map(flagFor).find(Boolean);
-    if (flagBackdrop && isUrl(flagBackdrop)) {
+    if (OPT.flags && flagBackdrop && isUrl(flagBackdrop)) {
       box.style.setProperty('--island-flag-image', 'url("' + flagBackdrop.replace(/["\\]/g, '') + '")');
     }
     if (popupGroups.length) {
@@ -2612,7 +2628,7 @@ function fillList(listEl, items, filter, onPick, onContext) {
         if (i.unnamed || String(i.label).includes('???')) cls += ' missing';
         if (i.duplicate) cls += ' duplicate';
         b.className = cls;
-      if (i.flag) {
+      if (OPT.flags && i.flag) {
         const img = document.createElement('img');
         img.className = 'flag'; img.alt = ''; img.src = i.flag;
         img.onerror = () => { img.remove(); b.classList.remove('hasflag'); };
@@ -2645,7 +2661,7 @@ function showCrewIslands(crew) {
     const idx = document.createElement('span');
     idx.className = 'cidx'; idx.textContent = p.index;
     b.appendChild(idx);
-    if (crew.flag) {
+    if (OPT.flags && crew.flag) {
       const img = document.createElement('img');
       img.className = 'cflag'; img.alt = ''; img.src = crew.flag;
       img.onerror = () => img.remove();
