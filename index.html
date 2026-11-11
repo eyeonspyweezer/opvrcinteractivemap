@@ -145,7 +145,8 @@ html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay
 .slist { display: none; max-height: 28dvh; overflow-y: auto; border: 1px solid var(--fg); }
 .slist.open { display: block; }
 .sitem { position: relative; display: block; width: 100%; padding: 6px 8px; text-align: center; font: inherit; background: var(--bg); color: var(--sfg); border: 0; border-bottom: 1px solid var(--fg); cursor: pointer; }
-.sitem.missing { color: #c62828; }      /* red = in sheet, not on map */
+.sitem.missing { color: #c62828; }      /* red = crew / unnamed entry without a map match */
+.sitem.notfound { color: #ef6c00; }     /* orange = island listed in sheets but not found on the map */
 .sitem.duplicate { color: #ef6c00; }    /* orange = several sheet rows → same name */
 .sitem.missing.duplicate { color: #ef6c00; } /* orange wins if both */
 .ctitle { padding: 6px 8px; font-weight: 700; text-align: center; border-bottom: 1px solid var(--fg); }
@@ -580,7 +581,7 @@ LIST_BUTTONS.forEach((b) => {
 });
 
 // ===== Map =====
-const map = L.map('map', { crs: L.CRS.Simple, maxZoom: 4, minZoom: -5 });
+const map = L.map('map', { crs: L.CRS.Simple, maxZoom: 8, minZoom: -5 });
 const LAST_MAP_VIEW_KEY = 'opvrc:last-map-view:v1';
 function canonicalMapX(x) {
   if (!mapWidth) return x;
@@ -2161,7 +2162,7 @@ function wireClick(target, layer) {
         box.appendChild(a);
       });
     }
-    if (civilians.length || islandWorlds.length || islandVisits || formerInfo || lastAnnouncementMention) {
+    {
       const extra = document.createElement('details');
       extra.className = 'island-extra-info';
       const summary = document.createElement('summary');
@@ -2274,8 +2275,10 @@ function wireClick(target, layer) {
         content.appendChild(list);
       }
 
-      extra.append(summary, content);
-      box.appendChild(extra);
+      if (content.childElementCount) {
+        extra.append(summary, content);
+        box.appendChild(extra);
+      }
     }
     if (bannerUrl) {
       const img = document.createElement('img');
@@ -2383,10 +2386,10 @@ function fillList(listEl, items, filter, onPick, onContext) {
   const q = filter.trim().toLowerCase();
   listEl.textContent = '';
 
-  // 0 = normal A–Z, 1 = digits / non-letter start, 2 = missing (not on map), 3 = ??? unnamed
+  // Normal entries first; unnamed and unavailable entries are grouped at the bottom.
   const sortBucket = (i) => {
+    if (i.missing) return 4;
     if (i.unnamed || String(i.label).includes('???')) return 3;
-    if (i.missing) return -1;   // sheet-only (not on the map): top of the list, in red
     const s = String(i.label || '').trim();
     if (!/^[A-Za-z]/.test(s) || /\d/.test(s)) return 1;
     return 0;
@@ -2402,7 +2405,7 @@ function fillList(listEl, items, filter, onPick, onContext) {
       const b = document.createElement('button');
       b.type = 'button';
       let cls = 'sitem';
-        if (i.missing) cls += ' missing';
+        if (i.missing) cls += (listEl.id === 'lIsland' ? ' notfound' : ' missing');
         if (i.unnamed || String(i.label).includes('???')) cls += ' missing';
         if (i.duplicate) cls += ' duplicate';
         b.className = cls;
