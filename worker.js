@@ -2262,33 +2262,41 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    const testerOrigin = new URL(BASE).origin;
     const testCors = {
-      "Access-Control-Allow-Origin": new URL(BASE).origin,
+      "Access-Control-Allow-Origin": testerOrigin,
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, X-Test-Key",
+      "Access-Control-Allow-Headers": "Content-Type",
       "Vary": "Origin"
     };
-    if (url.pathname === "/test" && request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: testCors });
-    }
-    if (url.pathname === "/test" && request.method === "POST") {
-      if (request.headers.get("Origin") !== new URL(BASE).origin || !env.TEST_KEY ||
-          request.headers.get("X-Test-Key") !== env.TEST_KEY) {
-        return new Response(JSON.stringify({ ok: false, error: "Unauthorized. Check the tester key." }), {
+    if (url.pathname === "/test") {
+      if (request.headers.get("Origin") !== testerOrigin) {
+        return new Response(JSON.stringify({ ok: false, error: "This tester only accepts requests from the OPVRC map website." }), {
           status: 403, headers: { ...testCors, "Content-Type": "application/json" }
         });
       }
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: testCors });
+      if (request.method !== "POST") {
+        return new Response(JSON.stringify({ ok: false, error: "Use POST for read-only command tests." }), {
+          status: 405, headers: { ...testCors, "Content-Type": "application/json", "Allow": "POST, OPTIONS" }
+        });
+      }
       try {
-        const input = await request.json();
+        const raw = await request.text();
+        if (raw.length > 2000) throw new Error("Request is too large.");
+        const input = JSON.parse(raw);
         const command = String(input.command || "");
         const value = String(input.value || "");
+        const allowed = new Set(["map", "events", "crewlist", "googlesheet", "group", "island", "worldactivity", "islandactivity", "crewactivity", "owneractivity", "mapurl", "maplink", "discord", "vrc", "marines", "marinesdiscord", "revolutionary"]);
+        if (!allowed.has(command)) throw new Error("That command is not enabled. Only approved read-only commands can run here.");
+        if (value.length > 120) throw new Error("Option value is too long.");
         const response = await runDebugCommand(env, command, value);
         return new Response(JSON.stringify({ ok: true, command, response }), {
-          headers: { ...testCors, "Content-Type": "application/json" }
+          headers: { ...testCors, "Content-Type": "application/json", "Cache-Control": "no-store" }
         });
       } catch (error) {
         return new Response(JSON.stringify({ ok: false, error: String(error?.stack || error).slice(0, 5000) }), {
-          status: 500, headers: { ...testCors, "Content-Type": "application/json" }
+          status: 400, headers: { ...testCors, "Content-Type": "application/json", "Cache-Control": "no-store" }
         });
       }
     }
