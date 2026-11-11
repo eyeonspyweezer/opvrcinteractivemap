@@ -1916,9 +1916,9 @@ async function writeQuotesFile(env, text, sha, message) {
   if (!response.ok) throw new Error(`Could not save ${QUOTES_FILE} to GitHub (${response.status}).`);
 }
 
-function quoteTsvLine(quote, displayName, username, messageId, addedAt) {
-  const clean = value => String(value || "").replace(/[\r\n\t]+/g, " ").trim();
-  return [clean(quote), clean(displayName), clean(username), clean(messageId), clean(addedAt)].join("\t");
+function quoteTsvLine(quote, displayName, username, messageId, messageUrl, addedAt) {
+  const clean = value => String(value || "").replace(/[\\r\\n\\t]+/g, " ").trim();
+  return [clean(quote), clean(displayName), clean(username), clean(messageId), clean(messageUrl), clean(addedAt)].join("\\t");
 }
 
 async function addQuoteFromMessage(env, interaction) {
@@ -1932,17 +1932,18 @@ async function addQuoteFromMessage(env, interaction) {
   }
   need(env, ["GITHUB_TOKEN"]);
   const current = await readQuotesFile(env);
-  const lines = current.text.split(/\r?\n/).filter(line => line.trim() && !line.trim().startsWith("#"));
-  const normalized = quote.toLowerCase().replace(/\s+/g, " ").trim();
-  if (lines.some(line => line.split("\t")[0].toLowerCase().replace(/\s+/g, " ").trim() === normalized)) {
+  const lines = current.text.split(/\\r?\\n/).filter(line => line.trim() && !line.trim().startsWith("#"));
+  const normalized = quote.toLowerCase().replace(/\\s+/g, " ").trim();
+  if (lines.some(line => line.split("\\t")[0].toLowerCase().replace(/\\s+/g, " ").trim() === normalized)) {
     return { type: 4, data: { flags: 64, content: "That quote is already in the quote list." } };
   }
   const displayName = message.author?.global_name || message.member?.nick || message.author?.username || "Unknown";
   const username = message.author?.username || "";
+  const messageUrl = `https://discord.com/channels/${interaction.guild_id || "@me"}/${interaction.channel_id}/${message.id}`;
   const addedAt = message.timestamp || new Date().toISOString();
-  const newText = (current.text.trimEnd() ? current.text.trimEnd() + "\n" : "") + quoteTsvLine(quote, displayName, username, message.id, addedAt) + "\n";
+  const newText = (current.text.trimEnd() ? current.text.trimEnd() + "\\n" : "") + quoteTsvLine(quote, displayName, username, message.id, messageUrl, addedAt) + "\\n";
   await writeQuotesFile(env, newText, current.sha, "Add quote from Discord message");
-  return { type: 4, data: { flags: 64, content: "✅ Added quote by **" + displayName + "** (@" + username + ")." } };
+  return { type: 4, data: { flags: 64, content: "✅ Added quote by **" + displayName + "** (@" + username + ").\\n[Open original Discord message](" + messageUrl + ")" } };
 }
 
 const VIDEO_FILE = "opvrc-videos.json";
