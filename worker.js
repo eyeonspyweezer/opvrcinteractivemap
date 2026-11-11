@@ -1992,20 +1992,20 @@ async function getYouTubeMetadata(url) {
 
 async function addVideosFromMessage(env, interaction) {
   const message = interaction.data.resolved?.messages?.[interaction.data.target_id];
-  const attachments = Object.values(message?.attachments || {}).filter(a => /video\\//i.test(a.content_type || "") || /\\.(mp4|mov|webm|m4v)$/i.test(a.filename || ""));
+  const attachments = Object.values(message?.attachments || {}).filter(a => /video\//i.test(a.content_type || "") || /\.(mp4|mov|webm|m4v)$/i.test(a.filename || ""));
   const content = String(message?.content || "");
-  const urls = [...content.matchAll(/https?:\\/\\/[^\\s<>]+/g)].map(match => match[0].replace(/[),.!?]+$/,"")).filter(url => /youtube\\.com|youtu\\.be|tiktok\\.com|instagram\\.com|facebook\\.com|fb\\.watch|vimeo\\.com|twitch\\.tv|x\\.com|twitter\\.com|kick\\.com/i.test(url));
+  const urls = [...content.matchAll(/https?:\/\/[^\s<>]+/g)].map(match => match[0].replace(/[),.!?]+$/,"")).filter(url => /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|facebook\.com|fb\.watch|vimeo\.com|twitch\.tv|x\.com|twitter\.com|kick\.com/i.test(url));
   const candidates = [...new Set([...urls, ...attachments.map(a => a.url).filter(Boolean)])];
   if (!message || !candidates.length) return { content: "I couldn't find video links or video attachments in that message.", flags: 64 };
   need(env, ["GITHUB_TOKEN"]);
   const stored = await readScheduleFile(env, VIDEO_FILE);
-  const sourceMessageUrl = `https://discord.com/channels/${interaction.guild_id || "@me"}/${interaction.channel_id}/${message.id}`;
+  const sourceMessageUrl = "https://discord.com/channels/" + (interaction.guild_id || "@me") + "/" + interaction.channel_id + "/" + message.id;
   const addedAt = message.timestamp || new Date().toISOString();
   let added = 0;
   for (const url of candidates) {
     if (stored.items.some(item => item.url === url)) continue;
     const attachment = attachments.find(a => a.url === url);
-    const platform = /youtube\\.com|youtu\\.be/i.test(url) ? "YouTube" : /tiktok\\.com/i.test(url) ? "TikTok" : /discord(app)?\\.com\\/attachments/i.test(url) ? "Discord" : "External";
+    const platform = /youtube\.com|youtu\.be/i.test(url) ? "YouTube" : /tiktok\.com/i.test(url) ? "TikTok" : /discord(app)?\.com\/attachments/i.test(url) ? "Discord" : "External";
     const youtube = platform === "YouTube" ? await getYouTubeMetadata(url) : null;
     stored.items.push({
       type:"video", category:"OPVRC Events", url, platform,
@@ -2019,7 +2019,7 @@ async function addVideosFromMessage(env, interaction) {
     added++;
   }
   if (added) await writeScheduleFile(env, VIDEO_FILE, stored.items, stored.sha, "Add videos to OPVRC Events");
-  return { content: added ? `Added **${added}** video link/attachment(s) to **OPVRC Events**. YouTube titles, channel names, and thumbnails were fetched automatically when available.` : "Those video links are already saved.", flags: 64 };
+  return { content: added ? "Added **" + added + "** video link/attachment(s) to **OPVRC Events**. YouTube titles, channel names, and thumbnails were fetched automatically when available." : "Those video links are already saved.", flags: 64 };
 }
 
 async function eventsListMessage(env) {
