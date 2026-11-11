@@ -95,7 +95,15 @@ def sync_backgrounds():
         url = m.group(0)
         base = url.split("?")[0]
         entry = manifest.get(key)
-        if entry and entry.get("url") == base and (BG_DIR / entry["file"]).exists():
+        existing_file = BG_DIR / entry["file"] if entry and entry.get("file") else None
+        existing_is_webp = False
+        if existing_file and existing_file.is_file() and existing_file.suffix.lower() == ".webp":
+            try:
+                with Image.open(existing_file) as existing_image:
+                    existing_is_webp = existing_image.format == "WEBP"
+            except Exception:
+                existing_is_webp = False
+        if entry and entry.get("url") == base and existing_is_webp:
             skipped += 1
             continue
 
