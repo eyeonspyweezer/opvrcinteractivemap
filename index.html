@@ -410,6 +410,7 @@ body { background: var(--bg); }
   <label><input type="checkbox" id="optOwners"> Show island owners next to names</label>
   <label><input type="checkbox" id="optHideUnnamed"> Hide Unnamed Islands</label>
   <label><input type="checkbox" id="optHideUnowned"> Hide unowned islands</label>
+  <label><input type="checkbox" id="optBlendUnowned"> Blend unowned / unknown islands into nearby map color</label>
   <label>Fill opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
 </div>
 
@@ -550,6 +551,7 @@ function saveLocalSettings() {
       theme: document.documentElement.dataset.theme || '',
       colors: OPT.colors, flags: OPT.flags, names: OPT.names,
       owners: OPT.owners, hideUnnamed: OPT.hideUnnamed, hideUnowned: OPT.hideUnowned,
+      blendUnowned: OPT.blendUnowned,
       crewLines: OPT.crewLines, ownerLines: OPT.ownerLines,
       opacity: POLYGON_FILL_OPACITY,
       islandAxisTravel: OPT.islandAxisTravel
@@ -566,6 +568,7 @@ const OPT = {
   owners: savedBool('owners', false),
   hideUnnamed: savedBool('hideUnnamed', false),
   hideUnowned: savedBool('hideUnowned', false),
+  blendUnowned: savedBool('blendUnowned', false),
   crewLines: savedBool('crewLines', false),
   ownerLines: savedBool('ownerLines', false),
   islandAxisTravel: savedBool('islandAxisTravel', false)
@@ -1324,7 +1327,9 @@ function applyStyle(layer) {
   } else {
     layer._stripeFill = null;
   }
-  
+  if (OPT.blendUnowned && (String(p.name || '').includes('???') || !ownersOf(owner).length)) {
+    paintStatusColor(layer);
+  }
 }
 const restyleAll = () => drawnItems.eachLayer(applyStyle);
 
@@ -1637,6 +1642,8 @@ let tileLayer = null;
     mapPixelCanvas.height = height;
     mapPixelContext = mapPixelCanvas.getContext('2d', { willReadFrequently: true });
     mapPixelContext.drawImage(image, 0, 0, width, height);
+    // Reapply island styles now that nearby map pixels can be sampled.
+    restyleAll();
     const Repeating = L.GridLayer.extend({
       createTile(coords) {
         const tile = document.createElement('canvas');
@@ -2751,6 +2758,7 @@ $('optNames').checked = OPT.names;
 $('optOwners').checked = OPT.owners;
 $('optHideUnnamed').checked = OPT.hideUnnamed;
 $('optHideUnowned').checked = OPT.hideUnowned;
+$('optBlendUnowned').checked = OPT.blendUnowned;
 $('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked; restyleAll(); rebuildFlags(); saveLocalSettings(); });
 $('optCrewLines').addEventListener('change', (e) => { OPT.crewLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
 $('optOwnerLines').addEventListener('change', (e) => { OPT.ownerLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
@@ -2760,6 +2768,7 @@ $('optNames').addEventListener('change', (e) => { OPT.names = e.target.checked; 
 $('optOwners').addEventListener('change', (e) => { OPT.owners = e.target.checked; rebuildLabels(); saveLocalSettings(); });
 $('optHideUnnamed').addEventListener('change', (e) => { OPT.hideUnnamed = e.target.checked; rebuildVisibility(); saveLocalSettings(); });
 $('optHideUnowned').addEventListener('change', (e) => { OPT.hideUnowned = e.target.checked; rebuildVisibility(); saveLocalSettings(); });
+$('optBlendUnowned').addEventListener('change', (e) => { OPT.blendUnowned = e.target.checked; restyleAll(); saveLocalSettings(); });
 $('optOpacity').value = POLYGON_FILL_OPACITY;
 $('optOpacityVal').textContent = POLYGON_FILL_OPACITY;
 $('optOpacity').addEventListener('input', (e) => {
