@@ -2263,7 +2263,7 @@ export default {
     const url = new URL(request.url);
 
     const testCors = {
-      "Access-Control-Allow-Origin": BASE,
+      "Access-Control-Allow-Origin": new URL(BASE).origin,
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, X-Test-Key",
       "Vary": "Origin"
@@ -2272,7 +2272,7 @@ export default {
       return new Response(null, { status: 204, headers: testCors });
     }
     if (url.pathname === "/test" && request.method === "POST") {
-      if (request.headers.get("Origin") !== BASE || !env.TEST_KEY ||
+      if (request.headers.get("Origin") !== new URL(BASE).origin || !env.TEST_KEY ||
           request.headers.get("X-Test-Key") !== env.TEST_KEY) {
         return new Response(JSON.stringify({ ok: false, error: "Unauthorized. Check the tester key." }), {
           status: 403, headers: { ...testCors, "Content-Type": "application/json" }
