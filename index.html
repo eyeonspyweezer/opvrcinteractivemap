@@ -392,7 +392,7 @@ const LIST_BUTTONS = [
   { label: 'Unlisted Island Tracker List (Dave)', url: 'https://docs.google.com/spreadsheets/d/127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE/' }
 ];
 const imageUrl = 'TargetedMap.PNG';
-const QUOTES_FILE = 'quotes.txt';
+const QUOTES_FILE = 'quotes.tsv';
 let loadingProgress = 8;
 function setLoadingProgress(value, status) {
   loadingProgress = Math.max(0, Math.min(100, value));
@@ -418,7 +418,7 @@ async function loadLoadingQuote() {
     const response = await fetch(QUOTES_FILE + '?v=' + Date.now(), { cache: 'no-store' });
     if (!response.ok) throw new Error('quotes.txt HTTP ' + response.status);
     const lines = (await response.text()).replace(/^\uFEFF/, '').split(/\r?\n/)
-      .filter(line => line.trim() && !line.trim().startsWith('#'));
+      .filter(line => line.trim() && !/^#\s*(OPVRC|Format:|Quotes are)/i.test(line.trim()));
     if (!lines.length) return;
     const fields = lines[Math.floor(Math.random() * lines.length)].split('\t');
     const quote = fields[0] || '';
@@ -469,7 +469,7 @@ async function loadLoadingQuote() {
       submitterLine.appendChild(label);
     }
     quoteBox.hidden = false;
-    setLoadingProgress(25, 'Loading map quote…');
+
   } catch (error) {
     console.warn('[quotes] failed:', error);
   }
