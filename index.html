@@ -239,6 +239,20 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 .live-head { font-weight: 700; }
 .map-flag { object-fit: contain; }
 
+#loadingScreen {
+  position: fixed; inset: 0; z-index: 5000; display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box; padding: 24px; background: var(--bg); color: var(--fg); text-align: center;
+  transition: opacity .35s ease, visibility .35s ease;
+}
+#loadingScreen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+#loadingInner { width: min(420px, 82vw); }
+#loadingTitle { font-size: clamp(24px, 6vw, 42px); letter-spacing: .04em; margin-bottom: 20px; }
+#loadingTrack { width: 100%; height: 12px; border: 1px solid var(--fg); border-radius: 999px; overflow: hidden; box-sizing: border-box; }
+#loadingBar { width: 8%; height: 100%; background: var(--fg); transition: width .3s ease; }
+#loadingStatus { margin-top: 9px; font-size: 12px; opacity: .72; }
+#loadingQuote { margin: 24px auto 0; max-width: 390px; font-size: clamp(14px, 3.2vw, 18px); line-height: 1.45; }
+#loadingQuote .quote-text { display: block; }
+#loadingQuote .quote-author { display: block; margin-top: 8px; font-size: .78em; opacity: .72; }
 #loadError { position: fixed; z-index: 1000; left: 50%; top: 10px; transform: translateX(-50%); width: min(420px, calc(100vw - 40px)); box-sizing: border-box; padding: 10px 14px; text-align: center; background: var(--bg); color: var(--fg); border: 1px solid var(--fg); border-radius: 6px; font-size: 14px; }
 
 /* ===== Bottom-right buttons, top to bottom: Search, Discord, VRChat, Settings ===== */
@@ -277,6 +291,19 @@ body { background: var(--bg); }
 </style>
 </head>
 <body>
+<div id="loadingScreen" aria-live="polite">
+  <div id="loadingInner">
+    <div id="loadingTitle">OPVRC INTERACTIVE MAP</div>
+    <div id="loadingTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
+      <div id="loadingBar"></div>
+    </div>
+    <div id="loadingStatus">Loading island data…</div>
+    <div id="loadingQuote">
+      <span class="quote-text">Every island has a story. Every voyage leaves a mark.</span>
+      <span class="quote-author">— OPVRC Interactive Map</span>
+    </div>
+  </div>
+</div>
 <div id="map"></div>
 
 <div id="sideList">
@@ -361,6 +388,40 @@ const LIST_BUTTONS = [
   { label: 'Unlisted Island Tracker List (Dave)', url: 'https://docs.google.com/spreadsheets/d/127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE/' }
 ];
 const imageUrl = 'TargetedMap.PNG';
+const QUOTES_FILE = 'quotes.txt';
+let loadingProgress = 8;
+function setLoadingProgress(value, status) {
+  loadingProgress = Math.max(0, Math.min(100, value));
+  const bar = $('loadingBar');
+  const track = $('loadingTrack');
+  if (bar) bar.style.width = loadingProgress + '%';
+  if (track) track.setAttribute('aria-valuenow', String(Math.round(loadingProgress)));
+  if (status) $('loadingStatus').textContent = status;
+}
+function finishLoadingScreen() {
+  setLoadingProgress(100, 'Ready');
+  setTimeout(() => $('loadingScreen')?.classList.add('hidden'), 220);
+}
+async function loadLoadingQuote() {
+  try {
+    const response = await fetch(QUOTES_FILE + '?v=' + Date.now(), { cache: 'no-store' });
+    if (!response.ok) throw new Error('quotes.txt HTTP ' + response.status);
+    const lines = (await response.text()).replace(/^\uFEFF/, '').split(/\r?\n/)
+      .map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+    if (!lines.length) return;
+    const fields = lines[Math.floor(Math.random() * lines.length)].split('\t');
+    const quote = fields[0] || '';
+    const displayName = fields[1] || '';
+    const username = fields[2] || '';
+    $('loadingQuote .quote-text').textContent = quote;
+    $('loadingQuote .quote-author').textContent = displayName
+      ? '— ' + displayName + (username ? ' (@' + username + ')' : '')
+      : '';
+    setLoadingProgress(25, 'Loading map quote…');
+  } catch (error) {
+    console.warn('[quotes] failed:', error);
+  }
+}
 // URLs of your white icon images (for example the files you upload to GitHub). Empty = the emoji shows instead.
 const ICONS = { search: '', discord: 'DiscordIcon.PNG', vrchat: 'VRCIcon.PNG', settings: '' };
 
@@ -1637,6 +1698,7 @@ big.addEventListener('pointercancel', endPtr);
 
 async function loadLive() {
   console.log('[map] loadLive running, version bounty-v5');
+  setLoadingProgress(40, 'Loading island data…');
   await loadStaticIslandData();
   const box = $('listLive');
   const pieces = {};
@@ -1655,7 +1717,14 @@ async function loadLive() {
   liveSection('Announcements', (pieces.announcements || []).slice(0, 10).map((r) => liveItem(r.title, [r.date, r.text].filter(Boolean).join(' - '), r.link)));
   liveSection('Events', (pieces.events || []).slice(0, 10).map((r) => liveItem(r.title, [r.start, r.world].filter(Boolean).join(' - '), r.link)));
 }
-loadLive();
+loadLoadingQuote().catch(() => {});
+loadLive()
+  .then(() => finishLoadingScreen())
+  .catch((error) => {
+    console.error('[map] initial load failed:', error);
+    setLoadingProgress(100, 'Map loaded with some unavailable data');
+    setTimeout(() => $('loadingScreen')?.classList.add('hidden'), 500);
+  });
 setInterval(loadLive, 300000);
 
 // ===== Live player total across uniquely linked owned worlds =====
