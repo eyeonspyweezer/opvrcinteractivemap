@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OPVRC Bot Debug Tester</title>
+<style>
+body{font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#111;color:#eee;margin:0;padding:20px}
+main{max-width:900px;margin:auto}h1{font-size:20px}label{display:block;margin:14px 0 5px}
+input,select,button{font:inherit;padding:9px;background:#222;color:#eee;border:1px solid #555;border-radius:4px;width:100%;box-sizing:border-box}
+button{cursor:pointer;background:#174b35;margin-top:16px}button:disabled{opacity:.5}
+small{color:#aaa}.warning{color:#ffc66d}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#080808;border:1px solid #444;padding:12px;min-height:120px}
+.status{margin-top:12px;color:#aaa}a{color:#8ab4ff}
+</style>
+</head>
+<body><main>
+<h1>OPVRC Discord Bot — Debug Tester</h1>
+<p>Runs selected read-only command handlers directly on the Worker. It does not post to Discord.</p>
+<p class="warning">Write commands and message context menus are intentionally disabled here.</p>
+<label for="key">Tester key (TEST_KEY)</label>
+<input id="key" type="password" autocomplete="off" placeholder="Enter the private tester key">
+<label for="command">Command</label>
+<select id="command">
+<option value="map">/map</option>
+<option value="events">/events</option>
+<option value="crewlist">/crewlist</option>
+<option value="googlesheet">/googlesheet</option>
+<option value="group">/group</option>
+<option value="island">/island</option>
+<option value="worldactivity">/worldactivity</option>
+<option value="islandactivity">/islandactivity</option>
+<option value="crewactivity">/crewactivity</option>
+<option value="owneractivity">/owneractivity</option>
+<option value="mapurl">/mapurl</option>
+<option value="discord">/discord</option>
+<option value="vrc">/vrc</option>
+<option value="marines">/marines</option>
+<option value="marinesdiscord">/marinesdiscord</option>
+<option value="revolutionary">/revolutionary</option>
+</select>
+<label for="value" id="valueLabel">Option value (if required)</label>
+<input id="value" placeholder="Island/group name, list type i or c, or duration such as 7d">
+<small id="hint">Examples: island = Reverse Mountain; group = Marines; googlesheet = i or c; activity = 7d.</small>
+<button id="run">Run test</button>
+<div class="status" id="status">Ready.</div>
+<h2>Raw response / error</h2>
+<pre id="output">No test has been run yet.</pre>
+<script>
+const WORKER="https://opvrcdiscordbot.dragonddavegorby.workers.dev";
+const $=id=>document.getElementById(id);
+$("run").addEventListener("click",async()=>{
+  const button=$("run"),out=$("output"),status=$("status");
+  if(!$("key").value.trim()){status.textContent="Enter the tester key first.";return;}
+  button.disabled=true;status.textContent="Running…";out.textContent="";
+  try{
+    const response=await fetch(WORKER+"/test",{method:"POST",headers:{"Content-Type":"application/json","X-Test-Key":$("key").value},body:JSON.stringify({command:$("command").value,value:$("value").value})});
+    const text=await response.text();
+    let data;try{data=JSON.parse(text)}catch{data={raw:text}}
+    status.textContent="HTTP "+response.status+(data.ok?" — test completed":" — test failed");
+    out.textContent=JSON.stringify(data,null,2);
+  }catch(error){status.textContent="Request failed";out.textContent=String(error.stack||error);}
+  finally{button.disabled=false;}
+});
+$("command").addEventListener("change",()=>{
+  const c=$("command").value;
+  $("value").disabled=["map","events","crewlist","mapurl","discord","vrc","marines","marinesdiscord","revolutionary"].includes(c);
+  $("value").placeholder=c==="googlesheet"?"i (islands) or c (crews)":c.includes("activity")?"7d, 24h, 30d, etc.":"Island or group name";
+});
+</script>
+</main></body></html>
