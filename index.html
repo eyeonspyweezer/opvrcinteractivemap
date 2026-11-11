@@ -73,11 +73,13 @@ html, body { min-height: 100%; background: var(--bg); }
   color: var(--fg) !important;
   border: 1px solid var(--fg) !important;
   box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  box-sizing: border-box;
   width: max-content !important;
   max-width: min(320px, 70vw);
+  min-width: 0;
   white-space: normal;
-  padding: 8px 10px;
-  line-height: 1.35;
+  padding: 6px 8px;
+  line-height: 1.3;
 }
 .leaflet-tooltip .tip-line {
   display: block;
@@ -92,7 +94,7 @@ html, body { min-height: 100%; background: var(--bg); }
 }
 .leaflet-tooltip .tip-image {
   display: block;
-  width: 50%;
+  width: min(240px, 64vw);
   max-width: 100%;
   aspect-ratio: 16 / 5;
   height: auto;
