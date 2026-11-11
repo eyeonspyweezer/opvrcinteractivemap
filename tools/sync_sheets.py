@@ -2,9 +2,10 @@
 """
 tools/sync_sheets.py
 --------------------
-Copies background pictures and owner links from Google Sheets into the repo.
-1) Island pictures ("Visual" column) -> island-backgrounds/<island-name>.jpg
+Copies island backgrounds, owner links, and former island info from Google Sheets.
+1) Island pictures ("Visual" column) -> island-backgrounds/
 2) Owner info ("Owner(s)", "Profile Link", "Discord ID") -> owner-links.tsv
+3) Former Info from the main Island Ownership sheet -> island-former-info.tsv
 """
 
 import csv
@@ -16,12 +17,14 @@ from pathlib import Path
 from PIL import Image
 
 ISLAND_SHEET = "127a13tHpfFMfhPDUWw16nX9i5u4Qrn1GL-kcFxL5GIE"
+MAIN_ISLAND_SHEET = "1MTRAqK_60N2GhAmBgAF3pouFnKLoL3va57H9DMP7UVc"
 OWNER_SHEET = "17N7e8tQkzWsbGQdD1wDuNvj3eYkPyl_anvkrbRBOV5I"
 GID = 0
 
 BG_DIR = Path("island-backgrounds")
 BG_MANIFEST = BG_DIR / "manifest.json"
 OWNER_FILE = Path("owner-links.tsv")
+FORMER_INFO_FILE = Path("island-former-info.tsv")
 
 NAME_HEADERS = ("island / location", "island/location", "location", "island", "name")
 OWNER_HEADERS = ("owner(s)", "owner", "owners")
@@ -105,6 +108,48 @@ def sync_backgrounds():
         BG_DIR.mkdir(exist_ok=True)
         BG_MANIFEST.write_text(json.dumps(manifest, indent=1, sort_keys=True, ensure_ascii=False))
     print(f"Island pictures: {saved} saved, {skipped} already saved, {failed} failed")
+
+
+def sync_former_info():
+    """Export Former Info from the new, primary Island Ownership sheet."""
+    rows = fetch_tsv(MAIN_ISLAND_SHEET)
+    header_index = None
+    island_col = former_col = None
+
+    for i, row in enumerate(rows):
+        low = [re.sub(r"\\s+", " ", c.strip().lower()) for c in row]
+        if "former info" not in low:
+            continue
+        candidate = next((j for j, value in enumerate(low)
+                          if value in ("island name", "island / location", "island/location", "location", "island")), None)
+        if candidate is None:
+            continue
+        header_index = i
+        island_col = candidate
+        former_col = low.index("former info")
+        break
+
+    if header_index is None:
+        raise ValueError("Could not find Island Name and Former Info columns in the main Island Ownership sheet.")
+
+    entries = {}
+    for row in rows[header_index + 1:]:
+        island = row[island_col].strip() if island_col < len(row) else ""
+        former = row[former_col].strip() if former_col < len(row) else ""
+        if not island or not former:
+            continue
+        former = re.sub(r"[\\t\\r\\n]+", " ", former).strip()
+        key = norm_key(island)
+        if key and key not in entries:
+            entries[key] = (island, former)
+
+    lines = ["Island Name\\tFormer Info"]
+    for island, former in sorted(entries.values(), key=lambda item: item[0].lower()):
+        lines.append(f"{island}\\t{former}")
+    output = "\\n".join(lines) + "\\n"
+    if not FORMER_INFO_FILE.exists() or FORMER_INFO_FILE.read_text(encoding="utf-8") != output:
+        FORMER_INFO_FILE.write_text(output, encoding="utf-8")
+    print(f"Former Info: {len(entries)} islands written to {FORMER_INFO_FILE}")
 
 
 def sync_owner_links():
@@ -199,7 +244,7 @@ def sync_crew_metadata():
           ", ".join(key for key, index in columns.items() if index is not None))
 
 def main():
-    for step in (sync_backgrounds, sync_owner_links, sync_crew_metadata):
+    for step in (sync_backgrounds, sync_former_info, sync_owner_links, sync_crew_metadata):
         try:
             step()
         except Exception as e:
