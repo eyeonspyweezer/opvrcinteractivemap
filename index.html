@@ -414,8 +414,21 @@ async function loadLoadingQuote() {
   const quoteBox = $('loadingQuote');
   quoteBox.hidden = true;
   try {
-    const response = await fetch(QUOTES_FILE + '?v=' + Date.now(), { cache: 'no-store' });
-    if (!response.ok) throw new Error('quotes.tsv HTTP ' + response.status);
+    let response = null;
+    const quoteSources = [
+      QUOTES_FILE,
+      'https://raw.githubusercontent.com/eyeonspyweezer/opvrcinteractivemap/main/quotes.tsv'
+    ];
+    for (const source of quoteSources) {
+      try {
+        const candidate = await fetch(source + '?v=' + Date.now(), { cache: 'no-store' });
+        if (candidate.ok) {
+          response = candidate;
+          break;
+        }
+      } catch {}
+    }
+    if (!response) throw new Error('Could not load quotes.tsv from the map or GitHub.');
     const lines = (await response.text()).replace(/^\uFEFF/, '').split(/\r?\n/)
       .filter(line => {
         const trimmed = line.trim();
