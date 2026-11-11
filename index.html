@@ -2337,18 +2337,8 @@ function wireClick(target, layer) {
           const days = Math.max(0, Math.floor((Date.now() - announcementMentions.latest.getTime()) / 86400000));
           const line = document.createElement('div');
           line.className = 'island-extra-line';
-          const label = document.createElement('strong');
-          label.textContent = 'Last mentioned: ';
-          line.appendChild(label);
-          line.appendChild(document.createTextNode(days === 0 ? 'Today' : days === 1 ? '1 day ago' : days + ' days ago'));
-          if (announcementMentions.url) {
-            const link = document.createElement('a');
-            link.href = announcementMentions.url;
-            link.target = '_blank';
-            link.rel = 'noopener';
-            link.textContent = ' (view announcement)';
-            line.appendChild(link);
-          }
+          line.style.textDecoration = 'underline';
+          line.appendChild(document.createTextNode('Last mentioned: ' + (days === 0 ? 'Today' : days === 1 ? '1 day ago' : days + ' days ago')));
           content.appendChild(line);
         }
       }
