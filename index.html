@@ -2380,9 +2380,46 @@ function flashLayers(layers) {
   };
   searchAF = requestAnimationFrame(step);
 }
+let islandMoveSequence = 0;
 function showLayers(layers) {
   if (!layers.length) return;
-  map.flyToBounds(L.latLngBounds(layers.map((l) => l.getBounds())), { duration: 1 });
+
+  const sequence = ++islandMoveSequence;
+  map.stop();
+
+  const bounds = L.latLngBounds(layers.map((l) => l.getBounds()));
+  const target = bounds.getCenter();
+  const current = map.getCenter();
+  const currentZoom = map.getZoom();
+  const currentPoint = map.project(current, currentZoom);
+  const targetPoint = map.project(target, currentZoom);
+  const dx = Math.abs(targetPoint.x - currentPoint.x);
+  const dy = Math.abs(targetPoint.y - currentPoint.y);
+  const xFirst = dx <= dy;
+
+  // Fit the selected island(s), while respecting the map's configured zoom limits.
+  const fittedZoom = map.getBoundsZoom(bounds, false, L.point(80, 80));
+  const targetZoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), fittedZoom));
+
+  // Stage one: travel only along the shorter screen-space axis.
+  const intermediate = xFirst
+    ? L.latLng(current.lat, target.lng)
+    : L.latLng(target.lat, current.lng);
+  const firstDistance = xFirst ? dx : dy;
+
+  const finishMove = () => {
+    if (sequence !== islandMoveSequence) return;
+    // Stage two: complete the longer axis and zoom to the island at the same time.
+    map.flyTo(target, targetZoom, { duration: 0.85, easeLinearity: 0.25 });
+  };
+
+  if (firstDistance > 1) {
+    map.once('moveend', finishMove);
+    map.flyTo(intermediate, currentZoom, { duration: 0.55, easeLinearity: 0.25 });
+  } else {
+    finishMove();
+  }
+
   flashLayers(layers);
 }
 function fillList(listEl, items, filter, onPick, onContext) {
