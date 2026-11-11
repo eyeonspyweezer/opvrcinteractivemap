@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: 20
       - run: npm install playwright
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - run: |
           cat > shot.js <<'EOF'
           const { chromium } = require('playwright');
