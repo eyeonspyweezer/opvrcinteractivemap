@@ -1895,6 +1895,56 @@ async function archiveExpiredScheduleEvents(env) {
   await writeScheduleFile(env, SCHEDULE_FILE, remaining, upcoming.sha, "Remove expired scheduled events");
 }
 
+const QUOTES_FILE = "quotes.txt";
+
+async function readQuotesFile(env) {
+  const headers = { Authorization: `Bearer ${env.GITHUB_TOKEN}`, "User-Agent": "opvrc-map-bot", Accept: "application/vnd.github+json" };
+  const response = await fetch(`${REPO_API}/contents/${QUOTES_FILE}?ref=main`, { headers });
+  if (response.status === 404) return { text: "", sha: null };
+  if (!response.ok) throw new Error(`Could not read ${QUOTES_FILE} from GitHub (${response.status}).`);
+  const data = await response.json();
+  const bytes = Uint8Array.from(atob(data.content.replace(/\n/g, "")), c => c.charCodeAt(0));
+  return { text: new TextDecoder().decode(bytes), sha: data.sha };
+}
+
+async function writeQuotesFile(env, text, sha, message) {
+  const headers = { Authorization: `Bearer ${env.GITHUB_TOKEN}`, "User-Agent": "opvrc-map-bot", Accept: "application/vnd.github+json", "Content-Type": "application/json" };
+  const response = await fetch(`${REPO_API}/contents/${QUOTES_FILE}`, {
+    method: "PUT", headers,
+    body: JSON.stringify({ message, content: githubTextEncode(text.endsWith("\n") ? text : text + "\n"), branch: "main", ...(sha ? { sha } : {}) })
+  });
+  if (!response.ok) throw new Error(`Could not save ${QUOTES_FILE} to GitHub (${response.status}).`);
+}
+
+function quoteTsvLine(quote, displayName, username, messageId, addedAt) {
+  const clean = value => String(value || "").replace(/[\r\n\t]+/g, " ").trim();
+  return [clean(quote), clean(displayName), clean(username), clean(messageId), clean(addedAt)].join("\t");
+}
+
+async function addQuoteFromMessage(env, interaction) {
+  const message = interaction.data.resolved?.messages?.[interaction.data.target_id];
+  const quote = String(message?.content || "").trim();
+  if (!message || !quote) {
+    return { type: 4, data: { flags: 64, content: "I couldn't find text in that message to save as a quote." } };
+  }
+  if (quote.length > 500) {
+    return { type: 4, data: { flags: 64, content: "That message is over 500 characters. Shorten it before adding it as a quote." } };
+  }
+  need(env, ["GITHUB_TOKEN"]);
+  const current = await readQuotesFile(env);
+  const lines = current.text.split(/\r?\n/).filter(line => line.trim() && !line.trim().startsWith("#"));
+  const normalized = quote.toLowerCase().replace(/\s+/g, " ").trim();
+  if (lines.some(line => line.split("\t")[0].toLowerCase().replace(/\s+/g, " ").trim() === normalized)) {
+    return { type: 4, data: { flags: 64, content: "That quote is already in the quote list." } };
+  }
+  const displayName = message.author?.global_name || message.member?.nick || message.author?.username || "Unknown";
+  const username = message.author?.username || "";
+  const addedAt = message.timestamp || new Date().toISOString();
+  const newText = (current.text.trimEnd() ? current.text.trimEnd() + "\n" : "") + quoteTsvLine(quote, displayName, username, message.id, addedAt) + "\n";
+  await writeQuotesFile(env, newText, current.sha, "Add quote from Discord message");
+  return { type: 4, data: { flags: 64, content: `✅ Added quote by **${displayName}** (`@${username}`).` } };
+}
+
 const VIDEO_FILE = "opvrc-videos.json";
 
 async function eventsListMessage(env) {
@@ -2025,6 +2075,7 @@ function discordCommandDefinitions() {
   { name: "map", description: "Interactive island map with toggle buttons", type: 1 },
   { name: "Add to Schedule", type: 3 },
   { name: "Add to Video List", type: 3 },
+  { name: "Add Quote", type: 3 },
   { name: "events", description: "Show OPVRC event messages and videos, newest first", type: 1 },
   {
     name: "reminders",
@@ -2234,6 +2285,10 @@ export default {
           { type: 2, style: 2, label: "Cancel", custom_id: "schedule_cancel" }
         ] }]
       } });
+    }
+
+    if (i.type === 2 && i.data.type === 3 && i.data.name === "Add Quote") {
+      return await addQuoteFromMessage(env, i);
     }
 
     if (i.type === 2 && i.data.type === 3 && i.data.name === "Add to Video List") {
