@@ -431,13 +431,14 @@ async function loadLoadingQuote() {
     if (!response) throw new Error('Could not load quotes.tsv from the map or GitHub.');
     const lines = (await response.text()).replace(/^\uFEFF/, '').split(/\r?\n/)
       .filter(line => {
-        const trimmed = line.trim();
-        if (!trimmed) return false;
-        if (trimmed.startsWith('#') && trimmed.split('\t').length < 11) return false;
-        return true;
+        if (!line.trim()) return false;
+        const fields = line.split('\t');
+        return fields.length === 11 && !!fields[0]?.trim() && /^\d{17,20}$/.test(fields[3] || '');
       });
-    if (!lines.length) return;
-    const fields = lines[Math.floor(Math.random() * lines.length)].split('\t');
+    // Ignore duplicate copies of the same Discord message.
+    const uniqueLines = [...new Map(lines.map(line => [line.split('\t')[3], line])).values()];
+    if (!uniqueLines.length) return;
+    const fields = uniqueLines[Math.floor(Math.random() * uniqueLines.length)].split('\t');
     const quote = fields[0] || '';
     const displayName = fields[1] || '';
     const username = fields[2] || '';
@@ -1790,8 +1791,7 @@ async function loadLive() {
   liveSection('Announcements', (pieces.announcements || []).slice(0, 10).map((r) => liveItem(r.title, [r.date, r.text].filter(Boolean).join(' - '), r.link)));
   liveSection('Events', (pieces.events || []).slice(0, 10).map((r) => liveItem(r.title, [r.start, r.world].filter(Boolean).join(' - '), r.link)));
 }
-loadLoadingQuote().catch(() => {});
-loadLive()
+Promise.all([loadLoadingQuote(), loadLive()])
   .then(() => finishLoadingScreen())
   .catch((error) => {
     console.error('[map] initial load failed:', error);
