@@ -253,7 +253,10 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #loadingStatus { margin-top: 5px; font-size: 10px; opacity: .62; }
 #loadingQuote { margin: 9px auto 0; max-width: 620px; font-size: clamp(13px, 2.5vw, 17px); line-height: 1.35; }
 #loadingQuote .quote-text { display: block; }
-#loadingQuote .quote-author { display: block; margin-top: 4px; font-size: .78em; opacity: .72; }
+#loadingQuote .quote-author { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 7px; font-size: .78em; opacity: .82; }
+#loadingQuote .quote-submitter { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 4px; font-size: .68em; opacity: .58; }
+#loadingQuote .quote-avatar { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; }
+#loadingQuote .quote-submitter .quote-avatar { width: 17px; height: 17px; }
 #loadError { position: fixed; z-index: 1000; left: 50%; top: 10px; transform: translateX(-50%); width: min(420px, calc(100vw - 40px)); box-sizing: border-box; padding: 10px 14px; text-align: center; background: var(--bg); color: var(--fg); border: 1px solid var(--fg); border-radius: 6px; font-size: 14px; }
 
 /* ===== Bottom-right buttons, top to bottom: Search, Discord, VRChat, Settings ===== */
@@ -301,6 +304,7 @@ body { background: var(--bg); }
     <div id="loadingQuote">
       <span class="quote-text">Every island has a story. Every voyage leaves a mark.</span>
       <span class="quote-author">— OPVRC Interactive Map</span>
+      <span class="quote-submitter"></span>
     </div>
   </div>
 </div>
@@ -413,14 +417,17 @@ async function loadLoadingQuote() {
   try {
     const response = await fetch(QUOTES_FILE + '?v=' + Date.now(), { cache: 'no-store' });
     if (!response.ok) throw new Error('quotes.txt HTTP ' + response.status);
-    const lines = (await response.text()).replace(/^\\uFEFF/, '').split(/\\r?\\n/)
+    const lines = (await response.text()).replace(/^\uFEFF/, '').split(/\r?\n/)
       .filter(line => line.trim() && !line.trim().startsWith('#'));
     if (!lines.length) return;
-    const fields = lines[Math.floor(Math.random() * lines.length)].split('\\t');
+    const fields = lines[Math.floor(Math.random() * lines.length)].split('\t');
     const quote = fields[0] || '';
     const displayName = fields[1] || '';
     const username = fields[2] || '';
     const messageUrl = fields[4] || '';
+    const quoteAuthorAvatar = fields[7] || '';
+    const submitterAvatar = fields[9] || '';
+    const submitterName = fields[10] || '';
     const quoteText = $('loadingQuote .quote-text');
     quoteText.textContent = quote;
     if (/^https:\/\/discord\.com\/channels\//i.test(messageUrl)) {
@@ -431,9 +438,36 @@ async function loadLoadingQuote() {
       quoteLink.textContent = quote;
       quoteText.replaceChildren(quoteLink);
     }
-    $('loadingQuote .quote-author').textContent = displayName
+    const authorLine = $('loadingQuote .quote-author');
+    authorLine.replaceChildren();
+    if (quoteAuthorAvatar) {
+      const avatar = document.createElement('img');
+      avatar.className = 'quote-avatar';
+      avatar.src = quoteAuthorAvatar;
+      avatar.alt = '';
+      avatar.loading = 'lazy';
+      authorLine.appendChild(avatar);
+    }
+    const authorLabel = document.createElement('span');
+    authorLabel.textContent = displayName
       ? '— ' + displayName + (username ? ' (@' + username + ')' : '')
       : '';
+    authorLine.appendChild(authorLabel);
+    const submitterLine = $('loadingQuote .quote-submitter');
+    submitterLine.replaceChildren();
+    if (submitterName) {
+      if (submitterAvatar) {
+        const avatar = document.createElement('img');
+        avatar.className = 'quote-avatar';
+        avatar.src = submitterAvatar;
+        avatar.alt = '';
+        avatar.loading = 'lazy';
+        submitterLine.appendChild(avatar);
+      }
+      const label = document.createElement('span');
+      label.textContent = 'Added by ' + submitterName;
+      submitterLine.appendChild(label);
+    }
     quoteBox.hidden = false;
     setLoadingProgress(25, 'Loading map quote…');
   } catch (error) {
