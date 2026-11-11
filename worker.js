@@ -1895,7 +1895,7 @@ async function archiveExpiredScheduleEvents(env) {
   await writeScheduleFile(env, SCHEDULE_FILE, remaining, upcoming.sha, "Remove expired scheduled events");
 }
 
-const QUOTES_FILE = "quotes.txt";
+const QUOTES_FILE = "quotes.tsv";
 
 async function readQuotesFile(env) {
   const headers = { Authorization: `Bearer ${env.GITHUB_TOKEN}`, "User-Agent": "opvrc-map-bot", Accept: "application/vnd.github+json" };
