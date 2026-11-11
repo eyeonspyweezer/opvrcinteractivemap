@@ -252,7 +252,7 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #loadingTrack { position: relative; width: 100%; height: 22px; border: 1px solid var(--fg); border-radius: 999px; overflow: hidden; box-sizing: border-box; background: rgba(80, 110, 140, .16); }
 #loadingBar { width: 8%; height: 100%; background: #63c9f2; transition: width .3s ease; }
 :root[data-theme="dark"] #loadingBar { background: #174a78; }
-#loadingPercent { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #12364a; font-size: 12px; font-weight: 800; line-height: 1; text-shadow: 0 1px 2px rgba(255,255,255,.45); pointer-events: none; }
+#loadingPercent { position: absolute; z-index: 2; inset: 0; display: flex; align-items: center; justify-content: center; color: #12364a; font-size: 12px; font-weight: 800; line-height: 1; text-shadow: 0 1px 2px rgba(255,255,255,.45); pointer-events: none; }
 :root[data-theme="dark"] #loadingPercent { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
 #loadingShip { position: absolute; z-index: 1; left: 8%; top: 50%; transform: translate(-50%, -58%); font-size: 17px; line-height: 1; transition: left .3s ease; pointer-events: none; }
 #loadingStatus { display: none !important; }
