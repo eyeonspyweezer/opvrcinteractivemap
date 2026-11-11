@@ -374,6 +374,25 @@ body { background: var(--bg); }
 </div>
 
 <script>
+// Capture errors from the main map script so the loading screen does not hide the cause.
+window.addEventListener('error', (event) => {
+  const status = document.getElementById('loadingStatus');
+  if (!status) return;
+  if (event.target && event.target.tagName === 'SCRIPT') {
+    status.textContent = 'Script failed to load: ' + (event.target.src || 'unknown script');
+    return;
+  }
+  if (event.message) {
+    const line = event.lineno ? ' (line ' + event.lineno + ')' : '';
+    status.textContent = 'JavaScript error: ' + event.message + line;
+  }
+}, true);
+window.addEventListener('unhandledrejection', (event) => {
+  const status = document.getElementById('loadingStatus');
+  if (status) status.textContent = 'Loading error: ' + String(event.reason?.message || event.reason || 'Unknown error');
+});
+</script>
+<script>
 // ===== CONFIG: change these if the header words in your Google Sheets change (case ignored) =====
 const CONFIG = {
   islandHeaders: ['Location', 'Island / Location', 'Island'],      // TSV #2 first column
@@ -628,14 +647,19 @@ map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
 map.zoomControl.setPosition('topright');
 // Dots and lines: draw, clear one (trash button), or clear all. Not saved; they disappear on reload.
 const userMarks = new L.FeatureGroup().addTo(map);
-map.addControl(new L.Control.Draw({
-  position: 'topright',
-  draw: { polyline: { shapeOptions: { color: '#ff3b30', weight: 3 } }, circlemarker: { color: '#ff3b30', fillColor: '#ff3b30', fillOpacity: 1, radius: 5 }, polygon: false, rectangle: false, circle: false, marker: false },
-  edit: { featureGroup: userMarks, edit: false }
-}));
-map.on(L.Draw.Event.CREATED, (e) => userMarks.addLayer(e.layer));
-map.on(L.Draw.Event.DRAWSTART, () => map.getContainer().classList.add('drawing'));
-map.on(L.Draw.Event.DRAWSTOP, () => map.getContainer().classList.remove('drawing'));
+// Drawing is optional. If the Leaflet.Draw CDN fails, keep the map itself working.
+if (L.Control && L.Control.Draw && L.Draw && L.Draw.Event) {
+  map.addControl(new L.Control.Draw({
+    position: 'topright',
+    draw: { polyline: { shapeOptions: { color: '#ff3b30', weight: 3 } }, circlemarker: { color: '#ff3b30', fillColor: '#ff3b30', fillOpacity: 1, radius: 5 }, polygon: false, rectangle: false, circle: false, marker: false },
+    edit: { featureGroup: userMarks, edit: false }
+  }));
+  map.on(L.Draw.Event.CREATED, (e) => userMarks.addLayer(e.layer));
+  map.on(L.Draw.Event.DRAWSTART, () => map.getContainer().classList.add('drawing'));
+  map.on(L.Draw.Event.DRAWSTOP, () => map.getContainer().classList.remove('drawing'));
+} else {
+  console.warn('[map] Leaflet.Draw unavailable; drawing tools disabled.');
+}
 const drawnItems = new L.FeatureGroup().addTo(map);
 const relationshipLines = new L.FeatureGroup().addTo(map);
 // ===== Globe-style wrapping: polygons are also drawn as read-only copies one map width left/right =====
