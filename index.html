@@ -646,6 +646,10 @@ function saveLastMapView() {
 map.createPane('wavePane');
 map.getPane('wavePane').style.zIndex = '350';
 map.getPane('wavePane').style.pointerEvents = 'none';
+// Relationship strings sit above the map background but below island polygons.
+map.createPane('relationshipLinePane');
+map.getPane('relationshipLinePane').style.zIndex = '399';
+map.getPane('relationshipLinePane').style.pointerEvents = 'none';
 map.setView([0, 0], 0);
 map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
 map.zoomControl.setPosition('topright');
@@ -1304,7 +1308,7 @@ function rebuildRelationshipLines() {
     const unique = [...new Map(points.map(p => [p.join(','), p])).values()];
     if (unique.length < 2) return;
     // Connect islands in a chain rather than drawing every possible pair.
-    relationshipLines.addLayer(L.polyline(unique, style));
+    relationshipLines.addLayer(L.polyline(unique, { ...style, pane: 'relationshipLinePane' }));
   });
   if (OPT.crewLines) drawGroups(crewGroups, { color: '#168bd2', weight: 2.5, opacity: 0.85 });
   if (OPT.ownerLines) drawGroups(ownerGroups, { color: '#9b59b6', weight: 2.5, opacity: 0.9, dashArray: '7 6' });
