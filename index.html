@@ -1980,13 +1980,13 @@ async function loadFormerInfo() {
   try {
     const response = await fetch('island-former-info.tsv?v=' + Date.now(), { cache: 'no-store' });
     if (!response.ok) throw new Error('HTTP ' + response.status);
-    const lines = (await response.text()).replace(/^\\uFEFF/, '').split(/\\r?\\n/).filter(Boolean);
-    const header = lines.shift().split('\\t').map(x => x.trim().toLowerCase());
+    const lines = (await response.text()).replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+    const header = lines.shift().split('\t').map(x => x.trim().toLowerCase());
     const islandCol = header.indexOf('island name');
     const formerCol = header.indexOf('former info');
     if (islandCol >= 0 && formerCol >= 0) {
       lines.forEach(line => {
-        const cols = line.split('\\t');
+        const cols = line.split('\t');
         const island = String(cols[islandCol] || '').trim();
         const former = String(cols[formerCol] || '').trim();
         if (island && former) map.set(islandKey(island), former);
@@ -2031,11 +2031,11 @@ async function loadIslandExtraStats() {
         try {
           const response = await fetch(path + '?v=' + Date.now(), { cache: 'no-store' });
           if (!response.ok) return [];
-          const lines = (await response.text()).replace(/^\\uFEFF/, '').trim().split(/\\r?\\n/);
+          const lines = (await response.text()).replace(/^\uFEFF/, '').trim().split(/\r?\n/);
           if (!lines.length || !lines[0]) return [];
-          const headers = lines.shift().split('\\t').map(x => x.trim());
+          const headers = lines.shift().split('\t').map(x => x.trim());
           return lines.filter(Boolean).map(line => {
-            const cells = line.split('\\t');
+            const cells = line.split('\t');
             return Object.fromEntries(headers.map((header, i) => [header, cells[i] || '']));
           });
         } catch (_) { return []; }
