@@ -255,7 +255,7 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #loadingPercent { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #12364a; font-size: 12px; font-weight: 800; line-height: 1; text-shadow: 0 1px 2px rgba(255,255,255,.45); pointer-events: none; }
 :root[data-theme="dark"] #loadingPercent { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
 #loadingShip { position: absolute; z-index: 1; left: 8%; top: 50%; transform: translate(-50%, -58%); font-size: 17px; line-height: 1; transition: left .3s ease; pointer-events: none; }
-#loadingStatus { margin-top: 5px; font-size: 11px; opacity: .78; }
+#loadingStatus { display: none !important; }
 #loadingQuote { margin: 9px auto 0; max-width: 620px; font-size: clamp(13px, 2.5vw, 17px); line-height: 1.35; }
 #loadingQuote .quote-text { display: block; }
 #loadingQuote .quote-author { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 7px; font-size: .78em; opacity: .82; }
@@ -307,7 +307,6 @@ body { background: var(--bg); }
       <span id="loadingShip" aria-hidden="true">⛵</span>
       <span id="loadingPercent">8%</span>
     </div>
-    <div id="loadingStatus">8% · Starting…</div>
     <div id="loadingQuote" hidden>
       <span class="quote-text"></span>
       <span class="quote-author">— OPVRC Interactive Map</span>
@@ -372,6 +371,7 @@ body { background: var(--bg); }
   <label><input type="checkbox" id="optFlags" checked> Flags on the map</label>
   <label><input type="checkbox" id="optCrewLines"> Connect islands by same crew</label>
   <label><input type="checkbox" id="optOwnerLines"> Connect islands by same owner</label>
+  <label><input type="checkbox" id="optIslandAxisTravel"> Two-axis island travel animation</label>
   <label><input type="checkbox" id="optNames" checked> Island names on the map</label>
   <label><input type="checkbox" id="optOwners"> Show island owners next to names</label>
   <label><input type="checkbox" id="optHideUnnamed"> Hide Unnamed Islands</label>
@@ -425,14 +425,12 @@ function setLoadingProgress(value, status) {
   const rounded = Math.round(loadingProgress);
   const bar = $('loadingBar');
   const track = $('loadingTrack');
-  const label = $('loadingStatus');
   if (bar) bar.style.width = loadingProgress + '%';
   if (track) track.setAttribute('aria-valuenow', String(rounded));
   const percent = $('loadingPercent');
   const ship = $('loadingShip');
   if (percent) percent.textContent = rounded + '%';
-  if (ship) ship.style.left = loadingProgress + '%';
-  if (label) label.textContent = status || 'Loading…';
+  if (ship) ship.style.left = Math.max(2, Math.min(98, loadingProgress)) + '%';
 }
 function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
   const controller = new AbortController();
@@ -519,7 +517,8 @@ function saveLocalSettings() {
       colors: OPT.colors, flags: OPT.flags, names: OPT.names,
       owners: OPT.owners, hideUnnamed: OPT.hideUnnamed, hideUnowned: OPT.hideUnowned,
       crewLines: OPT.crewLines, ownerLines: OPT.ownerLines,
-      opacity: POLYGON_FILL_OPACITY
+      opacity: POLYGON_FILL_OPACITY,
+      islandAxisTravel: OPT.islandAxisTravel
     }));
   } catch (_) {
     // Keep the page usable if browser storage is unavailable.
@@ -534,7 +533,8 @@ const OPT = {
   hideUnnamed: savedBool('hideUnnamed', false),
   hideUnowned: savedBool('hideUnowned', false),
   crewLines: savedBool('crewLines', false),
-  ownerLines: savedBool('ownerLines', false)
+  ownerLines: savedBool('ownerLines', false),
+  islandAxisTravel: savedBool('islandAxisTravel', false)
 };
 
 // ===== Link/bot filters: ?show=pirates,marines  (no ?show = everything) =====
@@ -2441,33 +2441,46 @@ function showLayers(layers) {
   const target = bounds.getCenter();
   const current = map.getCenter();
   const currentZoom = map.getZoom();
-  const currentPoint = map.project(current, currentZoom);
-  const targetPoint = map.project(target, currentZoom);
-  const dx = Math.abs(targetPoint.x - currentPoint.x);
-  const dy = Math.abs(targetPoint.y - currentPoint.y);
-  const xFirst = dx <= dy;
-
-  // Fit the selected island(s), while respecting the map's configured zoom limits.
   const fittedZoom = map.getBoundsZoom(bounds, false, L.point(80, 80));
   const targetZoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), fittedZoom));
 
-  // Stage one: travel only along the shorter screen-space axis.
-  const intermediate = xFirst
-    ? L.latLng(current.lat, target.lng)
-    : L.latLng(target.lat, current.lng);
-  const firstDistance = xFirst ? dx : dy;
-
-  const finishMove = () => {
-    if (sequence !== islandMoveSequence) return;
-    // Stage two: complete the longer axis and zoom to the island at the same time.
-    map.flyTo(target, targetZoom, { duration: 0.85, easeLinearity: 0.25 });
-  };
-
-  if (firstDistance > 1) {
-    map.once('moveend', finishMove);
-    map.flyTo(intermediate, currentZoom, { duration: 0.55, easeLinearity: 0.25 });
+  // Original Leaflet-style movement is the default.
+  if (!OPT.islandAxisTravel) {
+    map.flyTo(target, targetZoom, { duration: 1.1, easeLinearity: 0.25 });
   } else {
-    finishMove();
+    const currentPoint = map.project(current, currentZoom);
+    const targetPoint = map.project(target, currentZoom);
+    const dx = Math.abs(targetPoint.x - currentPoint.x);
+    const dy = Math.abs(targetPoint.y - currentPoint.y);
+    const xFirst = dx <= dy;
+    const intermediate = xFirst
+      ? L.latLng(current.lat, target.lng)
+      : L.latLng(target.lat, current.lng);
+    const halfway = xFirst
+      ? L.latLng(target.lat, intermediate.lng)
+      : L.latLng(intermediate.lat, target.lng);
+    const firstDistance = Math.min(dx, dy);
+
+    const beginLongAxis = () => {
+      if (sequence !== islandMoveSequence) return;
+      if (Math.max(dx, dy) <= 1) {
+        map.flyTo(target, targetZoom, { duration: 0.85, easeLinearity: 0.25 });
+        return;
+      }
+      map.once('moveend', () => {
+        if (sequence !== islandMoveSequence) return;
+        map.flyTo(target, targetZoom, { duration: 0.85, easeLinearity: 0.25 });
+      });
+      // First half of the longer axis: no zoom. Final half: zoom to the island.
+      map.flyTo(halfway, currentZoom, { duration: 0.45, easeLinearity: 0.25 });
+    };
+
+    if (firstDistance > 1) {
+      map.once('moveend', beginLongAxis);
+      map.flyTo(intermediate, currentZoom, { duration: 0.45, easeLinearity: 0.25 });
+    } else {
+      beginLongAxis();
+    }
   }
 
   flashLayers(layers);
@@ -2639,6 +2652,7 @@ document.querySelectorAll('.ico').forEach((el) => {
 $('optColors').checked = OPT.colors;
 $('optCrewLines').checked = OPT.crewLines;
 $('optOwnerLines').checked = OPT.ownerLines;
+$('optIslandAxisTravel').checked = OPT.islandAxisTravel;
 $('optFlags').checked = OPT.flags;
 $('optNames').checked = OPT.names;
 $('optOwners').checked = OPT.owners;
@@ -2647,6 +2661,7 @@ $('optHideUnowned').checked = OPT.hideUnowned;
 $('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked; restyleAll(); rebuildFlags(); saveLocalSettings(); });
 $('optCrewLines').addEventListener('change', (e) => { OPT.crewLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
 $('optOwnerLines').addEventListener('change', (e) => { OPT.ownerLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
+$('optIslandAxisTravel').addEventListener('change', (e) => { OPT.islandAxisTravel = e.target.checked; saveLocalSettings(); });
 $('optFlags').addEventListener('change', (e) => { OPT.flags = e.target.checked; rebuildFlags(); saveLocalSettings(); });
 $('optNames').addEventListener('change', (e) => { OPT.names = e.target.checked; rebuildLabels(); saveLocalSettings(); });
 $('optOwners').addEventListener('change', (e) => { OPT.owners = e.target.checked; rebuildLabels(); saveLocalSettings(); });
