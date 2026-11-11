@@ -2229,10 +2229,69 @@ async function syncDiscordCommands(env) {
 }
 let lastAutoCommandSyncAt = 0;
 
+
+// ---------- browser command tester (read-only commands only) ----------
+async function runDebugCommand(env, command, value) {
+  const v = String(value || "").trim();
+  if (LINKS[command]) return { type: 4, data: { content: LINKS[command] } };
+  if (command === "map") return { type: 4, data: await mapMessage(ALL_ON) };
+  if (command === "events") return { type: 4, data: await eventsListMessage(env) };
+  if (command === "crewlist") return { type: 4, data: await crewListPage(0) };
+  if (command === "googlesheet") return { type: 4, data: await sheetPage(v === "c" ? "c" : "i", 0) };
+  if (command === "island") {
+    if (!v) throw new Error("Enter an island name.");
+    return { type: 4, data: await islandMessage(v) };
+  }
+  if (command === "group") {
+    if (!v) throw new Error("Enter a crew/group name.");
+    const groups = await getGroups();
+    const g = groups.find(x => x.name.toLowerCase() === v.toLowerCase()) ||
+      groups.find(x => x.name.toLowerCase().includes(v.toLowerCase()));
+    if (!g) return { type: 4, data: { content: `I couldn't find a group called "${v}".` } };
+    return { type: 4, data: await groupData(g) };
+  }
+  if (["worldactivity", "islandactivity", "crewactivity", "owneractivity"].includes(command)) {
+    const kind = command === "islandactivity" ? "island" : command === "owneractivity" ? "owner" : "crew";
+    return { type: 4, data: await historicalActivityResponse(kind, v || "7d") };
+  }
+  throw new Error("That command is not enabled in the browser tester. Only read-only commands can run here.");
+}
+
 // ---------- main ----------
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    const testCors = {
+      "Access-Control-Allow-Origin": BASE,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, X-Test-Key",
+      "Vary": "Origin"
+    };
+    if (url.pathname === "/test" && request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: testCors });
+    }
+    if (url.pathname === "/test" && request.method === "POST") {
+      if (request.headers.get("Origin") !== BASE || !env.TEST_KEY ||
+          request.headers.get("X-Test-Key") !== env.TEST_KEY) {
+        return new Response(JSON.stringify({ ok: false, error: "Unauthorized. Check the tester key." }), {
+          status: 403, headers: { ...testCors, "Content-Type": "application/json" }
+        });
+      }
+      try {
+        const input = await request.json();
+        const command = String(input.command || "");
+        const value = String(input.value || "");
+        const response = await runDebugCommand(env, command, value);
+        return new Response(JSON.stringify({ ok: true, command, response }), {
+          headers: { ...testCors, "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({ ok: false, error: String(error?.stack || error).slice(0, 5000) }), {
+          status: 500, headers: { ...testCors, "Content-Type": "application/json" }
+        });
+      }
+    }
 
     // One-time: open https://YOUR-WORKER/register?key=REGISTER_KEY in your browser
     if (request.method === "GET" && url.pathname === "/register") {
