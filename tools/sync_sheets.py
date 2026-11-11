@@ -117,7 +117,7 @@ def sync_former_info():
     island_col = former_col = None
 
     for i, row in enumerate(rows):
-        low = [re.sub(r"\\s+", " ", c.strip().lower()) for c in row]
+        low = [re.sub(r"\s+", " ", c.strip().lower()) for c in row]
         if "former info" not in low:
             continue
         candidate = next((j for j, value in enumerate(low)
@@ -138,15 +138,15 @@ def sync_former_info():
         former = row[former_col].strip() if former_col < len(row) else ""
         if not island or not former:
             continue
-        former = re.sub(r"[\\t\\r\\n]+", " ", former).strip()
+        former = re.sub(r"[\t\r\n]+", " ", former).strip()
         key = norm_key(island)
         if key and key not in entries:
             entries[key] = (island, former)
 
-    lines = ["Island Name\\tFormer Info"]
+    lines = ["Island Name\tFormer Info"]
     for island, former in sorted(entries.values(), key=lambda item: item[0].lower()):
-        lines.append(f"{island}\\t{former}")
-    output = "\\n".join(lines) + "\\n"
+        lines.append(f"{island}\t{former}")
+    output = "\n".join(lines) + "\n"
     if not FORMER_INFO_FILE.exists() or FORMER_INFO_FILE.read_text(encoding="utf-8") != output:
         FORMER_INFO_FILE.write_text(output, encoding="utf-8")
     print(f"Former Info: {len(entries)} islands written to {FORMER_INFO_FILE}")
