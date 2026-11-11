@@ -72,7 +72,7 @@ jobs:
               lambda _: replacement,
               html,
               count=1,
-              flags=re.DOTALL
+              flags=re.MULTILINE
           )
           if count != 1:
               raise SystemExit("Could not locate the embedded quote array in index.html.")
