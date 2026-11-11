@@ -877,11 +877,14 @@ function mapPixelColor(layer) {
     // island's own PNG color, which makes the opaque polygon blend in invisibly.
     const bounds = turf.bbox(layer.toGeoJSON());
     const [minX, minY, maxX, maxY] = bounds;
+    // Cache the result: the source map never changes during a page session.
+    if (layer._nearbyMapColor) return layer._nearbyMapColor;
     const pad = 5;
     const spanX = Math.max(1, maxX - minX);
     const spanY = Math.max(1, maxY - minY);
-    const stepX = Math.max(1, Math.floor(spanX / 24));
-    const stepY = Math.max(1, Math.floor(spanY / 24));
+    // Keep the first-time sampling work small (previously up to ~100 pixel reads per island).
+    const stepX = Math.max(1, Math.floor(spanX / 6));
+    const stepY = Math.max(1, Math.floor(spanY / 6));
     const samples = [];
     const read = (mapX, mapY) => {
       const x = ((Math.floor(mapX) % mapWidth) + mapWidth) % mapWidth;
@@ -907,7 +910,8 @@ function mapPixelColor(layer) {
       counts.set(key, (counts.get(key) || 0) + 1);
     });
     const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
-    return 'rgb(' + best + ')';
+    layer._nearbyMapColor = 'rgb(' + best + ')';
+    return layer._nearbyMapColor;
   } catch (err) {
     console.warn('[island status] Could not sample surrounding map color:', err);
     return null;
@@ -1298,6 +1302,15 @@ function randomUnknownIslandColor(name) {
 }
 
 function applyStyle(layer) {
+  // Remove only the previous blend override before applying the normal style.
+  // This lets the checkbox turn blending off without disturbing sunk/destroyed islands.
+  if (layer._blendPainted) {
+    [layer, ...(layer._ghosts || [])].forEach(x => {
+      if (!x._path) return;
+      ['fill', 'stroke', 'fill-opacity', 'stroke-opacity', 'opacity'].forEach(k => x._path.style.removeProperty(k));
+    });
+    layer._blendPainted = false;
+  }
   const p = layer.feature.properties;
   const owner = resolveOwner(p);
   const colors = groupColorsOf(owner);
@@ -1345,6 +1358,7 @@ function applyStyle(layer) {
   }
   if (OPT.blendUnowned && (String(p.name || '').includes('???') || !ownersOf(owner).length)) {
     paintStatusColor(layer);
+    layer._blendPainted = true;
   }
 }
 const restyleAll = () => drawnItems.eachLayer(applyStyle);
