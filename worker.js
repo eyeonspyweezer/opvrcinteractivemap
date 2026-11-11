@@ -1942,7 +1942,7 @@ async function addQuoteFromMessage(env, interaction) {
   const addedAt = message.timestamp || new Date().toISOString();
   const newText = (current.text.trimEnd() ? current.text.trimEnd() + "\n" : "") + quoteTsvLine(quote, displayName, username, message.id, addedAt) + "\n";
   await writeQuotesFile(env, newText, current.sha, "Add quote from Discord message");
-  return { type: 4, data: { flags: 64, content: `✅ Added quote by **${displayName}** (`@${username}`).` } };
+  return { type: 4, data: { flags: 64, content: "✅ Added quote by **" + displayName + "** (@" + username + ")." } };
 }
 
 const VIDEO_FILE = "opvrc-videos.json";
