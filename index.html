@@ -2033,11 +2033,11 @@ async function getAnnouncementMentions(islandName) {
   if (!announcementArchivePromise) {
     announcementArchivePromise = fetch('https://raw.githubusercontent.com/eyeonspyweezer/goofymarinenewspb/main/discord-archive.txt', { cache: 'no-cache' })
       .then(response => { if (!response.ok) throw new Error('HTTP ' + response.status); return response.text(); })
-      .then(text => text.split(/(?=^\\[\\d{4}-\\d{2}-\\d{2}T)/m).filter(block => /^\\[\\d{4}-\\d{2}-\\d{2}T/.test(block))
+      .then(text => text.split(/(?=^\[\d{4}-\d{2}-\d{2}T)/m).filter(block => /^\[\d{4}-\d{2}-\d{2}T/.test(block))
         .map(block => {
-          const dateMatch = block.match(/^\\[([^\\]]+)\\]/);
-          const messageMatch = block.match(/\\(message (\\d+)\\)/i);
-          const channelMatch = block.match(/^Channel ID:\\s*(\\d+)/mi);
+          const dateMatch = block.match(/^\[([^\]]+)\]/);
+          const messageMatch = block.match(/\(message (\d+)\)/i);
+          const channelMatch = block.match(/^Channel ID:\s*(\d+)/mi);
           const body = block.slice(block.indexOf(']') + 1).toLowerCase().replace(/[^a-z0-9]+/g, ' ');
           return dateMatch ? {
             date: new Date(dateMatch[1]),
