@@ -2084,6 +2084,128 @@ async function videosListMessage(env) {
 }
 
 
+
+const VIDEO_MONITOR_FILE = "opvrc-video-monitor.json";
+const YOUTUBE_CHANNELS_TO_MONITOR = [
+  { handle: "@Bepo-j4o", url: "https://www.youtube.com/@Bepo-j4o" },
+  { handle: "@Redrangervr", url: "https://www.youtube.com/@Redrangervr" }
+];
+
+function decodeYouTubeXml(value) {
+  return String(value || "")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
+}
+
+async function resolveYouTubeChannelId(channel) {
+  const response = await fetch(channel.url, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; OPVRCMapBot/1.0)", "Accept-Language": "en-US,en;q=0.9" }
+  });
+  if (!response.ok) throw new Error("YouTube channel page returned " + response.status);
+  const html = await response.text();
+  const patterns = [
+    /"channelId"\s*:\s*"(UC[a-zA-Z0-9_-]{22})"/,
+    /"externalId"\s*:\s*"(UC[a-zA-Z0-9_-]{22})"/,
+    /<meta\s+itemprop=["']channelId["']\s+content=["'](UC[a-zA-Z0-9_-]{22})["']/i
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) return match[1];
+  }
+  throw new Error("Could not resolve channel ID for " + channel.handle);
+}
+
+async function readYouTubeRss(channelId) {
+  const response = await fetch("https://www.youtube.com/feeds/videos.xml?channel_id=" + encodeURIComponent(channelId), {
+    headers: { "User-Agent": "OPVRCMapBot/1.0", "Accept": "application/atom+xml, application/xml, text/xml" }
+  });
+  if (!response.ok) throw new Error("YouTube RSS returned " + response.status);
+  const xml = await response.text();
+  const entries = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map(match => {
+    const body = match[1];
+    const read = (tag) => {
+      const found = body.match(new RegExp("<" + tag + "(?:\\s[^>]*)?>([\\s\\S]*?)<\\/" + tag + ">"));
+      return found ? decodeYouTubeXml(found[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim()) : "";
+    };
+    const videoId = read("yt:videoId");
+    const link = body.match(/<link\b[^>]*rel=["']alternate["'][^>]*href=["']([^"']+)["']/i);
+    const author = body.match(/<author>[\s\S]*?<name>([\s\S]*?)<\/name>/i);
+    return {
+      videoId,
+      url: link ? decodeYouTubeXml(link[1]) : (videoId ? "https://www.youtube.com/watch?v=" + videoId : ""),
+      title: read("title"),
+      publishedAt: read("published"),
+      channelName: author ? decodeYouTubeXml(author[1].trim()) : "",
+      thumbnail: videoId ? "https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg" : null
+    };
+  }).filter(item => item.videoId && item.url);
+  return entries;
+}
+
+async function monitorYouTubeChannels(env) {
+  need(env, ["GITHUB_TOKEN"]);
+  const stateFile = await readScheduleFile(env, VIDEO_MONITOR_FILE);
+  const videoFile = await readScheduleFile(env, VIDEO_FILE);
+  const states = new Map(stateFile.items.map(item => [item.handle, item]));
+  const knownVideoIds = new Set(videoFile.items.map(item => item.videoId).filter(Boolean));
+  const knownUrls = new Set(videoFile.items.map(item => item.url).filter(Boolean));
+  let stateChanged = false;
+  let videosChanged = false;
+
+  for (const channel of YOUTUBE_CHANNELS_TO_MONITOR) {
+    try {
+      let state = states.get(channel.handle);
+      const channelId = state?.channelId || await resolveYouTubeChannelId(channel);
+      const entries = await readYouTubeRss(channelId);
+      if (!state) {
+        // First run is a baseline only. Existing uploads are marked seen, never imported.
+        state = { handle: channel.handle, channelId, initialized: true, seenIds: entries.map(item => item.videoId), lastCheckedAt: new Date().toISOString() };
+        states.set(channel.handle, state);
+        stateChanged = true;
+        console.log("Initialized YouTube monitor baseline for " + channel.handle + "; did not import older videos.");
+        continue;
+      }
+
+      const seen = new Set(state.seenIds || []);
+      const fresh = entries.filter(item => !seen.has(item.videoId));
+      for (const entry of fresh) {
+        if (!knownVideoIds.has(entry.videoId) && !knownUrls.has(entry.url)) {
+          videoFile.items.push({
+            type: "video",
+            category: "OPVRC Events",
+            videoId: entry.videoId,
+            url: entry.url,
+            platform: "YouTube",
+            title: entry.title || "YouTube video",
+            channelName: entry.channelName || channel.handle,
+            thumbnail: entry.thumbnail,
+            publishedAt: entry.publishedAt || null,
+            addedAt: new Date().toISOString(),
+            sourceChannel: channel.handle,
+            sourceChannelUrl: channel.url,
+            author: channel.handle + " (automatic)"
+          });
+          knownVideoIds.add(entry.videoId);
+          knownUrls.add(entry.url);
+          videosChanged = true;
+        }
+      }
+      state.channelId = channelId;
+      state.initialized = true;
+      state.seenIds = [...new Set([...(state.seenIds || []), ...entries.map(item => item.videoId)])].slice(-100);
+      state.lastCheckedAt = new Date().toISOString();
+      states.set(channel.handle, state);
+      stateChanged = true;
+      if (fresh.length) console.log("Detected " + fresh.length + " new upload(s) from " + channel.handle + ".");
+    } catch (error) {
+      console.error("YouTube monitor failed for " + channel.handle + ":", error);
+    }
+  }
+
+  if (videosChanged) await writeScheduleFile(env, VIDEO_FILE, videoFile.items, videoFile.sha, "Automatically add new uploads from monitored YouTube channels");
+  if (stateChanged) await writeScheduleFile(env, VIDEO_MONITOR_FILE, [...states.values()], stateFile.sha, "Update monitored YouTube channel checkpoints");
+}
+
 async function scheduleRemindersCommand(env, interaction) {
   need(env, ["GITHUB_TOKEN"]);
   const userId = interaction.member?.user?.id || interaction.user?.id;
@@ -2789,7 +2911,8 @@ export default {
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(Promise.allSettled([
       archiveExpiredScheduleEvents(env),
-      sendDueScheduleReminders(env)
+      sendDueScheduleReminders(env),
+      monitorYouTubeChannels(env)
     ]));
   }
 };
