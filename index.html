@@ -412,7 +412,8 @@ function finishLoadingScreen() {
 }
 async function loadLoadingQuote() {
   const quoteBox = $('loadingQuote');
-  quoteBox.hidden = true;
+  // Keep the built-in fallback quote visible while quotes.tsv is loading.
+  quoteBox.hidden = false;
   try {
     let response = null;
     const quoteSources = [
