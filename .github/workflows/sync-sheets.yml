@@ -31,9 +31,9 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add island-backgrounds owner-links.tsv crew-links.tsv
+          git add island-backgrounds owner-links.tsv crew-links.tsv island-former-info.tsv
           if ! git diff --cached --quiet; then
-            git commit -m "Sync island pictures and owner links"
+            git commit -m "Sync island sheets and Former Info"
             git pull --rebase -X theirs
             git push
           fi
