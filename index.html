@@ -412,7 +412,7 @@ body { background: var(--bg); }
   <label><input type="checkbox" id="optOwners"> Show island owners next to names</label>
   <label><input type="checkbox" id="optHideUnnamed"> Hide Unnamed Islands</label>
   <label><input type="checkbox" id="optHideUnowned"> Hide unowned islands</label>
-  <label><input type="checkbox" id="optBlendUnowned"> Blend unowned / unknown islands into nearby map color</label>
+  <label><input type="checkbox" id="optBlendUnowned"> Blend unknown islands (??? names) into nearby map color</label>
   <label>Fill opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
 </div>
 
@@ -1314,7 +1314,7 @@ function applyStyle(layer) {
   const p = layer.feature.properties;
   const owner = resolveOwner(p);
   const colors = groupColorsOf(owner);
-  const isUnknownIsland = String(p.name || '').includes('???') || !ownersOf(owner).length;
+  const isUnknownIsland = String(p.name || '').includes('???');
 
   let col = OPT.colors
     ? (isUnknownIsland ? randomUnknownIslandColor(p.name) : p.color)
@@ -1356,7 +1356,7 @@ function applyStyle(layer) {
   } else {
     layer._stripeFill = null;
   }
-  if (OPT.blendUnowned && (String(p.name || '').includes('???') || !ownersOf(owner).length)) {
+  if (OPT.blendUnowned && String(p.name || '').includes('???')) {
     paintStatusColor(layer);
     layer._blendPainted = true;
   }
