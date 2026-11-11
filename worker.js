@@ -1990,6 +1990,38 @@ async function getYouTubeMetadata(url) {
   }
 }
 
+async function addVideosFromMessage(env, interaction) {
+  const message = interaction.data.resolved?.messages?.[interaction.data.target_id];
+  const attachments = Object.values(message?.attachments || {}).filter(a => /video\\//i.test(a.content_type || "") || /\\.(mp4|mov|webm|m4v)$/i.test(a.filename || ""));
+  const content = String(message?.content || "");
+  const urls = [...content.matchAll(/https?:\\/\\/[^\\s<>]+/g)].map(match => match[0].replace(/[),.!?]+$/,"")).filter(url => /youtube\\.com|youtu\\.be|tiktok\\.com|instagram\\.com|facebook\\.com|fb\\.watch|vimeo\\.com|twitch\\.tv|x\\.com|twitter\\.com|kick\\.com/i.test(url));
+  const candidates = [...new Set([...urls, ...attachments.map(a => a.url).filter(Boolean)])];
+  if (!message || !candidates.length) return { content: "I couldn't find video links or video attachments in that message.", flags: 64 };
+  need(env, ["GITHUB_TOKEN"]);
+  const stored = await readScheduleFile(env, VIDEO_FILE);
+  const sourceMessageUrl = `https://discord.com/channels/${interaction.guild_id || "@me"}/${interaction.channel_id}/${message.id}`;
+  const addedAt = message.timestamp || new Date().toISOString();
+  let added = 0;
+  for (const url of candidates) {
+    if (stored.items.some(item => item.url === url)) continue;
+    const attachment = attachments.find(a => a.url === url);
+    const platform = /youtube\\.com|youtu\\.be/i.test(url) ? "YouTube" : /tiktok\\.com/i.test(url) ? "TikTok" : /discord(app)?\\.com\\/attachments/i.test(url) ? "Discord" : "External";
+    const youtube = platform === "YouTube" ? await getYouTubeMetadata(url) : null;
+    stored.items.push({
+      type:"video", category:"OPVRC Events", url, platform,
+      title: youtube?.title || attachment?.filename || (platform === "YouTube" ? "YouTube video" : platform === "TikTok" ? "TikTok video" : "Video"),
+      thumbnail: youtube?.thumbnail || null,
+      ...(youtube?.channelName ? { channelName: youtube.channelName } : {}),
+      addedAt,
+      sourceMessageUrl, sourceMessageId: message.id,
+      author: message.author?.global_name || message.author?.username || "Unknown"
+    });
+    added++;
+  }
+  if (added) await writeScheduleFile(env, VIDEO_FILE, stored.items, stored.sha, "Add videos to OPVRC Events");
+  return { content: added ? `Added **${added}** video link/attachment(s) to **OPVRC Events**. YouTube titles, channel names, and thumbnails were fetched automatically when available.` : "Those video links are already saved.", flags: 64 };
+}
+
 async function eventsListMessage(env) {
   const [stored, videos] = await Promise.all([
     readScheduleFile(env, SCHEDULE_FILE),
@@ -2453,35 +2485,22 @@ export default {
     }
 
     if (i.type === 2 && i.data.type === 3 && i.data.name === "Add to Video List") {
-      const message = i.data.resolved?.messages?.[i.data.target_id];
-      const attachments = Object.values(message?.attachments || {}).filter(a => /video\//i.test(a.content_type || "") || /\.(mp4|mov|webm|m4v)$/i.test(a.filename || ""));
-      const content = String(message?.content || "");
-      const urls = [...content.matchAll(/https?:\/\/[^\s<>]+/g)].map(match => match[0].replace(/[),.!?]+$/,"")).filter(url => /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|facebook\.com|fb\.watch|vimeo\.com|twitch\.tv|x\.com|twitter\.com|kick\.com/i.test(url));
-      const candidates = [...new Set([...urls, ...attachments.map(a => a.url).filter(Boolean)])];
-      if (!message || !candidates.length) return json({type:4,data:{flags:64,content:"I couldn't find video links or video attachments in that message."}});
-      need(env, ["GITHUB_TOKEN"]);
-      const stored = await readScheduleFile(env, VIDEO_FILE);
-      const sourceMessageUrl = `https://discord.com/channels/${i.guild_id || "@me"}/${i.channel_id}/${message.id}`;
-      const addedAt = message.timestamp || new Date().toISOString();
-      let added = 0;
-      for (const url of candidates) {
-        if (stored.items.some(item => item.url === url)) continue;
-        const attachment = attachments.find(a => a.url === url);
-        const platform = /youtube\.com|youtu\.be/i.test(url) ? "YouTube" : /tiktok\.com/i.test(url) ? "TikTok" : /discord(app)?\.com\/attachments/i.test(url) ? "Discord" : "External";
-        const youtube = platform === "YouTube" ? await getYouTubeMetadata(url) : null;
-        stored.items.push({
-          type:"video", category:"OPVRC Events", url, platform,
-          title: youtube?.title || attachment?.filename || (platform === "YouTube" ? "YouTube video" : platform === "TikTok" ? "TikTok video" : "Video"),
-          thumbnail: youtube?.thumbnail || null,
-          ...(youtube?.channelName ? { channelName: youtube.channelName } : {}),
-          addedAt,
-          sourceMessageUrl, sourceMessageId: message.id,
-          author: message.author?.global_name || message.author?.username || "Unknown"
+      ctx.waitUntil((async () => {
+        let data;
+        try {
+          data = await addVideosFromMessage(env, i);
+        } catch (error) {
+          console.error("Add to Video List failed:", error);
+          data = { content: `❌ I couldn't save those videos: ${String(error?.message || error).slice(0, 200)}`, flags: 64 };
+        }
+        const response = await fetch(`https://discord.com/api/v10/webhooks/${env.DISCORD_APP_ID}/${i.token}/messages/@original`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
         });
-        added++;
-      }
-      if (added) await writeScheduleFile(env, VIDEO_FILE, stored.items, stored.sha, "Add videos to OPVRC Events");
-      return json({type:4,data:{flags:64,content:added ? `Added **${added}** video link/attachment(s) to **OPVRC Events**. Items are tagged VIDEO and sorted by date in /events.` : "Those video links are already saved."}});
+        if (!response.ok) console.error("Add to Video List response update failed:", response.status, (await response.text()).slice(0, 300));
+      })());
+      return json({ type: 5, data: { flags: 64 } });
     }
 
     // slash commands
