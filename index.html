@@ -249,8 +249,12 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 }
 #loadingScreen.hidden { opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-100%); }
 #loadingInner { width: min(620px, 88vw); margin: 0 auto; }
-#loadingTrack { width: 100%; height: 10px; border: 1px solid var(--fg); border-radius: 999px; overflow: hidden; box-sizing: border-box; }
-#loadingBar { width: 8%; height: 100%; background: var(--fg); transition: width .3s ease; }
+#loadingTrack { position: relative; width: 100%; height: 22px; border: 1px solid var(--fg); border-radius: 999px; overflow: hidden; box-sizing: border-box; background: rgba(80, 110, 140, .16); }
+#loadingBar { width: 8%; height: 100%; background: #63c9f2; transition: width .3s ease; }
+:root[data-theme="dark"] #loadingBar { background: #174a78; }
+#loadingPercent { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #12364a; font-size: 12px; font-weight: 800; line-height: 1; text-shadow: 0 1px 2px rgba(255,255,255,.45); pointer-events: none; }
+:root[data-theme="dark"] #loadingPercent { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+#loadingShip { position: absolute; z-index: 1; left: 8%; top: 50%; transform: translate(-50%, -58%); font-size: 17px; line-height: 1; transition: left .3s ease; pointer-events: none; }
 #loadingStatus { margin-top: 5px; font-size: 11px; opacity: .78; }
 #loadingQuote { margin: 9px auto 0; max-width: 620px; font-size: clamp(13px, 2.5vw, 17px); line-height: 1.35; }
 #loadingQuote .quote-text { display: block; }
@@ -300,6 +304,8 @@ body { background: var(--bg); }
   <div id="loadingInner">
     <div id="loadingTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
       <div id="loadingBar"></div>
+      <span id="loadingShip" aria-hidden="true">⛵</span>
+      <span id="loadingPercent">8%</span>
     </div>
     <div id="loadingStatus">8% · Starting…</div>
     <div id="loadingQuote" hidden>
@@ -422,7 +428,11 @@ function setLoadingProgress(value, status) {
   const label = $('loadingStatus');
   if (bar) bar.style.width = loadingProgress + '%';
   if (track) track.setAttribute('aria-valuenow', String(rounded));
-  if (label) label.textContent = rounded + '% · ' + (status || 'Loading…');
+  const percent = $('loadingPercent');
+  const ship = $('loadingShip');
+  if (percent) percent.textContent = rounded + '%';
+  if (ship) ship.style.left = loadingProgress + '%';
+  if (label) label.textContent = status || 'Loading…';
 }
 function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
   const controller = new AbortController();
@@ -1589,7 +1599,7 @@ let tileLayer = null;
         const ctx = tile.getContext('2d');
         const scale = Math.pow(2, coords.z);
         const mod = (n, m) => ((n % m) + m) % m;
-        const pattern = ctx.createPattern(image, 'repeat');
+        const pattern = ctx.createPattern(image, 'repeat-x');
         if (!pattern) return tile;
         pattern.setTransform(new DOMMatrix([scale, 0, 0, scale, -mod(coords.x * size.x, width * scale), -mod(coords.y * size.y, height * scale)]));
         ctx.fillStyle = pattern;
