@@ -423,7 +423,7 @@ async function loadLoadingQuote() {
     const messageUrl = fields[4] || '';
     const quoteText = $('loadingQuote .quote-text');
     quoteText.textContent = quote;
-    if (/^https:\\/\\/discord\\.com\\/channels\\//i.test(messageUrl)) {
+    if (/^https:\/\/discord\.com\/channels\//i.test(messageUrl)) {
       const quoteLink = document.createElement('a');
       quoteLink.href = messageUrl;
       quoteLink.target = '_blank';
