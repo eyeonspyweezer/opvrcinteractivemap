@@ -2486,42 +2486,129 @@ function formatMapArea(n){
   if(n>=1e3)return (n/1e3).toFixed(1)+'K map²';
   return Math.round(n).toLocaleString()+' map²';
 }
+let landMassCategory='crews', growthPeriod='Visits 7d', growthCategory='islands', mentionCategory='islands', mentionSort='count', expandedMentionKey='';
 function openLandMassRanking(){
-  openInsight('Land Mass Ranking',tools=>{tools.textContent='Ranked by total mapped island area. Shared islands are split evenly between their groups.';});
+  openInsight('Land Mass Ranking',tools=>{
+    tools.textContent='Ranked by mapped island area. Shared island area is split evenly between the selected groups or owners.';
+    addInsightSelect(tools,'Ranking type',[['islands','Islands'],['crews','Crews / Groups'],['worlds','VRChat Worlds'],['owners','Owners']],landMassCategory,v=>{landMassCategory=v;renderLandMassRanking();});
+  });
+  renderLandMassRanking();
+}
+async function renderLandMassRanking(){
+  const box=$('insightRows');box.textContent='Calculating mapped area…';
   const totals=new Map(), totalArea={value:0};
+  let stats=null;
+  if(landMassCategory==='worlds') stats=await loadIslandExtraStats();
+  const add=(name,area,flag='')=>{
+    if(!name||!area||!Number.isFinite(area))return;
+    const key=norm(name),old=totals.get(key)||{name,area:0,flag};
+    old.area+=area;if(!old.flag&&flag)old.flag=flag;totals.set(key,old);
+  };
   drawnItems.eachLayer(layer=>{
     if(layer._hidden||layer._sunk||layer._destroyed||isGoneStatus(layer))return;
-    const p=layer.feature?.properties||{},area=planarGeometryArea(layer.feature?.geometry);
-    if(!area)return;
+    const p=layer.feature?.properties||{},name=String(p.name||'').trim();
+    const area=planarGeometryArea(layer.feature?.geometry);
+    if(!area||!name||name==='???')return;
     totalArea.value+=area;
-    const groups=preferMarines(groupsForIsland(p.name,resolveOwner(p))).filter(Boolean);
-    if(!groups.length)return;
-    const share=area/groups.length;
-    groups.forEach(group=>totals.set(group,(totals.get(group)||0)+share));
+    if(landMassCategory==='islands'){add(name,area);return;}
+    let targets=[];
+    if(landMassCategory==='owners')targets=uniqueOwners(resolveOwner(p));
+    else if(landMassCategory==='crews')targets=preferMarines(groupsForIsland(name,resolveOwner(p)));
+    else {
+      const links=stats?.worldsByIsland.get(islandKey(name))||[];
+      targets=[...new Set(links.map(w=>w.stats?.['World Name']||w.id).filter(Boolean))];
+    }
+    targets=[...new Map(targets.filter(Boolean).map(v=>[norm(v),v])).values()];
+    if(!targets.length)return;
+    const share=area/targets.length;
+    targets.forEach(target=>add(target,share,landMassCategory==='crews'?flagFor(target):''));
   });
-  const rows=[...totals.entries()].sort((a,b)=>b[1]-a[1]).slice(0,20);
-  const box=$('insightRows');box.textContent='';
-  if(!rows.length){box.textContent='No organization/group land-area data available.';return;}
-  rows.forEach(([name,area],i)=>{
+  const rows=[...totals.values()].sort((a,b)=>b.area-a.area).slice(0,100);
+  box.textContent='';
+  if(!rows.length){box.textContent='No mapped area data available for this category.';return;}
+  rows.forEach((row,i)=>{
     const el=document.createElement('div');el.className='insight-row';
-    const label=document.createElement('span');label.textContent=(i+1)+'. '+name;
+    const label=document.createElement('span');
+    label.textContent=(i+1)+'. ';
+    if(row.flag){const img=document.createElement('img');img.src=row.flag;img.alt='';img.loading='lazy';img.style.cssText='width:20px;height:14px;object-fit:cover;vertical-align:middle;margin-right:6px';label.appendChild(img);}
+    label.appendChild(document.createTextNode(row.name));
     const value=document.createElement('strong');value.className='insight-value';
-    value.textContent=formatMapArea(area)+' · '+((area/Math.max(totalArea.value,1))*100).toFixed(1)+'%';
+    value.textContent=formatMapArea(row.area)+' · '+((row.area/Math.max(totalArea.value,1))*100).toFixed(1)+'%';
     el.append(label,value);box.appendChild(el);
   });
 }
-// ===== Sidebar insight panels: visitor growth and Discord announcement mentions =====
-let growthPeriod='Visits 7d', growthCategory='islands';
 function openInsight(title,buildTools){$('bountyPanel').hidden=true;$('insightTitle').textContent=title;$('insightTools').textContent='';$('insightRows').textContent='Loading…';$('insightPanel').hidden=false;buildTools?.($('insightTools'));}
 function addInsightSelect(parent,label,options,value,change){const select=document.createElement('select');select.setAttribute('aria-label',label);options.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;select.appendChild(o);});select.value=value;select.addEventListener('change',()=>change(select.value));parent.appendChild(select);}
 function drawInsightRows(rows,empty){const box=$('insightRows');box.textContent='';if(!rows.length){box.textContent=empty;return;}rows.forEach((row,i)=>{const el=document.createElement('div');el.className='insight-row';const name=document.createElement('span');name.textContent=(i+1)+'. '+row.name;const value=document.createElement('strong');value.className='insight-value';value.textContent=row.value;el.append(name,value);if(row.layer)el.addEventListener('click',()=>{closeInsightPanels();$('sideList').classList.remove('open');map.fitBounds(row.layer.getBounds(),{padding:[35,35],maxZoom:3});row.layer.fire('click',{latlng:row.layer.getBounds().getCenter()});});box.appendChild(el);});}
-async function openVisitorGrowth(){openInsight('Visitor Growth',tools=>{addInsightSelect(tools,'Growth period',[['Visits 24h','24 hours'],['Visits 7d','7 days'],['Visits 30d','30 days']],growthPeriod,v=>{growthPeriod=v;renderVisitorGrowth();});addInsightSelect(tools,'Ranking type',[['islands','Islands'],['crews','Crews / Groups'],['owners','Owners'],['worlds','VRChat Worlds']],growthCategory,v=>{growthCategory=v;renderVisitorGrowth();});});await renderVisitorGrowth();}
+async function openVisitorGrowth(){openInsight('Visitor Growth',tools=>{addInsightSelect(tools,'Growth period',[['Visits 24h','24 hours'],['Visits 7d','7 days'],['Visits 30d','30 days']],growthPeriod,v=>{growthPeriod=v;renderVisitorGrowth();});addInsightSelect(tools,'Ranking type',[['islands','Islands'],['crews','Crews / Groups'],['worlds','VRChat Worlds'],['owners','Owners']],growthCategory,v=>{growthCategory=v;renderVisitorGrowth();});});await renderVisitorGrowth();}
 async function renderVisitorGrowth(){const stats=await loadIslandExtraStats(),rows=[];const add=(name,n,layer)=>{n=Number(n);if(name&&Number.isFinite(n)&&n>0)rows.push({name,value:'+'+n.toLocaleString(),layer});};
  if(growthCategory==='worlds'){stats.worldStats.forEach((record,id)=>{if(record[growthPeriod+' Status']==='ok')add(record['World Name']||id,record[growthPeriod]);});}
- else {const totals=new Map();drawnItems.eachLayer(layer=>{if(isGoneStatus(layer)||layer._hidden||layer._sunk||layer._destroyed)return;const p=layer.feature?.properties||{},record=stats.islandTotals.get(islandKey(p.name));if(!record||record[growthPeriod+' Status']!=='ok')return;const n=Number(record[growthPeriod]);if(!Number.isFinite(n)||n<=0)return;const targets=growthCategory==='islands'?[String(p.name||'')]:growthCategory==='owners'?ownersOf(resolveOwner(p)):preferMarines(groupsForIsland(p.name,resolveOwner(p)));targets.filter(Boolean).forEach(name=>{const key=norm(name);if(!key)return;const old=totals.get(key)||{name,value:0,layer:null};old.value+=n;if(!old.layer)old.layer=layer;totals.set(key,old);});});totals.forEach(v=>add(v.name,v.value,growthCategory==='islands'?v.layer:null));}
+ else {const totals=new Map();drawnItems.eachLayer(layer=>{if(isGoneStatus(layer)||layer._hidden||layer._sunk||layer._destroyed)return;const p=layer.feature?.properties||{},record=stats.islandTotals.get(islandKey(p.name));if(!record||record[growthPeriod+' Status']!=='ok')return;const n=Number(record[growthPeriod]);if(!Number.isFinite(n)||n<=0)return;const targets=growthCategory==='islands'?[String(p.name||'')]:growthCategory==='owners'?uniqueOwners(resolveOwner(p)):preferMarines(groupsForIsland(p.name,resolveOwner(p)));targets.filter(Boolean).forEach(name=>{const key=norm(name);if(!key)return;const old=totals.get(key)||{name,value:0,layer:null};old.value+=n;if(!old.layer)old.layer=layer;totals.set(key,old);});});totals.forEach(v=>add(v.name,v.value,growthCategory==='islands'?v.layer:null));}
  rows.sort((a,b)=>Number(b.value.replace(/[+,]/g,''))-Number(a.value.replace(/[+,]/g,'')));drawInsightRows(rows.slice(0,100),'No verified visitor-growth records are available for this period.');}
-async function openAnnouncementRankings(){openInsight('Announcement Mentions',tools=>addInsightSelect(tools,'Sort mentions',[['count','Most mentioned'],['latest','Most recent'],['name','A–Z']],'count',v=>renderAnnouncementRankings(v)));await renderAnnouncementRankings('count');}
-async function renderAnnouncementRankings(sort='count'){const box=$('insightRows');box.textContent='Loading Discord archive…';try{if(!announcementArchivePromise)await getAnnouncementMentions('__archive_init__');const entries=await announcementArchivePromise,counts=new Map();drawnItems.eachLayer(layer=>{const name=String(layer.feature?.properties?.name||'').trim();if(!name||isGoneStatus(layer)||layer._hidden)return;const key=name.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();if(!key)return;const matches=entries.filter(e=>(' '+e.body+' ').includes(' '+key+' '));if(matches.length)counts.set(name,{name,count:matches.length,latest:matches.reduce((best,e)=>!best||e.date>best?e.date:best,null),layer});});const rows=[...counts.values()];rows.sort((a,b)=>sort==='name'?a.name.localeCompare(b.name):sort==='latest'?(b.latest-a.latest):(b.count-a.count));drawInsightRows(rows.slice(0,100).map(v=>({name:v.name,value:v.count+' mentions · '+v.latest.toLocaleDateString(),layer:v.layer})),'No island mentions were found in the available Discord archive.');}catch(e){box.textContent='Could not load the Discord archive: '+String(e.message||e);}}
+async function openAnnouncementRankings(){
+  openInsight('Announcement Mentions',tools=>{
+    addInsightSelect(tools,'Show mentions',[['islands','Islands'],['crews','Crews / Groups'],['owners','Owners']],mentionCategory,v=>{mentionCategory=v;expandedMentionKey='';renderAnnouncementRankings();});
+    addInsightSelect(tools,'Sort mentions',[['count','Most mentioned'],['latest','Most recent'],['name','A–Z']],mentionSort,v=>{mentionSort=v;renderAnnouncementRankings();});
+  });
+  await renderAnnouncementRankings();
+}
+function archiveMatches(entries,name){
+  const key=String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  return key?entries.filter(e=>(' '+e.body+' ').includes(' '+key+' ')):[];
+}
+async function renderAnnouncementRankings(){
+  const box=$('insightRows');box.textContent='Loading Discord archive…';
+  try{
+    if(!announcementArchivePromise)await getAnnouncementMentions('__archive_init__');
+    const entries=await announcementArchivePromise,entities=new Map();
+    const add=(name,layer=null)=>{
+      name=String(name||'').trim();if(!name||name==='???')return;
+      const key=norm(name);if(!key)return;
+      if(!entities.has(key))entities.set(key,{name,layer});
+      else if(!entities.get(key).layer&&layer)entities.get(key).layer=layer;
+    };
+    drawnItems.eachLayer(layer=>{
+      const p=layer.feature?.properties||{},name=String(p.name||'').trim();
+      if(!name||name==='???'||isGoneStatus(layer)||layer._hidden||layer._sunk||layer._destroyed)return;
+      if(mentionCategory==='islands')add(name,layer);
+      else if(mentionCategory==='owners')uniqueOwners(resolveOwner(p)).forEach(v=>add(v));
+      else preferMarines(groupsForIsland(name,resolveOwner(p))).forEach(v=>add(v));
+    });
+    const rows=[...entities.values()].map(entity=>{
+      const matches=archiveMatches(entries,entity.name);
+      return {...entity,matches,count:matches.length,latest:matches.reduce((best,e)=>!best||e.date>best?e.date:best,null)};
+    }).filter(v=>v.count);
+    rows.sort((a,b)=>mentionSort==='name'?a.name.localeCompare(b.name):mentionSort==='latest'?(b.latest-a.latest):(b.count-a.count));
+    box.textContent='';
+    if(!rows.length){box.textContent='No matching names were found in the available Discord archive.';return;}
+    rows.slice(0,100).forEach((row,i)=>{
+      const wrap=document.createElement('div');
+      const el=document.createElement('div');el.className='insight-row';
+      const label=document.createElement('span');label.textContent=(i+1)+'. '+row.name;
+      const value=document.createElement('strong');value.className='insight-value';value.textContent=row.count+' mentions · '+row.latest.toLocaleDateString();
+      el.append(label,value);wrap.appendChild(el);
+      const key=norm(row.name);
+      el.addEventListener('click',()=>{
+        expandedMentionKey=expandedMentionKey===key?'':key;
+        renderAnnouncementRankings();
+        if(row.layer){map.fitBounds(row.layer.getBounds(),{padding:[35,35],maxZoom:3});}
+      });
+      if(expandedMentionKey===key){
+        const detail=document.createElement('div');detail.style.cssText='padding:4px 8px 12px 22px;border-bottom:1px solid color-mix(in srgb,var(--fg) 30%,transparent)';
+        row.matches.sort((a,b)=>b.date-a.date).forEach(entry=>{
+          const item=document.createElement('div');item.style.cssText='padding:7px 0;border-top:1px solid color-mix(in srgb,var(--fg) 15%,transparent)';
+          const meta=document.createElement('div');meta.style.cssText='font-weight:700;margin-bottom:3px';meta.textContent=entry.author+' · '+entry.date.toLocaleString();
+          const body=document.createElement('div');body.textContent=entry.message;body.style.whiteSpace='pre-wrap';
+          item.append(meta,body);
+          if(entry.url){const link=document.createElement('a');link.href=entry.url;link.target='_blank';link.rel='noopener';link.textContent='Open in Discord';link.style.display='inline-block';link.style.marginTop='4px';item.appendChild(link);}
+          detail.appendChild(item);
+        });
+        wrap.appendChild(detail);
+      }
+      box.appendChild(wrap);
+    });
+  }catch(e){box.textContent='Could not load the Discord archive: '+String(e.message||e);}
+}
 
 function formatWorldDate(value) {
   if (!value) return '';
