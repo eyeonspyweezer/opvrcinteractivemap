@@ -458,13 +458,7 @@ body { background: var(--bg); }
   <label><input type="checkbox" id="optHideUnowned"> Hide unowned islands</label>
   <label><input type="checkbox" id="optBlendUnowned"> Blend unknown islands (??? names) into nearby map color</label>
   <label><input type="checkbox" id="optGlobeTexture"> Use map texture on 3D island polygons</label>
-  <div id="globeDebugSetting" style="display:none">
-  <label>3D polygon horizontal offset: <output id="optGlobeOffsetVal">0°</output>
-    <input type="range" id="optGlobeOffset" min="-180" max="180" step="1" value="0">
-  </label>
-  <button type="button" id="resetGlobeOffset" class="small-btn">Reset horizontal offset</button>
-  <label><input type="checkbox" id="optGlobeDebug"> Show 3D polygon position markers (X coordinates)</label>
-</div>
+  <div id="globeDebugSetting" style="display:none"><label><input type="checkbox" id="optGlobeDebug"> Show 3D polygon position markers (X coordinates)</label></div>
   <label>Fill opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
 </div>
 
@@ -605,7 +599,7 @@ function saveLocalSettings() {
       theme: document.documentElement.dataset.theme || '',
       colors: OPT.colors, flags: OPT.flags, names: OPT.names,
       owners: OPT.owners, hideNonCanon: OPT.hideNonCanon, hideUnnamed: OPT.hideUnnamed, hideUnowned: OPT.hideUnowned,
-      blendUnowned: OPT.blendUnowned, globeTexture: OPT.globeTexture, globeDebug: OPT.globeDebug, globeOffset: OPT.globeOffset,
+      blendUnowned: OPT.blendUnowned, globeTexture: OPT.globeTexture, globeDebug: OPT.globeDebug,
       crewLines: OPT.crewLines, ownerLines: OPT.ownerLines,
       opacity: POLYGON_FILL_OPACITY,
       islandAxisTravel: OPT.islandAxisTravel
@@ -625,7 +619,6 @@ const OPT = {
   hideUnowned: savedBool('hideUnowned', false),
   blendUnowned: savedBool('blendUnowned', false),
   globeTexture: savedBool('globeTexture', false),
-  globeOffset: Number.isFinite(Number(savedSettings.globeOffset)) ? Math.max(-180, Math.min(180, Number(savedSettings.globeOffset))) : 0,
   globeDebug: savedBool('globeDebug', false),
   crewLines: savedBool('crewLines', false),
   ownerLines: savedBool('ownerLines', false),
@@ -1586,7 +1579,7 @@ function addGlobeIsland(layer){
   const geo=new THREE.ShapeGeometry(shape),pos=geo.attributes.position,uv=[];
   for(let i=0;i<pos.count;i++){
    const px=(pos.getX(i)+Math.PI)/(2*Math.PI)*mapWidth,py=(pos.getY(i)+Math.PI/2)/Math.PI*mapHeight;
-   const offsetX=OPT.globeOffset/360*mapWidth;const v=globeVector(px+offsetX,py,1.014);pos.setXYZ(i,v.x,v.y,v.z);uv.push(px/mapWidth,1-py/mapHeight);
+   const offsetX=OPT.globeOffset/360*mapWidth;const v=globeVector(px+mapWidth/4,py,1.014);pos.setXYZ(i,v.x,v.y,v.z);uv.push(px/mapWidth,1-py/mapHeight);
   }
   geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));pos.needsUpdate=true;geo.computeVertexNormals();
   const blended=!!(layer._blendPainted||layer._sunk||layer._destroyed||isGoneStatus(layer));
@@ -2971,21 +2964,6 @@ $('optHideUnowned').checked = OPT.hideUnowned;
 $('optBlendUnowned').checked = OPT.blendUnowned;
 $('optGlobeTexture').checked = OPT.globeTexture;
 $('optGlobeDebug').checked = OPT.globeDebug;
-$('optGlobeOffset').value = OPT.globeOffset;
-$('optGlobeOffsetVal').textContent = OPT.globeOffset + '°';
-$('optGlobeOffset').addEventListener('input', (e) => {
-  OPT.globeOffset = Number(e.target.value);
-  $('optGlobeOffsetVal').textContent = OPT.globeOffset + '°';
-  if(globeBuilt) rebuildGlobeLayers();
-  saveLocalSettings();
-});
-$('resetGlobeOffset').addEventListener('click', () => {
-  OPT.globeOffset = 0;
-  $('optGlobeOffset').value = '0';
-  $('optGlobeOffsetVal').textContent = '0°';
-  if(globeBuilt) rebuildGlobeLayers();
-  saveLocalSettings();
-});
 $('optGlobeDebug').addEventListener('change', (e) => { OPT.globeDebug = e.target.checked; saveLocalSettings(); if(globeBuilt) rebuildGlobeLayers(); });
 $('optGlobeTexture').addEventListener('change', (e) => { OPT.globeTexture = e.target.checked; saveLocalSettings(); if (globeBuilt) rebuildGlobeLayers(); });
 $('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked; restyleAll(); rebuildFlags(); saveLocalSettings(); });
