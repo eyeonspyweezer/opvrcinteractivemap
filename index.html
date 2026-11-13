@@ -2651,7 +2651,11 @@ function wireClick(target, layer) {
     const p = layer.feature.properties, raw = resolveOwner(p);
     const isUrl = (u) => /^https?:\/\//i.test(u || '');
     await Promise.all([loadIslandBackgrounds(), loadCivilianList(), loadFormerInfo(), loadIslandExtraStats(), loadOwnerProfileLinks()]);
-    const bannerUrl = islandBackgrounds.get(islandKey(p.name)) || '';
+    const bannerKey = islandKey(p.name);
+    const bannerUrl = islandBackgrounds.get(bannerKey)
+      || islandBackgrounds.get(bannerKey + 'island')
+      || islandBackgrounds.get(bannerKey.replace(/island$/, ''))
+      || '';
     const links = linksOf(p.name);
     const w = links.length ? null : worldOf(p.name);
     const nameHref = links[0] || (w && w.link) || '';
