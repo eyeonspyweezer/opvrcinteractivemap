@@ -458,6 +458,7 @@ body { background: var(--bg); }
   <label><input type="checkbox" id="optHideUnowned"> Hide unowned islands</label>
   <label><input type="checkbox" id="optBlendUnowned"> Blend unknown islands (??? names) into nearby map color</label>
   <label><input type="checkbox" id="optGlobeTexture"> Use map texture on 3D island polygons</label>
+  <div id="globeDebugSetting" style="display:none"><label><input type="checkbox" id="optGlobeDebug"> Show 3D polygon position markers (X coordinates)</label></div>
   <label>Fill opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
 </div>
 
@@ -598,7 +599,7 @@ function saveLocalSettings() {
       theme: document.documentElement.dataset.theme || '',
       colors: OPT.colors, flags: OPT.flags, names: OPT.names,
       owners: OPT.owners, hideNonCanon: OPT.hideNonCanon, hideUnnamed: OPT.hideUnnamed, hideUnowned: OPT.hideUnowned,
-      blendUnowned: OPT.blendUnowned, globeTexture: OPT.globeTexture,
+      blendUnowned: OPT.blendUnowned, globeTexture: OPT.globeTexture, globeDebug: OPT.globeDebug,
       crewLines: OPT.crewLines, ownerLines: OPT.ownerLines,
       opacity: POLYGON_FILL_OPACITY,
       islandAxisTravel: OPT.islandAxisTravel
@@ -618,6 +619,7 @@ const OPT = {
   hideUnowned: savedBool('hideUnowned', false),
   blendUnowned: savedBool('blendUnowned', false),
   globeTexture: savedBool('globeTexture', false),
+  globeDebug: savedBool('globeDebug', false),
   crewLines: savedBool('crewLines', false),
   ownerLines: savedBool('ownerLines', false),
   islandAxisTravel: savedBool('islandAxisTravel', false)
@@ -1596,9 +1598,29 @@ function addGlobeIsland(layer){
  }
 }
 function addGlobePathLayer(layer){if(!globeRoot||!layer.getLatLngs)return;const flatten=(value,out=[])=>{value.forEach(item=>{if(Array.isArray(item))flatten(item,out);else if(item&&Number.isFinite(item.lat)&&Number.isFinite(item.lng))out.push(item);});return out;};const points=flatten(layer.getLatLngs()).map(ll=>globeVector(ll.lng,mapHeight-ll.lat,1.024));if(points.length>1)globeRoot.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color:layer.options?.color||'#ffffff',transparent:true,opacity:layer.options?.opacity??.9})));else if(points.length===1){const dot=new THREE.Mesh(new THREE.SphereGeometry(.009,10,8),new THREE.MeshBasicMaterial({color:layer.options?.color||'#ffffff'}));dot.position.copy(points[0]);globeRoot.add(dot);}}
-function rebuildGlobeLayers(){if(!globeRoot||!globeBuilt)return;globeRoot.children.slice(2).forEach(child=>{globeRoot.remove(child);if(child.geometry)child.geometry.dispose();if(child.material)child.material.dispose();if(child.material?.map)child.material.map.dispose();});globeMeshes=[];drawnItems.eachLayer(addGlobeIsland);relationshipLines.eachLayer(addGlobePathLayer);userMarks.eachLayer(layer=>{if(layer.getLatLng){const ll=layer.getLatLng(),dot=new THREE.Mesh(new THREE.SphereGeometry(.009,10,8),new THREE.MeshBasicMaterial({color:layer.options?.color||'#ff3b30'}));dot.position.copy(globeVector(ll.lng,mapHeight-ll.lat,1.027));globeRoot.add(dot);}else addGlobePathLayer(layer);});}
+function drawGlobeDebugPositions(){
+ if(!OPT.globeDebug||!globeRoot||!globeBuilt)return;
+ drawnItems.eachLayer(layer=>{
+  if(layer._hidden||layer._sinking||layer._destroying)return;
+  try{
+   const center=turf.pointOnFeature(layer.toGeoJSON()).geometry.coordinates;
+   const x=((center[0]%mapWidth)+mapWidth)%mapWidth;
+   const marker=globeVector(x,mapHeight-center[1],1.043);
+   const dot=new THREE.Mesh(new THREE.SphereGeometry(.012,10,8),new THREE.MeshBasicMaterial({color:0xff3b30,depthTest:false}));
+   dot.position.copy(marker);globeRoot.add(dot);
+   const canvas=document.createElement('canvas');canvas.width=256;canvas.height=64;
+   const ctx=canvas.getContext('2d');ctx.font='bold 34px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+   ctx.lineWidth=7;ctx.strokeStyle='#000';ctx.strokeText('X '+Math.round(x),128,32);
+   ctx.fillStyle='#ffef66';ctx.fillText('X '+Math.round(x),128,32);
+   const texture=new THREE.CanvasTexture(canvas);
+   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:false}));
+   sprite.position.copy(marker.clone().multiplyScalar(1.012));sprite.scale.set(.22,.055,1);globeRoot.add(sprite);
+  }catch(_){}
+ });
+}
+function rebuildGlobeLayers(){if(!globeRoot||!globeBuilt)return;globeRoot.children.slice(2).forEach(child=>{globeRoot.remove(child);if(child.geometry)child.geometry.dispose();if(child.material){if(child.material.map)child.material.map.dispose();child.material.dispose();}});globeMeshes=[];drawnItems.eachLayer(addGlobeIsland);relationshipLines.eachLayer(addGlobePathLayer);userMarks.eachLayer(layer=>{if(layer.getLatLng){const ll=layer.getLatLng(),dot=new THREE.Mesh(new THREE.SphereGeometry(.009,10,8),new THREE.MeshBasicMaterial({color:layer.options?.color||'#ff3b30'}));dot.position.copy(globeVector(ll.lng,mapHeight-ll.lat,1.027));globeRoot.add(dot);}else addGlobePathLayer(layer);});drawGlobeDebugPositions();}
 function initGlobe(){if(globeBuilt||!window.THREE)return;const host=$('globeView');globeScene=new THREE.Scene();globeScene.background=new THREE.Color('#07111d');globeCamera=new THREE.PerspectiveCamera(50,host.clientWidth/Math.max(host.clientHeight,1),.1,100);globeCamera.position.z=globeFitDistance(host.clientWidth,host.clientHeight);globeRenderer=new THREE.WebGLRenderer({antialias:true});globeRenderer.setPixelRatio(Math.min(devicePixelRatio||1,2));host.textContent='';host.appendChild(globeRenderer.domElement);globeRoot=new THREE.Group();globeScene.add(globeRoot);globeTextureCanvas=document.createElement('canvas');globeTextureCanvas.width=2048;globeTextureCanvas.height=1024;const ctx=globeTextureCanvas.getContext('2d');ctx.fillStyle='#17334a';ctx.fillRect(0,0,globeTextureCanvas.width,globeTextureCanvas.height);if(mapPixelCanvas)ctx.drawImage(mapPixelCanvas,0,0,globeTextureCanvas.width,globeTextureCanvas.height);globeMapTexture=new THREE.CanvasTexture(globeTextureCanvas);globeMapTexture.colorSpace=THREE.SRGBColorSpace;globeMapTexture.offset.x=0;globeRoot.add(new THREE.Mesh(new THREE.SphereGeometry(1,96,64),new THREE.MeshBasicMaterial({map:globeMapTexture})));globeRoot.add(new THREE.Mesh(new THREE.SphereGeometry(1.018,64,48),new THREE.MeshBasicMaterial({color:0x4d9bd3,transparent:true,opacity:.08,side:THREE.BackSide})));globeRaycaster=new THREE.Raycaster();globePointer=new THREE.Vector2();const resize=()=>{const w=host.clientWidth,h=host.clientHeight;globeCamera.aspect=w/Math.max(h,1);globeCamera.updateProjectionMatrix();if(!globeUserZoomed)globeCamera.position.z=globeFitDistance(w,h);globeRenderer.setSize(w,h);};window.addEventListener('resize',resize);resize();let lastX=0,lastY=0,pinchStart=0,pinchDistance=0;const activePointers=new Map();const canvasEl=globeRenderer.domElement;canvasEl.addEventListener('pointerdown',e=>{activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvasEl.setPointerCapture(e.pointerId);if(activePointers.size===2){const pts=[...activePointers.values()];pinchDistance=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);globeDrag=null;return;}globeDrag={x:e.clientX,y:e.clientY,moved:false};lastX=e.clientX;lastY=e.clientY;});canvasEl.addEventListener('pointermove',e=>{if(activePointers.has(e.pointerId))activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(activePointers.size===2){const pts=[...activePointers.values()],dist=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);if(pinchDistance>0){globeCamera.position.z=Math.max(2.2,Math.min(12,globeCamera.position.z*pinchDistance/Math.max(dist,1)));globeUserZoomed=true;}pinchDistance=dist;return;}if(!globeDrag)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(e.clientX-globeDrag.x)+Math.abs(e.clientY-globeDrag.y)>4)globeDrag.moved=true;globeRoot.rotation.y+=dx*.006;globeRoot.rotation.x=Math.max(-1.35,Math.min(1.35,globeRoot.rotation.x+dy*.006));lastX=e.clientX;lastY=e.clientY;});canvasEl.addEventListener('pointerup',e=>{activePointers.delete(e.pointerId);if(activePointers.size<2)pinchDistance=0;if(globeDrag&&!globeDrag.moved){const rect=canvasEl.getBoundingClientRect();globePointer.set((e.clientX-rect.left)/rect.width*2-1,-((e.clientY-rect.top)/rect.height*2-1));globeRaycaster.setFromCamera(globePointer,globeCamera);const hit=globeRaycaster.intersectObjects(globeMeshes,false).find(v=>v.object.userData.layer);if(hit){const layer=hit.object.userData.layer;setGlobeMode(false);map.fitBounds(layer.getBounds(),{padding:[35,35],maxZoom:3});layer.fire('click',{latlng:layer.getBounds().getCenter()});}}globeDrag=null;});canvasEl.addEventListener('pointercancel',e=>{activePointers.delete(e.pointerId);globeDrag=null;pinchDistance=0;});canvasEl.addEventListener('wheel',e=>{e.preventDefault();globeCamera.position.z=Math.max(2.2,Math.min(12,globeCamera.position.z+e.deltaY*.002));globeUserZoomed=true;},{passive:false});globeBuilt=true;rebuildGlobeLayers();const animate=()=>{requestAnimationFrame(animate);globeRenderer.render(globeScene,globeCamera);};animate();}
-function setGlobeMode(on){if(!on)globeUserZoomed=false;$('map3dBtn').setAttribute('aria-pressed',String(on));$('map3dBtn').setAttribute('aria-label',on?'Return to 2D map':'3D Globe');$('globeView').classList.toggle('active',on);$('map').style.visibility=on?'hidden':'visible';if(on){initGlobe();if(globeRenderer)globeRenderer.setSize($('globeView').clientWidth,$('globeView').clientHeight);}else map.invalidateSize({pan:false});}
+function setGlobeMode(on){if(!on)globeUserZoomed=false;$('map3dBtn').setAttribute('aria-pressed',String(on));$('map3dBtn').setAttribute('aria-label',on?'Return to 2D map':'3D Globe');$('globeView').classList.toggle('active',on);$('globeDebugSetting').style.display=on?'block':'none';$('map').style.visibility=on?'hidden':'visible';if(on){initGlobe();if(globeRenderer)globeRenderer.setSize($('globeView').clientWidth,$('globeView').clientHeight);}else map.invalidateSize({pan:false});}
 $('map3dBtn').addEventListener('click',()=>setGlobeMode(!$('globeView').classList.contains('active')));
 
 function addIsland(geometry, props) {
@@ -2941,6 +2963,8 @@ $('optHideUnnamed').checked = OPT.hideUnnamed;
 $('optHideUnowned').checked = OPT.hideUnowned;
 $('optBlendUnowned').checked = OPT.blendUnowned;
 $('optGlobeTexture').checked = OPT.globeTexture;
+$('optGlobeDebug').checked = OPT.globeDebug;
+$('optGlobeDebug').addEventListener('change', (e) => { OPT.globeDebug = e.target.checked; saveLocalSettings(); if(globeBuilt) rebuildGlobeLayers(); });
 $('optGlobeTexture').addEventListener('change', (e) => { OPT.globeTexture = e.target.checked; saveLocalSettings(); if (globeBuilt) rebuildGlobeLayers(); });
 $('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked; restyleAll(); rebuildFlags(); saveLocalSettings(); });
 $('optCrewLines').addEventListener('change', (e) => { OPT.crewLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
