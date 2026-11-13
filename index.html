@@ -319,6 +319,19 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #dcInfo .dc-title { font-weight: 700; }
 #dcWrap:hover #dcInfo { width: 230px; }
 #dcBg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: var(--dc-splash-opacity); }
+/* VRChat group hover overlay mirrors the Discord server overlay. */
+#vrcWrap { position: relative; }
+#fabVrc { position: relative; z-index: 2; }
+#fabVrc .vrc-group-icon { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; opacity: 0; transition: opacity .2s; }
+#fabVrc .ico { position: relative; z-index: 1; transition: opacity .2s; }
+#vrcWrap:hover .vrc-logo { opacity: .35; }
+#vrcWrap:hover .vrc-group-icon.ready { opacity: var(--dc-icon-opacity); }
+#vrcInfo { position: absolute; right: 50%; top: 0; bottom: 0; z-index: 1; width: 0; overflow: hidden; white-space: nowrap; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; background: rgb(70, 70, 70); color: #fff; border-radius: calc(var(--fab) / 2) 0 0 calc(var(--fab) / 2); font-size: clamp(11px, calc(var(--fab) * 0.26), 14px); line-height: 1.3; transition: width .25s ease; }
+#vrcInfo[hidden] { display: none; }
+#vrcInfo > div { padding: 0 calc(var(--fab) / 2 + 6px) 0 14px; text-align: right; position: relative; z-index: 1; }
+#vrcInfo .vrc-title { font-weight: 700; }
+#vrcBg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: var(--dc-splash-opacity); }
+#vrcWrap:hover #vrcInfo { width: 230px; }
 /* Search and settings frames, animated. On mouse devices they sit further left so the Discord tab never overlaps them. */
 #searchFrame, #settingsFrame { position: fixed; z-index: 1000; box-sizing: border-box; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); right: calc(28px + var(--fab)); width: min(300px, calc(100vw - var(--fab) - 40px)); max-height: 70dvh; overflow-y: auto; padding: 8px; background: var(--bg); color: var(--sfg); border: 1px solid var(--fg); border-radius: 6px; opacity: 0; visibility: hidden; transform: translateY(14px) scale(.97); transition: opacity .2s ease, transform .2s ease, visibility 0s linear .2s; }
 #searchFrame.open, #settingsFrame.open { opacity: 1; visibility: visible; transform: none; transition: opacity .2s ease, transform .2s ease, visibility 0s; }
@@ -387,7 +400,14 @@ body { background: var(--bg); }
     </div>
     <a id="fabDiscord" class="round-btn" href="https://discord.gg/TeunYpsHb6" target="_blank" rel="noopener" aria-label="Discord"><img id="dcIcon" class="dc-server" alt=""><span class="ico dc-logo" data-icon="discord">🔗</span></a>
   </div>
-  <a id="fabVrc" class="round-btn" href="https://vrchat.com/home/group/grp_677be38a-564d-432f-be95-f2e319bb4b13" target="_blank" rel="noopener" aria-label="VRChat"><span class="ico" data-icon="vrchat">🌐</span></a>
+  <div id="vrcWrap">
+    <div id="vrcInfo" hidden>
+      <span id="vrcBg"></span>
+      <div class="vrc-title" id="vrcName"></div>
+      <div class="dc-row"><span id="vrcMembers"></span></div>
+    </div>
+    <a id="fabVrc" class="round-btn" href="https://vrchat.com/home/group/grp_677be38a-564d-432f-be95-f2e319bb4b13" target="_blank" rel="noopener" aria-label="VRChat"><img id="vrcGroupIcon" class="vrc-group-icon" alt=""><span class="ico vrc-logo" data-icon="vrchat">🌐</span></a>
+  </div>
   <button id="settingsBtn" class="round-btn" type="button" aria-label="Settings"><span class="ico" data-icon="settings">⚙</span></button>
 </div>
 <div id="searchFrame">
@@ -1984,6 +2004,43 @@ async function loadDiscord() {
 }
 loadDiscord();
 setInterval(loadDiscord, 300000);
+
+// ===== VRChat group hover info =====
+// Public group metadata is fetched without a VRChat login. Try VRChat first,
+// then the community proxy used for browser-side API requests when CORS blocks the direct endpoint.
+const VRC_GROUP_ID = 'grp_677be38a-564d-432f-be95-f2e319bb4b13';
+const VRC_GROUP_ENDPOINTS = [
+  `https://api.vrchat.cloud/api/1/groups/${VRC_GROUP_ID}`,
+  `https://vrchat.vercel.app/api/1/groups/${VRC_GROUP_ID}`
+];
+async function loadVrcGroup() {
+  let d = null;
+  for (const url of VRC_GROUP_ENDPOINTS) {
+    try {
+      const r = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!r.ok) continue;
+      const x = await r.json();
+      if (x && (x.name || x.iconUrl || x.bannerUrl)) { d = x; break; }
+    } catch (_) {}
+  }
+  if (!d) {
+    $('vrcInfo').hidden = true;
+    return;
+  }
+  $('vrcName').textContent = d.name || 'VRChat Group';
+  $('vrcMembers').textContent = typeof d.memberCount === 'number'
+    ? d.memberCount.toLocaleString() + ' members'
+    : '';
+  if (d.bannerUrl) $('vrcBg').style.backgroundImage = `url(${d.bannerUrl})`;
+  if (d.iconUrl) {
+    const img = $('vrcGroupIcon');
+    img.onload = () => img.classList.add('ready');
+    img.src = d.iconUrl;
+  }
+  $('vrcInfo').hidden = false;
+}
+loadVrcGroup();
+setInterval(loadVrcGroup, 300000);
 // ===== Search frame: islands (by name) / groups / owners =====
 // Owner spellings that mean the same person. 'Name shown in the list': ['other spellings']. Example: 'Lincoln': ['thelincoln65']
 
