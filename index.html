@@ -353,6 +353,11 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #searchFrame.open, #settingsFrame.open { opacity: 1; visibility: visible; transform: none; transition: opacity .2s ease, transform .2s ease, visibility 0s; }
 @media (hover: hover) { #searchFrame, #settingsFrame { right: calc(14px + var(--fab) / 2 + 246px); width: max(180px, min(300px, calc(100vw - var(--fab) / 2 - 280px))); } }
 #settingsFrame label { display: block; margin: 8px 0; }
+#settingsFrame details { margin: 3px 0; border-top: 1px solid color-mix(in srgb, var(--fg) 25%, transparent); }
+#settingsFrame details:first-child { border-top: 0; }
+#settingsFrame summary { cursor: pointer; font-weight: 700; padding: 9px 4px; list-style-position: inside; }
+#settingsFrame details[open] summary { margin-bottom: 2px; }
+#settingsFrame .settings-section { padding: 0 5px 5px; }
 #settingsFrame input[type=range] { width: 100%; }
 .map-label div { transform: translate(-50%, -50%); white-space: nowrap; pointer-events: none; font-family: inherit; font-size: 12px; color: #fff; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000; }
 @keyframes islandSink { 0% { opacity:1; transform:scale(1) translateY(0) rotate(0deg); } 18% { opacity:1; transform:scale(1.02,.98) translateY(0) rotate(-.4deg); } 55% { opacity:1; transform:scale(.82,.62) translateY(8px) rotate(.7deg); } 82% { opacity:1; transform:scale(.38,.22) translateY(24px) rotate(-1deg); } 100% { opacity:1; transform:scale(.06,.03) translateY(42px) rotate(0deg); } }
@@ -446,20 +451,49 @@ body { background: var(--bg); }
   <div class="slist" id="lOwner"></div>
 </div>
 <div id="settingsFrame">
-  <label><input type="checkbox" id="optColors"> Random island colors</label>
-  <label><input type="checkbox" id="optFlags" checked> Show flags (map, lists, and island info)</label>
-  <label><input type="checkbox" id="optCrewLines"> Connect islands by same crew</label>
-  <label><input type="checkbox" id="optOwnerLines"> Connect islands by same owner</label>
-  <label><input type="checkbox" id="optIslandAxisTravel"> Two-axis island travel animation</label>
-  <label><input type="checkbox" id="optNames" checked> Island names on the map</label>
-  <label><input type="checkbox" id="optOwners"> Show island owners next to names</label>
-  <label><input type="checkbox" id="optHideNonCanon"> Hide Non-Canon islands</label>
-  <label><input type="checkbox" id="optHideUnnamed"> Hide Unnamed Islands</label>
-  <label><input type="checkbox" id="optHideUnowned"> Hide unowned islands</label>
-  <label><input type="checkbox" id="optBlendUnowned"> Blend unknown islands (??? names) into nearby map color</label>
-  <label><input type="checkbox" id="optGlobeTexture"> Use map texture on 3D island polygons</label>
-  <div id="globeDebugSetting" style="display:none"><label><input type="checkbox" id="optGlobeDebug"> Show 3D polygon position markers (X coordinates)</label></div>
-  <label>Fill opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
+  <details open>
+    <summary>Island Appearance</summary>
+    <div class="settings-section">
+      <label><input type="checkbox" id="optColors"> Random island colors</label>
+      <label><input type="checkbox" id="optFlags" checked> Show flags (map, lists, and island info)</label>
+      <label>Fill opacity: <span id="optOpacityVal"></span><input type="range" id="optOpacity" min="0" max="1" step="0.05"></label>
+    </div>
+  </details>
+  <details>
+    <summary>Island Visibility</summary>
+    <div class="settings-section">
+      <label><input type="checkbox" id="optHideNonCanon"> Hide Non-Canon islands</label>
+      <label><input type="checkbox" id="optHideUnnamed"> Hide Unnamed Islands</label>
+      <label><input type="checkbox" id="optHideUnowned"> Hide unowned islands</label>
+      <label><input type="checkbox" id="optBlendUnowned"> Blend unknown islands (??? names) into nearby map color</label>
+    </div>
+  </details>
+  <details>
+    <summary>Island Connections</summary>
+    <div class="settings-section">
+      <label><input type="checkbox" id="optCrewLines"> Connect islands by same crew</label>
+      <label><input type="checkbox" id="optOwnerLines"> Connect islands by same owner</label>
+    </div>
+  </details>
+  <details>
+    <summary>Island Labels</summary>
+    <div class="settings-section">
+      <label><input type="checkbox" id="optNames" checked> Island names on the map</label>
+      <label><input type="checkbox" id="optOwners"> Show island owners next to names</label>
+    </div>
+  </details>
+  <details>
+    <summary>Island Movement</summary>
+    <div class="settings-section">
+      <label><input type="checkbox" id="optIslandAxisTravel"> Two-axis island travel animation</label>
+    </div>
+  </details>
+  <details>
+    <summary>3D Globe</summary>
+    <div class="settings-section">
+      <div id="globeDebugSetting" style="display:none"><label><input type="checkbox" id="optGlobeDebug"> Show 3D polygon position markers (X coordinates)</label></div>
+    </div>
+  </details>
 </div>
 
 <script>
@@ -599,7 +633,7 @@ function saveLocalSettings() {
       theme: document.documentElement.dataset.theme || '',
       colors: OPT.colors, flags: OPT.flags, names: OPT.names,
       owners: OPT.owners, hideNonCanon: OPT.hideNonCanon, hideUnnamed: OPT.hideUnnamed, hideUnowned: OPT.hideUnowned,
-      blendUnowned: OPT.blendUnowned, globeTexture: OPT.globeTexture, globeDebug: OPT.globeDebug,
+      blendUnowned: OPT.blendUnowned, globeDebug: OPT.globeDebug,
       crewLines: OPT.crewLines, ownerLines: OPT.ownerLines,
       opacity: POLYGON_FILL_OPACITY,
       islandAxisTravel: OPT.islandAxisTravel
@@ -618,7 +652,6 @@ const OPT = {
   hideUnnamed: savedBool('hideUnnamed', false),
   hideUnowned: savedBool('hideUnowned', false),
   blendUnowned: savedBool('blendUnowned', false),
-  globeTexture: savedBool('globeTexture', false),
   globeDebug: savedBool('globeDebug', false),
   crewLines: savedBool('crewLines', false),
   ownerLines: savedBool('ownerLines', false),
@@ -1610,9 +1643,7 @@ function addGlobeIsland(layer){
   const flagTexture=flagUrl?getGlobeFlagTexture(flagUrl):null;
   const mat=flagTexture
    ?new THREE.MeshBasicMaterial({map:flagTexture,transparent:true,opacity,side:THREE.DoubleSide})
-   :OPT.globeTexture&&globeMapTexture&&!blended
-    ?new THREE.MeshBasicMaterial({map:globeMapTexture,transparent:true,opacity,side:THREE.DoubleSide})
-    :new THREE.MeshBasicMaterial({color,transparent:!blended&&opacity<1,opacity,side:THREE.DoubleSide});
+   :new THREE.MeshBasicMaterial({color,transparent:!blended&&opacity<1,opacity,side:THREE.DoubleSide});
   const mesh=new THREE.Mesh(geo,mat);mesh.userData.layer=layer;globeRoot.add(mesh);globeMeshes.push(mesh);
   const outline=poly[0].map(coord=>{const [x,y]=toMap(coord);return globeAlignedVector(x,y,1.019);});
   if(outline.length>2)globeRoot.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(outline),new THREE.LineBasicMaterial({color})));
@@ -2987,10 +3018,8 @@ $('optHideNonCanon').checked = OPT.hideNonCanon;
 $('optHideUnnamed').checked = OPT.hideUnnamed;
 $('optHideUnowned').checked = OPT.hideUnowned;
 $('optBlendUnowned').checked = OPT.blendUnowned;
-$('optGlobeTexture').checked = OPT.globeTexture;
 $('optGlobeDebug').checked = OPT.globeDebug;
 $('optGlobeDebug').addEventListener('change', (e) => { OPT.globeDebug = e.target.checked; saveLocalSettings(); if(globeBuilt) rebuildGlobeLayers(); });
-$('optGlobeTexture').addEventListener('change', (e) => { OPT.globeTexture = e.target.checked; saveLocalSettings(); if (globeBuilt) rebuildGlobeLayers(); });
 $('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked; restyleAll(); rebuildFlags(); saveLocalSettings(); });
 $('optCrewLines').addEventListener('change', (e) => { OPT.crewLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
 $('optOwnerLines').addEventListener('change', (e) => { OPT.ownerLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
