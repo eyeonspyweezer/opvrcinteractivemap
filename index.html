@@ -1563,6 +1563,21 @@ let globeRenderer=null,globeScene=null,globeCamera=null,globeRoot=null,globeBuil
 let globeUserZoomed=false;
 function globeFitDistance(width,height){const aspect=Math.max(width/Math.max(height,1),.01),fov=THREE.MathUtils.degToRad(50);return Math.max(3.1,1.18/(Math.tan(fov/2)*Math.min(1,aspect)));}
 function globeVector(x,y,r=1.014){const lon=x/Math.max(mapWidth,1)*Math.PI*2-Math.PI,lat=(.5-y/Math.max(mapHeight,1))*Math.PI,c=Math.cos(lat);return new THREE.Vector3(Math.sin(lon)*c,Math.sin(lat),Math.cos(lon)*c).multiplyScalar(r);}
+const globeFlagTextures = new Map();
+function globeFlagUrl(layer){
+ if(!OPT.flags)return null;
+ const groups=preferMarines(ownersOf(resolveOwner(layer.feature?.properties||{})).flatMap(groupsOf));
+ return groups.map(flagFor).find(Boolean)||null;
+}
+function getGlobeFlagTexture(url){
+ if(!url||!window.THREE)return null;
+ if(globeFlagTextures.has(url))return globeFlagTextures.get(url);
+ const loader=new THREE.TextureLoader();
+ loader.setCrossOrigin('anonymous');
+ const texture=loader.load(url,()=>{texture.colorSpace=THREE.SRGBColorSpace;texture.needsUpdate=true;},undefined,()=>{globeFlagTextures.delete(url);});
+ globeFlagTextures.set(url,texture);
+ return texture;
+}
 function addGlobeIsland(layer){
  if(!globeRoot||!globeBuilt||!mapWidth||!mapHeight||layer._hidden||layer._sinking||layer._destroying)return;
  const g=layer.feature?.geometry,p=layer.feature?.properties||{};if(!g)return;
@@ -1576,18 +1591,27 @@ function addGlobeIsland(layer){
   const point=coord=>{const [x,y]=toMap(coord);return new THREE.Vector2(x/mapWidth*Math.PI*2-Math.PI,y/mapHeight*Math.PI-Math.PI/2);};
   const shape=new THREE.Shape(poly[0].map(point));
   poly.slice(1).forEach(ring=>{if(ring.length>=3)shape.holes.push(new THREE.Path(ring.map(point)));});
+  const blended=!!(layer._blendPainted||layer._sunk||layer._destroyed||isGoneStatus(layer));
+  const flagUrl=blended?null:globeFlagUrl(layer);
+  const mapBounds=poly[0].map(toMap);
+  const minX=Math.min(...mapBounds.map(v=>v[0])),maxX=Math.max(...mapBounds.map(v=>v[0]));
+  const minY=Math.min(...mapBounds.map(v=>v[1])),maxY=Math.max(...mapBounds.map(v=>v[1]));
   const geo=new THREE.ShapeGeometry(shape),pos=geo.attributes.position,uv=[];
   for(let i=0;i<pos.count;i++){
    const px=(pos.getX(i)+Math.PI)/(2*Math.PI)*mapWidth,py=(pos.getY(i)+Math.PI/2)/Math.PI*mapHeight;
-   const offsetX=OPT.globeOffset/360*mapWidth;const v=globeVector(px+mapWidth/4,py,1.014);pos.setXYZ(i,v.x,v.y,v.z);uv.push(px/mapWidth,1-py/mapHeight);
+   const v=globeVector(px+mapWidth/4,py,1.014);pos.setXYZ(i,v.x,v.y,v.z);
+   uv.push(flagUrl?(px-minX)/Math.max(maxX-minX,1):px/mapWidth);
+   uv.push(flagUrl?1-(py-minY)/Math.max(maxY-minY,1):1-py/mapHeight);
   }
   geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));pos.needsUpdate=true;geo.computeVertexNormals();
-  const blended=!!(layer._blendPainted||layer._sunk||layer._destroyed||isGoneStatus(layer));
   const color=blended?(mapPixelColor(layer)||'#17334a'):(layer.options?.fillColor||layer.options?.color||p.color||'#b7a77b');
   const opacity=blended?1:(layer.options?.fillOpacity??POLYGON_FILL_OPACITY);
-  const mat=OPT.globeTexture&&globeMapTexture&&!blended
-   ?new THREE.MeshBasicMaterial({map:globeMapTexture,transparent:true,opacity,side:THREE.DoubleSide})
-   :new THREE.MeshBasicMaterial({color,transparent:!blended&&opacity<1,opacity,side:THREE.DoubleSide});
+  const flagTexture=flagUrl?getGlobeFlagTexture(flagUrl):null;
+  const mat=flagTexture
+   ?new THREE.MeshBasicMaterial({map:flagTexture,transparent:true,opacity,side:THREE.DoubleSide})
+   :OPT.globeTexture&&globeMapTexture&&!blended
+    ?new THREE.MeshBasicMaterial({map:globeMapTexture,transparent:true,opacity,side:THREE.DoubleSide})
+    :new THREE.MeshBasicMaterial({color,transparent:!blended&&opacity<1,opacity,side:THREE.DoubleSide});
   const mesh=new THREE.Mesh(geo,mat);mesh.userData.layer=layer;globeRoot.add(mesh);globeMeshes.push(mesh);
   const outline=poly[0].map(coord=>{const [x,y]=toMap(coord);return globeVector(x,y,1.019);});
   if(outline.length>2)globeRoot.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(outline),new THREE.LineBasicMaterial({color})));
