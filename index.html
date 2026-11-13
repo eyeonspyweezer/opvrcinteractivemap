@@ -200,6 +200,10 @@ button.list-btn { font: inherit; text-transform: uppercase; cursor: pointer; }
 #globeView { position:fixed; inset:0; z-index:500; display:none; background:#07111d; touch-action:none; }
 #globeView.active { display:block; }
 #globeView canvas { display:block; width:100%; height:100%; }
+#globeInfo { position:absolute; z-index:2; left:16px; top:16px; width:min(360px,calc(100vw - 32px)); max-height:min(65dvh,560px); overflow:auto; box-sizing:border-box; padding:9px; border:1px solid var(--fg); border-radius:6px; background:var(--bg); color:var(--sfg); pointer-events:auto; }
+#globeInfo[hidden] { display:none; }
+#globeInfo.hover-only { pointer-events:none; }
+
 #map3dBtn { z-index:1102; }
 #bountyPanel { position: fixed; z-index: 1000; top: 10px; left: calc(var(--sidew) + 8px); width: min(380px, calc(100vw - var(--sidew) - 16px)); max-height: 80dvh; overflow: auto; box-sizing: border-box; padding: 8px; background: var(--bg); color: var(--fg); border: 1px solid var(--fg); border-radius: 6px; font-size: 14px; }
 #bountyPanel { clip-path: inset(0); visibility: visible; transition: clip-path .4s ease, visibility 0s; }
@@ -400,7 +404,7 @@ body { background: var(--bg); }
   </div>
 </div>
 <div id="map"></div>
-<div id="globeView" aria-label="Interactive 3D island globe"></div>
+<div id="globeView" aria-label="Interactive 3D island globe"><div id="globeInfo" hidden></div></div>
 
 
 <div id="sideList">
@@ -1693,7 +1697,7 @@ function drawGlobeDebugPositions(){
  });
 }
 function rebuildGlobeLayers(){if(!globeRoot||!globeBuilt)return;globeRoot.children.slice(2).forEach(child=>{globeRoot.remove(child);if(child.geometry)child.geometry.dispose();if(child.material){if(child.material.map)child.material.map.dispose();child.material.dispose();}});globeMeshes=[];drawnItems.eachLayer(addGlobeIsland);relationshipLines.eachLayer(addGlobePathLayer);userMarks.eachLayer(layer=>{if(layer.getLatLng){const ll=layer.getLatLng(),dot=new THREE.Mesh(new THREE.SphereGeometry(.009,10,8),new THREE.MeshBasicMaterial({color:layer.options?.color||'#ff3b30'}));dot.position.copy(globeAlignedVector(ll.lng,mapHeight-ll.lat,1.027));globeRoot.add(dot);}else addGlobePathLayer(layer);});drawGlobeDebugPositions();}
-function initGlobe(){if(globeBuilt||!window.THREE)return;const host=$('globeView');globeScene=new THREE.Scene();globeScene.background=new THREE.Color('#07111d');globeCamera=new THREE.PerspectiveCamera(50,host.clientWidth/Math.max(host.clientHeight,1),.1,100);globeCamera.position.z=globeFitDistance(host.clientWidth,host.clientHeight);globeRenderer=new THREE.WebGLRenderer({antialias:true});globeRenderer.setPixelRatio(Math.min(devicePixelRatio||1,2));host.textContent='';host.appendChild(globeRenderer.domElement);globeRoot=new THREE.Group();globeScene.add(globeRoot);globeTextureCanvas=document.createElement('canvas');globeTextureCanvas.width=2048;globeTextureCanvas.height=1024;const ctx=globeTextureCanvas.getContext('2d');ctx.fillStyle='#17334a';ctx.fillRect(0,0,globeTextureCanvas.width,globeTextureCanvas.height);if(mapPixelCanvas)ctx.drawImage(mapPixelCanvas,0,0,globeTextureCanvas.width,globeTextureCanvas.height);globeMapTexture=new THREE.CanvasTexture(globeTextureCanvas);globeMapTexture.colorSpace=THREE.SRGBColorSpace;globeMapTexture.offset.x=0;globeRoot.add(new THREE.Mesh(new THREE.SphereGeometry(1,96,64),new THREE.MeshBasicMaterial({map:globeMapTexture})));globeRoot.add(new THREE.Mesh(new THREE.SphereGeometry(1.018,64,48),new THREE.MeshBasicMaterial({color:0x4d9bd3,transparent:true,opacity:.08,side:THREE.BackSide})));globeRaycaster=new THREE.Raycaster();globePointer=new THREE.Vector2();const resize=()=>{const w=host.clientWidth,h=host.clientHeight;globeCamera.aspect=w/Math.max(h,1);globeCamera.updateProjectionMatrix();if(!globeUserZoomed)globeCamera.position.z=globeFitDistance(w,h);globeRenderer.setSize(w,h);};window.addEventListener('resize',resize);resize();let lastX=0,lastY=0,pinchStart=0,pinchDistance=0;const activePointers=new Map();const canvasEl=globeRenderer.domElement;canvasEl.addEventListener('pointerdown',e=>{activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvasEl.setPointerCapture(e.pointerId);if(activePointers.size===2){const pts=[...activePointers.values()];pinchDistance=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);globeDrag=null;return;}globeDrag={x:e.clientX,y:e.clientY,moved:false};lastX=e.clientX;lastY=e.clientY;});canvasEl.addEventListener('pointermove',e=>{if(activePointers.has(e.pointerId))activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(activePointers.size===2){const pts=[...activePointers.values()],dist=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);if(pinchDistance>0){globeCamera.position.z=Math.max(2.2,Math.min(12,globeCamera.position.z*pinchDistance/Math.max(dist,1)));globeUserZoomed=true;}pinchDistance=dist;return;}if(!globeDrag)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(e.clientX-globeDrag.x)+Math.abs(e.clientY-globeDrag.y)>4)globeDrag.moved=true;globeRoot.rotation.y+=dx*.006;globeRoot.rotation.x=Math.max(-1.35,Math.min(1.35,globeRoot.rotation.x+dy*.006));lastX=e.clientX;lastY=e.clientY;});canvasEl.addEventListener('pointerup',e=>{activePointers.delete(e.pointerId);if(activePointers.size<2)pinchDistance=0;if(globeDrag&&!globeDrag.moved){const rect=canvasEl.getBoundingClientRect();globePointer.set((e.clientX-rect.left)/rect.width*2-1,-((e.clientY-rect.top)/rect.height*2-1));globeRaycaster.setFromCamera(globePointer,globeCamera);const hit=globeRaycaster.intersectObjects(globeMeshes,false).find(v=>v.object.userData.layer);if(hit){const layer=hit.object.userData.layer;setGlobeMode(false);map.fitBounds(layer.getBounds(),{padding:[35,35],maxZoom:3});layer.fire('click',{latlng:layer.getBounds().getCenter()});}}globeDrag=null;});canvasEl.addEventListener('pointercancel',e=>{activePointers.delete(e.pointerId);globeDrag=null;pinchDistance=0;});canvasEl.addEventListener('wheel',e=>{e.preventDefault();globeCamera.position.z=Math.max(2.2,Math.min(12,globeCamera.position.z+e.deltaY*.002));globeUserZoomed=true;},{passive:false});globeBuilt=true;rebuildGlobeLayers();const animate=()=>{requestAnimationFrame(animate);globeRenderer.render(globeScene,globeCamera);};animate();}
+function initGlobe(){if(globeBuilt||!window.THREE)return;const host=$('globeView');globeScene=new THREE.Scene();globeScene.background=new THREE.Color('#07111d');globeCamera=new THREE.PerspectiveCamera(50,host.clientWidth/Math.max(host.clientHeight,1),.1,100);globeCamera.position.z=globeFitDistance(host.clientWidth,host.clientHeight);globeRenderer=new THREE.WebGLRenderer({antialias:true});globeRenderer.setPixelRatio(Math.min(devicePixelRatio||1,2));host.textContent='';host.appendChild(globeRenderer.domElement);globeRoot=new THREE.Group();globeScene.add(globeRoot);globeTextureCanvas=document.createElement('canvas');globeTextureCanvas.width=2048;globeTextureCanvas.height=1024;const ctx=globeTextureCanvas.getContext('2d');ctx.fillStyle='#17334a';ctx.fillRect(0,0,globeTextureCanvas.width,globeTextureCanvas.height);if(mapPixelCanvas)ctx.drawImage(mapPixelCanvas,0,0,globeTextureCanvas.width,globeTextureCanvas.height);globeMapTexture=new THREE.CanvasTexture(globeTextureCanvas);globeMapTexture.colorSpace=THREE.SRGBColorSpace;globeMapTexture.offset.x=0;globeRoot.add(new THREE.Mesh(new THREE.SphereGeometry(1,96,64),new THREE.MeshBasicMaterial({map:globeMapTexture})));globeRoot.add(new THREE.Mesh(new THREE.SphereGeometry(1.018,64,48),new THREE.MeshBasicMaterial({color:0x4d9bd3,transparent:true,opacity:.08,side:THREE.BackSide})));globeRaycaster=new THREE.Raycaster();globePointer=new THREE.Vector2();const resize=()=>{const w=host.clientWidth,h=host.clientHeight;globeCamera.aspect=w/Math.max(h,1);globeCamera.updateProjectionMatrix();if(!globeUserZoomed)globeCamera.position.z=globeFitDistance(w,h);globeRenderer.setSize(w,h);};window.addEventListener('resize',resize);resize();let lastX=0,lastY=0,pinchStart=0,pinchDistance=0;const activePointers=new Map();const canvasEl=globeRenderer.domElement;canvasEl.addEventListener('pointerdown',e=>{activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvasEl.setPointerCapture(e.pointerId);if(activePointers.size===2){const pts=[...activePointers.values()];pinchDistance=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);globeDrag=null;return;}globeDrag={x:e.clientX,y:e.clientY,moved:false};lastX=e.clientX;lastY=e.clientY;});canvasEl.addEventListener('pointermove',e=>{if(activePointers.has(e.pointerId))activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(!globeDrag&&activePointers.size===0){const rect=canvasEl.getBoundingClientRect();globePointer.set((e.clientX-rect.left)/rect.width*2-1,-((e.clientY-rect.top)/rect.height*2-1));globeRaycaster.setFromCamera(globePointer,globeCamera);const hoverHit=globeRaycaster.intersectObjects(globeMeshes,false).find(v=>v.object.userData.layer);const info=$('globeInfo');if(hoverHit){const layer=hoverHit.object.userData.layer;info.replaceChildren(tipContent(layer));info.hidden=false;info.classList.add('hover-only');info.style.left=Math.min(e.clientX+14,window.innerWidth-info.offsetWidth-12)+'px';info.style.top=Math.min(e.clientY+14,window.innerHeight-info.offsetHeight-12)+'px';}else if(info.classList.contains('hover-only')){info.hidden=true;info.replaceChildren();}}if(activePointers.size===2){const pts=[...activePointers.values()],dist=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);if(pinchDistance>0){globeCamera.position.z=Math.max(2.2,Math.min(12,globeCamera.position.z*pinchDistance/Math.max(dist,1)));globeUserZoomed=true;}pinchDistance=dist;return;}if(!globeDrag)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(e.clientX-globeDrag.x)+Math.abs(e.clientY-globeDrag.y)>4)globeDrag.moved=true;globeRoot.rotation.y+=dx*.006;globeRoot.rotation.x=Math.max(-1.35,Math.min(1.35,globeRoot.rotation.x+dy*.006));lastX=e.clientX;lastY=e.clientY;});canvasEl.addEventListener('pointerup',e=>{activePointers.delete(e.pointerId);if(activePointers.size<2)pinchDistance=0;if(globeDrag&&!globeDrag.moved){const rect=canvasEl.getBoundingClientRect();globePointer.set((e.clientX-rect.left)/rect.width*2-1,-((e.clientY-rect.top)/rect.height*2-1));globeRaycaster.setFromCamera(globePointer,globeCamera);const hit=globeRaycaster.intersectObjects(globeMeshes,false).find(v=>v.object.userData.layer);if(hit){const layer=hit.object.userData.layer;focusGlobeLayers([layer]);layer.fire('click',{latlng:layer.getBounds().getCenter()});}}globeDrag=null;});canvasEl.addEventListener('pointercancel',e=>{activePointers.delete(e.pointerId);globeDrag=null;pinchDistance=0;});canvasEl.addEventListener('wheel',e=>{e.preventDefault();globeCamera.position.z=Math.max(2.2,Math.min(12,globeCamera.position.z+e.deltaY*.002));globeUserZoomed=true;},{passive:false});globeBuilt=true;rebuildGlobeLayers();const animate=()=>{requestAnimationFrame(animate);globeRenderer.render(globeScene,globeCamera);};animate();}
 function setGlobeMode(on){if(!on)globeUserZoomed=false;$('map3dBtn').setAttribute('aria-pressed',String(on));$('map3dBtn').setAttribute('aria-label',on?'Return to 2D map':'3D Globe');$('globeView').classList.toggle('active',on);$('globeDebugSetting').style.display=on?'block':'none';$('map').style.visibility=on?'hidden':'visible';if(on){initGlobe();if(globeRenderer)globeRenderer.setSize($('globeView').clientWidth,$('globeView').clientHeight);}else map.invalidateSize({pan:false});}
 function updateMap3dButton() {
   const button = $('map3dBtn');
@@ -2784,7 +2788,16 @@ function wireClick(target, layer) {
     }
     const infoLength = box.textContent.trim().length;
     if (infoLength < 90) box.classList.add('short-info');
-    L.popup({ maxWidth: 500, minWidth: 0 }).setLatLng(e.latlng).setContent(box).openOn(map);
+    if ($('globeView').classList.contains('active')) {
+      const info = $('globeInfo');
+      info.classList.remove('hover-only');
+      info.replaceChildren(box);
+      info.hidden = false;
+      info.style.left = '16px';
+      info.style.top = '16px';
+    } else {
+      L.popup({ maxWidth: 500, minWidth: 0 }).setLatLng(e.latlng).setContent(box).openOn(map);
+    }
   });
 }
 function collect() {
@@ -2872,8 +2885,26 @@ function flashLayers(layers) {
   searchAF = requestAnimationFrame(step);
 }
 let islandMoveSequence = 0;
+function focusGlobeLayers(layers) {
+  if (!globeBuilt || !globeRoot || !globeCamera || !layers.length) return;
+  const bounds = L.latLngBounds(layers.map(layer => layer.getBounds()));
+  const center = bounds.getCenter();
+  const direction = globeAlignedVector(center.lng, center.lat).normalize();
+  globeRoot.quaternion.setFromUnitVectors(direction, new THREE.Vector3(0, 0, 1));
+  const latSpan = Math.abs(bounds.getNorth() - bounds.getSouth()) / Math.max(mapHeight, 1) * Math.PI;
+  const lngSpan = Math.abs(bounds.getEast() - bounds.getWest()) / Math.max(mapWidth, 1) * Math.PI * 2;
+  const angularSize = Math.max(latSpan, lngSpan, 0.025);
+  globeCamera.position.z = Math.max(1.18, Math.min(3.2, 1.03 / Math.sin(Math.min(angularSize * 0.75, 1.2))));
+  globeCamera.lookAt(0, 0, 0);
+  globeUserZoomed = true;
+}
 function showLayers(layers) {
   if (!layers.length) return;
+  if ($('globeView').classList.contains('active')) {
+    focusGlobeLayers(layers);
+    flashLayers(layers);
+    return;
+  }
 
   const sequence = ++islandMoveSequence;
   map.stop();
