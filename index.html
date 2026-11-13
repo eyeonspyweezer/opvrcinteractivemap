@@ -200,7 +200,7 @@ button.list-btn { font: inherit; text-transform: uppercase; cursor: pointer; }
 #globeView { position:fixed; inset:0; z-index:500; display:none; background:#07111d; touch-action:none; }
 #globeView.active { display:block; }
 #globeView canvas { display:block; width:100%; height:100%; }
-#map3dBtn { position:fixed; z-index:1100; top:calc(12px + env(safe-area-inset-top,0px)); right:12px; padding:9px 13px; border:1px solid var(--fg); border-radius:7px; background:var(--bg); color:var(--fg); font:inherit; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); }
+#map3dBtn { position:fixed; z-index:1100; top:calc(12px + env(safe-area-inset-top,0px)); right:64px; padding:9px 13px; border:1px solid var(--fg); border-radius:7px; background:var(--bg); color:var(--fg); font:inherit; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); }
 #map3dBtn[aria-pressed="true"] { background:var(--fg); color:var(--bg); }
 #bountyPanel { position: fixed; z-index: 1000; top: 10px; left: calc(var(--sidew) + 8px); width: min(380px, calc(100vw - var(--sidew) - 16px)); max-height: 80dvh; overflow: auto; box-sizing: border-box; padding: 8px; background: var(--bg); color: var(--fg); border: 1px solid var(--fg); border-radius: 6px; font-size: 14px; }
 #bountyPanel { clip-path: inset(0); visibility: visible; transition: clip-path .4s ease, visibility 0s; }
@@ -1410,7 +1410,7 @@ function applyStyle(layer) {
     layer._blendPainted = true;
   }
 }
-const restyleAll = () => drawnItems.eachLayer(applyStyle);
+const restyleAll = () => { drawnItems.eachLayer(applyStyle); if (globeBuilt) rebuildGlobeLayers(); };
 
 // Optional relationship lines. Crew links are blue/solid; owner links are purple/dashed.
 function rebuildRelationshipLines() {
