@@ -1622,7 +1622,10 @@ function globeAlignedVector(x,y,r=1.014){return globeVector(x+mapWidth/4,y,r);}
 const globeFlagTextures = new Map();
 function globeFlagUrl(layer){
  if(!OPT.flags)return null;
- const groups=preferMarines(ownersOf(resolveOwner(layer.feature?.properties||{})).flatMap(groupsOf));
+ const p=layer.feature?.properties||{};
+ // Use the same resolved group list as the 2D map, including generated/static
+ // island group assignments, rather than deriving groups from owner text alone.
+ const groups=preferMarines(groupsForIsland(p.name,resolveOwner(p)));
  return groups.map(flagFor).find(Boolean)||null;
 }
 function getGlobeFlagTexture(url){
