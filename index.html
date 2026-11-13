@@ -2995,7 +2995,7 @@ $('optColors').addEventListener('change', (e) => { OPT.colors = e.target.checked
 $('optCrewLines').addEventListener('change', (e) => { OPT.crewLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
 $('optOwnerLines').addEventListener('change', (e) => { OPT.ownerLines = e.target.checked; rebuildRelationshipLines(); saveLocalSettings(); });
 $('optIslandAxisTravel').addEventListener('change', (e) => { OPT.islandAxisTravel = e.target.checked; saveLocalSettings(); });
-$('optFlags').addEventListener('change', (e) => { OPT.flags = e.target.checked; rebuildFlags(); saveLocalSettings(); });
+$('optFlags').addEventListener('change', (e) => { OPT.flags = e.target.checked; rebuildFlags(); if(globeBuilt) rebuildGlobeLayers(); saveLocalSettings(); });
 $('optNames').addEventListener('change', (e) => { OPT.names = e.target.checked; rebuildLabels(); saveLocalSettings(); });
 $('optOwners').addEventListener('change', (e) => { OPT.owners = e.target.checked; rebuildLabels(); saveLocalSettings(); });
 $('optHideNonCanon').addEventListener('change', (e) => { OPT.hideNonCanon = e.target.checked; rebuildVisibility(); saveLocalSettings(); });
