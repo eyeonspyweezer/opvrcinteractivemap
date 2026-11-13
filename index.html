@@ -16,6 +16,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
   
 <style>
@@ -49,14 +51,12 @@ html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay
   touch-action: pan-x pan-y;
 }
 
-/* Experimental perspective view. The map returns to its normal 2D layout by default. */
-#map { transform: none; transform-origin: 50% 62%; transition: transform .35s ease; }
-#map.experimental-3d {
-  transform: perspective(1200px) rotateX(24deg) scale(1.08);
-}
-@media (prefers-reduced-motion: reduce) {
-  #map { transition: none; }
-}
+/* Experimental globe view; the normal Leaflet map remains untouched underneath. */
+#globeView { position: fixed; inset: 0; z-index: 500; display: none; overflow: hidden; background: radial-gradient(ellipse at center, #172b3d 0%, #07111d 72%, #03070c 100%); touch-action: none; }
+#globeView.active { display: block; }
+#globeView canvas { display: block; width: 100%; height: 100%; }
+body.globe-mode #map { visibility: hidden; }
+
 html, body { min-height: 100%; background: var(--bg); }
 
 .drawing path.leaflet-interactive { pointer-events: none; }
@@ -375,6 +375,7 @@ body { background: var(--bg); }
   </div>
 </div>
 <div id="map"></div>
+<div id="globeView" aria-label="Experimental 3D globe view"></div>
 
 <div id="sideList">
  
@@ -2819,13 +2820,67 @@ $('searchBtn').addEventListener('click', () => {
 });
 
 const mapModeBtn = $('mapModeBtn');
+let globeRenderer = null, globeScene = null, globeCamera = null, globeControls = null, globeFrame = 0;
+function startGlobeView() {
+  if (globeRenderer) return;
+  if (!window.THREE || !THREE.OrbitControls) throw new Error('3D globe library unavailable');
+  const host = $('globeView');
+  globeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  globeRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  host.appendChild(globeRenderer.domElement);
+  globeScene = new THREE.Scene();
+  globeCamera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  globeCamera.position.set(0, 0, 13);
+  globeControls = new THREE.OrbitControls(globeCamera, globeRenderer.domElement);
+  globeControls.enableDamping = true;
+  globeControls.dampingFactor = 0.06;
+  globeControls.minDistance = 7;
+  globeControls.maxDistance = 22;
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(5, 96, 64),
+    new THREE.MeshStandardMaterial({ map: new THREE.TextureLoader().load(imageUrl), roughness: 1, metalness: 0 })
+  );
+  globeScene.add(sphere);
+  globeScene.add(new THREE.AmbientLight(0xffffff, 1.25));
+  const sunlight = new THREE.DirectionalLight(0xffffff, 1.15);
+  sunlight.position.set(7, 4, 8);
+  globeScene.add(sunlight);
+  const resizeGlobe = () => {
+    const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
+    globeRenderer.setSize(w, h, false);
+    globeCamera.aspect = w / h;
+    globeCamera.updateProjectionMatrix();
+  };
+  window.addEventListener('resize', resizeGlobe);
+  resizeGlobe();
+  const render = () => {
+    globeFrame = requestAnimationFrame(render);
+    globeControls.update();
+    globeRenderer.render(globeScene, globeCamera);
+  };
+  render();
+}
 mapModeBtn.addEventListener('click', () => {
-  const enabled = $('map').classList.toggle('experimental-3d');
+  const enabled = !$('globeView').classList.contains('active');
+  if (enabled) {
+    try {
+      startGlobeView();
+      document.body.classList.add('globe-mode');
+      $('globeView').classList.add('active');
+    } catch (error) {
+      console.warn('Experimental globe unavailable:', error);
+      mapModeBtn.title = 'Globe unavailable on this device/browser';
+      return;
+    }
+  } else {
+    $('globeView').classList.remove('active');
+    document.body.classList.remove('globe-mode');
+    map.invalidateSize({ pan: false });
+  }
   mapModeBtn.textContent = enabled ? '2D' : '3D';
   mapModeBtn.setAttribute('aria-pressed', String(enabled));
-  mapModeBtn.setAttribute('aria-label', enabled ? 'Switch back to 2D map' : 'Switch to experimental 3D map');
-  mapModeBtn.title = enabled ? 'Return to 2D map' : 'Experimental 2D / 3D map';
-  requestAnimationFrame(() => map.invalidateSize({ pan: false }));
+  mapModeBtn.setAttribute('aria-label', enabled ? 'Switch back to 2D map' : 'Switch to 3D globe');
+  mapModeBtn.title = enabled ? 'Return to 2D map' : 'Experimental 3D globe';
 });
 $('settingsBtn').addEventListener('click', () => togglePanel('settingsFrame'));
 document.addEventListener('pointerdown', (e) => { if (!$('searchFrame').contains(e.target)) closeLists(); });
