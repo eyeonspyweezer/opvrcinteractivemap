@@ -889,13 +889,31 @@ const eachShape = (fn) => { drawnItems.eachLayer(fn); ghostItems.eachLayer(fn); 
 const shiftLL = (ll, dx) => Array.isArray(ll) ? ll.map((x) => shiftLL(x, dx)) : L.latLng(ll.lat, ll.lng + dx);
 const shiftCoords = (c, dx) => typeof c[0] === 'number' ? [c[0] + dx, c[1]] : c.map((x) => shiftCoords(x, dx));
 function setLayerStyle(layer, style) { layer.setStyle(style); (layer._ghosts || []).forEach((g) => g.setStyle(style)); applyFlagFill(layer); }
+// Flip polygon info tooltips toward the side with more room on screen.
+function adaptTooltipToScreen(layer) {
+  layer.on('tooltipopen', (event) => {
+    if (layer._adjustingTooltip) return;
+    const tooltip = layer.getTooltip();
+    if (!tooltip) return;
+    const point = map.latLngToContainerPoint(event.latlng || layer.getBounds().getCenter());
+    const direction = point.y < map.getSize().y / 2 ? 'bottom' : 'top';
+    if (tooltip.options.direction === direction) return;
+    layer._adjustingTooltip = true;
+    tooltip.options.direction = direction;
+    layer.closeTooltip();
+    layer.openTooltip(event.latlng || layer.getBounds().getCenter());
+    layer._adjustingTooltip = false;
+  });
+}
+
 function makeGhosts(layer) {
   layer._ghosts = [];
   if (!mapWidth) return;
   for (let k = -WRAP_COPIES; k <= WRAP_COPIES; k++) {
     if (!k) continue;
     const g = L.polygon(shiftLL(layer.getLatLngs(), k * mapWidth), layer.options);
-    g.bindTooltip(() => tipContent(layer), { sticky: true });
+    g.bindTooltip(() => tipContent(layer), { sticky: true, direction: 'auto', opacity: 1 });
+    adaptTooltipToScreen(g);
     wireHoverImage(g, layer);
     wireClick(g, layer);
     ghostItems.addLayer(g);
@@ -1721,6 +1739,7 @@ updateMap3dButton();
 function addIsland(geometry, props) {
   const layer = L.geoJSON({ type: 'Feature', properties: props, geometry }).getLayers()[0];
   layer.bindTooltip(() => tipContent(layer), { sticky: true, direction: 'auto', opacity: 1 });
+  adaptTooltipToScreen(layer);
   wireHoverImage(layer, layer);
   wireClick(layer, layer);
   drawnItems.addLayer(layer);
