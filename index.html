@@ -2009,38 +2009,33 @@ loadDiscord();
 setInterval(loadDiscord, 300000);
 
 // ===== VRChat group hover info =====
-// Public group metadata is fetched without a VRChat login. Try VRChat first,
-// then the community proxy used for browser-side API requests when CORS blocks the direct endpoint.
-const VRC_GROUP_ID = 'grp_677be38a-564d-432f-be95-f2e319bb4b13';
-const VRC_GROUP_ENDPOINTS = [
-  `https://api.vrchat.cloud/api/1/groups/${VRC_GROUP_ID}`,
-  `https://vrchat.vercel.app/api/1/groups/${VRC_GROUP_ID}`
-];
+// Public group metadata is retrieved through our Cloudflare proxy, which calls VRC Search.
+const VRC_GROUP_PROXY = 'https://opvrc-vrc-group-proxy.dragonddavegorby.workers.dev/group';
 async function loadVrcGroup() {
-  let d = null;
-  for (const url of VRC_GROUP_ENDPOINTS) {
-    try {
-      const r = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!r.ok) continue;
-      const x = await r.json();
-      if (x && (x.name || x.iconUrl || x.bannerUrl)) { d = x; break; }
-    } catch (_) {}
-  }
-  if (!d) {
-    $('vrcInfo').hidden = true;
-    return;
-  }
-  $('vrcName').textContent = d.name || 'VRChat Group';
-  $('vrcMembers').textContent = typeof d.memberCount === 'number'
-    ? d.memberCount.toLocaleString() + ' members'
-    : '';
-  if (d.bannerUrl) $('vrcBg').style.backgroundImage = `url(${d.bannerUrl})`;
-  if (d.iconUrl) {
+  try {
+    const r = await fetch(VRC_GROUP_PROXY, { headers: { Accept: 'application/json' } });
+    if (!r.ok) throw new Error('Group proxy HTTP ' + r.status);
+    const d = await r.json();
+    if (!d || (!d.name && !d.icon_url && !d.banner_url)) throw new Error('Group data unavailable');
+
+    $('vrcName').textContent = d.name || 'VRChat Group';
+    $('vrcMembers').textContent = Number.isFinite(Number(d.member_count))
+      ? Number(d.member_count).toLocaleString() + ' members'
+      : '';
+
+    const bg = $('vrcBg');
+    bg.style.backgroundImage = d.banner_url ? `url("${d.banner_url}")` : '';
+
     const img = $('vrcGroupIcon');
+    img.classList.remove('ready');
     img.onload = () => img.classList.add('ready');
-    img.src = d.iconUrl;
+    img.onerror = () => img.classList.remove('ready');
+    img.src = d.icon_url || '';
+    $('vrcInfo').hidden = false;
+  } catch (err) {
+    console.warn('VRChat group info unavailable:', err);
+    $('vrcInfo').hidden = true;
   }
-  $('vrcInfo').hidden = false;
 }
 loadVrcGroup();
 setInterval(loadVrcGroup, 300000);
