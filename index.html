@@ -330,6 +330,8 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #vrcInfo[hidden] { display: none; }
 #vrcInfo > div { padding: 0 calc(var(--fab) / 2 + 6px) 0 14px; text-align: right; position: relative; z-index: 1; }
 #vrcInfo .vrc-title { font-weight: 700; }
+#vrcInfo .vrc-credit { font-size: 10px; opacity: .8; }
+#vrcInfo .vrc-credit a { color: inherit; text-decoration: underline; }
 #vrcBg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: var(--dc-splash-opacity); }
 #vrcWrap:hover #vrcInfo { width: 230px; }
 /* Search and settings frames, animated. On mouse devices they sit further left so the Discord tab never overlaps them. */
@@ -405,6 +407,7 @@ body { background: var(--bg); }
       <span id="vrcBg"></span>
       <div class="vrc-title" id="vrcName"></div>
       <div class="dc-row"><span id="vrcMembers"></span></div>
+      <div class="vrc-credit"><a href="https://search.vrcwwt.com/" target="_blank" rel="noopener">Data from VRC Search</a></div>
     </div>
     <a id="fabVrc" class="round-btn" href="https://vrchat.com/home/group/grp_677be38a-564d-432f-be95-f2e319bb4b13" target="_blank" rel="noopener" aria-label="VRChat"><img id="vrcGroupIcon" class="vrc-group-icon" alt=""><span class="ico vrc-logo" data-icon="vrchat">🌐</span></a>
   </div>
@@ -2019,8 +2022,8 @@ async function loadVrcGroup() {
     if (!d || (!d.name && !d.icon_url && !d.banner_url)) throw new Error('Group data unavailable');
 
     $('vrcName').textContent = d.name || 'VRChat Group';
-    $('vrcMembers').textContent = Number.isFinite(Number(d.member_count))
-      ? Number(d.member_count).toLocaleString() + ' members'
+    $('vrcMembers').textContent = typeof d.member_count === 'number'
+      ? d.member_count.toLocaleString() + ' members'
       : '';
 
     const bg = $('vrcBg');
