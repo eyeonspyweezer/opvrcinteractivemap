@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 
   
 <style>
@@ -188,6 +189,19 @@ a.pop-name { color: var(--link); text-decoration: underline; }
 .pop-more { margin-top: 6px; opacity: .75; }
 .list-btn[hidden] { display: none; }
 button.list-btn { font: inherit; text-transform: uppercase; cursor: pointer; }
+#insightPanel { position:fixed; z-index:1001; top:10px; left:calc(var(--sidew) + 8px); width:min(430px,calc(100vw - var(--sidew) - 16px)); max-height:82dvh; overflow:auto; box-sizing:border-box; padding:10px; background:var(--bg); color:var(--fg); border:1px solid var(--fg); border-radius:6px; font-size:13px; }
+#insightPanel[hidden] { display:none; }
+#insightPanel h3 { margin:0 0 8px; font-size:15px; }
+#insightPanel .insight-tools { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+#insightPanel select { max-width:100%; padding:5px; background:var(--bg); color:var(--fg); border:1px solid var(--fg); }
+#insightPanel .insight-row { display:flex; justify-content:space-between; gap:10px; padding:7px 4px; border-bottom:1px solid color-mix(in srgb,var(--fg) 30%,transparent); cursor:pointer; }
+#insightPanel .insight-row:hover { background:color-mix(in srgb,var(--fg) 9%,transparent); }
+#insightPanel .insight-value { white-space:nowrap; font-variant-numeric:tabular-nums; }
+#globeView { position:fixed; inset:0; z-index:500; display:none; background:#07111d; touch-action:none; }
+#globeView.active { display:block; }
+#globeView canvas { display:block; width:100%; height:100%; }
+#map3dBtn { position:fixed; z-index:1100; top:calc(12px + env(safe-area-inset-top,0px)); right:12px; padding:9px 13px; border:1px solid var(--fg); border-radius:7px; background:var(--bg); color:var(--fg); font:inherit; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25); }
+#map3dBtn[aria-pressed="true"] { background:var(--fg); color:var(--bg); }
 #bountyPanel { position: fixed; z-index: 1000; top: 10px; left: calc(var(--sidew) + 8px); width: min(380px, calc(100vw - var(--sidew) - 16px)); max-height: 80dvh; overflow: auto; box-sizing: border-box; padding: 8px; background: var(--bg); color: var(--fg); border: 1px solid var(--fg); border-radius: 6px; font-size: 14px; }
 #bountyPanel { clip-path: inset(0); visibility: visible; transition: clip-path .4s ease, visibility 0s; }
 #bountyPanel[hidden] { display: block; clip-path: inset(0 0 100% 0); visibility: hidden; transition: clip-path .4s ease, visibility 0s linear .4s; }
@@ -367,14 +381,19 @@ body { background: var(--bg); }
   </div>
 </div>
 <div id="map"></div>
+<div id="globeView" aria-label="Interactive 3D island globe"></div>
+<button id="map3dBtn" type="button" aria-pressed="false">3D Globe</button>
 
 <div id="sideList">
  
   <img class="list-icon" src="VRCTitle.PNG" alt="">
   <div id="listButtons"></div>
   <button id="bountyBtn" class="list-btn" type="button">Bounty List</button>
+  <button id="growthBtn" class="list-btn" type="button">Visitor Growth</button>
+  <button id="mentionsBtn" class="list-btn" type="button">Announcement Mentions</button>
   <div id="listLive"></div>
 </div>
+<div id="insightPanel" hidden aria-live="polite"><h3 id="insightTitle">Visitor Growth</h3><div class="insight-tools" id="insightTools"></div><div id="insightRows"></div></div>
 <div id="bountyPanel" hidden>
   <table><thead><tr><th id="bSortName" style="cursor:pointer">Name</th><th id="bSortNum" class="bnum" style="cursor:pointer">Bounty</th></tr></thead><tbody id="bountyBody"></tbody></table>
 </div>
@@ -669,9 +688,12 @@ $('themeBtn').addEventListener('click', () => {
 });
 $('listToggle').addEventListener('click', () => {
   $('sideList').classList.toggle('open');
-  if (!$('sideList').classList.contains('open')) $('bountyPanel').hidden = true;
+  if (!$('sideList').classList.contains('open')) closeInsightPanels();
 });
-$('bountyBtn').addEventListener('click', () => { $('bountyPanel').hidden = !$('bountyPanel').hidden; });
+function closeInsightPanels() { $('bountyPanel').hidden = true; $('insightPanel').hidden = true; }
+$('bountyBtn').addEventListener('click', () => { const opening = $('bountyPanel').hidden; closeInsightPanels(); $('bountyPanel').hidden = !opening; });
+$('growthBtn').addEventListener('click', () => openVisitorGrowth());
+$('mentionsBtn').addEventListener('click', () => openAnnouncementRankings());
 // Right-click the Bounty List button or panel = open the bounty Google Sheet
 const openBountySheet = (e) => { e.preventDefault(); window.open(SHEETS.bounty, '_blank', 'noopener'); };
 $('bountyBtn').addEventListener('contextmenu', openBountySheet);
