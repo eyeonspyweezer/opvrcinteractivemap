@@ -1,5 +1,5 @@
 ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unknown	Group1	Group2	Group3	WorldId	LabelX	LabelY
-1	Wano Capital	#000000	Albertis	https://vrchat.com/home/world/wrld_e03a81d6-f39f-49e1-a56d-b6eaf81ad40f	10	21456	32522	270	451	89	0	0	2	0	0	wrld_e03a81d6-f39f-49e1-a56d-b6eaf81ad40f	21591	32747
+1	Wano Capital	#000000	Albertis	https://vrchat.com/home/world/wrld_e03a81d6-f39f-49e1-a56d-b6eaf81ad40f	11	21456	32522	270	451	89	0	0	2	0	0	wrld_e03a81d6-f39f-49e1-a56d-b6eaf81ad40f	21591	32747
 2	New Kuraigana	#009246			-1	21222	31402	263	471	0	1	0	0	0	0		21353	31638
 3	The rest of Wano	#000000	VRGoofy	https://vrchat.com/home/world/wrld_6689e02e-6ce0-4a20-abf5-009ea21fa691/info https://vrchat.com/home/world/wrld_7b69f8f5-355a-4396-852f-bdda3571baad/info	6	20811	31095	1649	2929	50	0	0	5	0	0	wrld_6689e02e-6ce0-4a20-abf5-009ea21fa691	21632	32529
 4	Elbaph	#005aff	Vanneran		3	24308	31334	802	1167	75	0	0	1	0	0		24709	31918
@@ -10,7 +10,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 9	Dressrosa/Green Bit Path	#ffd700			-1	5664	29924	146	382	0	1	0	0	0	0		5737	30115
 10	Dressrosa	#005aff	Zenny	https://vrchat.com/home/world/wrld_589ff613-6cf4-43a5-b5f8-0ca51cdbd6fc https://vrchat.com/home/world/wrld_e78554f8-7a06-44c4-bcd5-236f3b48bfce https://vrchat.com/home/world/wrld_02313eb6-459c-4071-94fb-bc11dc131d6a https://vrchat.com/home/world/wrld_7508cffe-01a9-4458-99ff-4c9a9a9af73a	3	5178	28436	792	1574	75	0	0	1	0	0	wrld_589ff613-6cf4-43a5-b5f8-0ca51cdbd6fc	5574	29223
 11	Punk Hazard	#000000 #005aff	Omnus/The World Government	https://vrchat.com/home/world/wrld_45b04394-9d90-4c7b-9fb1-f5a1fbe39a7c/info	-1	3166	28876	456	860	0	0	0	4	3	0	wrld_45b04394-9d90-4c7b-9fb1-f5a1fbe39a7c	3394	29306
-12	Fishman Island	#000000	Voice Lord	https://vrchat.com/home/world/wrld_44cd3df3-bb34-40c6-b2ae-e7c08d665547/info	-1	1176	31173	224	522	0	0	0	6	0	0	wrld_44cd3df3-bb34-40c6-b2ae-e7c08d665547	1288	31435
+12	Fishman Island	#000000	Voice Lord	https://vrchat.com/home/world/wrld_44cd3df3-bb34-40c6-b2ae-e7c08d665547/info	9	1176	31173	224	522	50	0	0	6	0	0	wrld_44cd3df3-bb34-40c6-b2ae-e7c08d665547	1288	31435
 13	Foodvalten Island	#005aff	Vanneran		3	19435	29627	413	744	75	0	0	1	0	0		19642	29999
 14	Sphinx Island	#ffd700			-1	23948	30556	232	423	0	1	0	0	0	0		24064	30767
 15	G-14	#ffd700			-1	24064	28685	118	232	0	1	0	0	0	0		24123	28801
@@ -34,33 +34,33 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 33	G-5	#005aff	Marines		3	1825	28892	207	321	75	0	0	1	0	0		1929	29053
 34	Little Garden	#000000 #005aff	Omnus/The World Government	https://vrchat.com/home/world/wrld_8d3a4215-2432-4020-b66a-3907affe8c9e/info	-1	36773	34734	377	584	0	0	0	4	3	0	wrld_8d3a4215-2432-4020-b66a-3907affe8c9e	36962	35025
 35	Cactus	#009246		https://vrchat.com/home/world/wrld_13ecd901-7c75-4fdb-847b-038b55fa69d0	-1	36406	32682	275	420	0	1	0	0	0	0	wrld_13ecd901-7c75-4fdb-847b-038b55fa69d0	36543	32892
-36	Kyuka	#000000	Albertis		10	37829	33177	254	478	89	0	0	2	0	0		37957	33416
+36	Kyuka	#000000	Albertis		11	37829	33177	254	478	89	0	0	2	0	0		37957	33416
 37	Renaisse	#ffd700			-1	38536	31621	270	573	0	1	0	0	0	0		38671	31907
-38	Nanimonai	#000000	Albertis		10	39884	32706	283	532	89	0	0	2	0	0		40026	32972
+38	Nanimonai	#000000	Albertis		11	39884	32706	283	532	89	0	0	2	0	0		40026	32972
 39	Drum Island	#005aff #000000	JaxorJax	https://vrchat.com/home/world/wrld_3b8e39d2-d97c-4cac-befe-fb512e75917e https://vrchat.com/home/world/wrld_f6189e1f-f820-483e-9f61-0b71bcecd1de	-1	39014	34597	396	778	0	0	0	3	4	0	wrld_3b8e39d2-d97c-4cac-befe-fb512e75917e	39212	34986
 40	Jaya	#000000 #005aff	Albertis/Zenny	https://vrchat.com/home/world/wrld_598fae77-d05d-4cfa-a808-c2ef9e6fa82e	-1	43649	31395	440	754	0	0	0	2	1	0	wrld_598fae77-d05d-4cfa-a808-c2ef9e6fa82e	43840	31846
 41	Long Ring Long Land	#000000	Vael D. Yarausy		7	47414	33215	387	754	57	0	0	7	2	0		47608	33592
 42	Ukkari	#ffd700			-1	44468	33945	311	539	0	1	0	0	0	0		44624	34215
-43	Foolshout	#000000	Albertis / Caine		10	43328	29347	375	689	89	0	0	2	4	0		43516	29692
+43	Foolshout	#000000	Albertis / Caine		11	43328	29347	375	689	89	0	0	2	4	0		43516	29692
 44	Alabasta	#800080	Lord Toshi	https://vrchat.com/home/world/wrld_116f85cb-267a-487b-92ab-046ab86daaa2	-1	40799	33559	1123	1577	0	0	0	9	0	0	wrld_116f85cb-267a-487b-92ab-046ab86daaa2	41360	34348
-45	Kenzan	#000000	Albertis / Caine		10	47073	28904	386	778	89	0	0	2	4	0		47265	29293
-46	Namakura	#000000	Albertis / Caine		10	48250	29689	375	867	89	0	0	2	4	0		48438	30122
+45	Kenzan	#000000	Albertis / Caine		11	47073	28904	386	778	89	0	0	2	4	0		47265	29293
+46	Namakura	#000000	Albertis / Caine		11	48250	29689	375	867	89	0	0	2	4	0		48438	30122
 47	Ohara	#005aff	Vanneran		3	13319	19968	375	881	75	0	0	1	0	0		13506	20408
-48	God Valley	#000000	Albertis	https://vrchat.com/home/world/wrld_cabb63fd-532b-4f66-9c63-7259318a7976/info	10	18196	14500	300	689	89	0	0	2	0	0	wrld_cabb63fd-532b-4f66-9c63-7259318a7976	18346	14844
+48	God Valley	#000000	Albertis	https://vrchat.com/home/world/wrld_cabb63fd-532b-4f66-9c63-7259318a7976/info	11	18196	14500	300	689	89	0	0	2	0	0	wrld_cabb63fd-532b-4f66-9c63-7259318a7976	18346	14844
 49	Weatheria	#ffd700			-1	48704	35075	454	765	0	1	0	0	0	0		48931	35457
 50	G-2	#ffd700			-1	63008	35062	181	355	0	1	0	0	0	0		63099	35240
 51	Lulusia	#ffd700			-1	60838	33894	437	785	0	1	0	0	0	0		61057	34286
 52	Sabaody	#009246		https://vrchat.com/home/world/wrld_548471d5-9574-4ab1-93f7-d0b9532426fd/info https://vrchat.com/home/world/wrld_d5dee36a-3492-40b8-adaf-f8540eea8b4f/info	-1	62835	32372	512	928	0	1	0	0	0	0	wrld_548471d5-9574-4ab1-93f7-d0b9532426fd	63091	32836
 53	Enies Lobby	#005aff	World Government	https://vrchat.com/home/world/wrld_e199c352-7f4b-4829-852f-a09408136648 https://vrchat.com/home/world/wrld_aeef45dd-c7f7-4523-bbc5-d472ef45f6d0	8	56865	30344	700	608	50	0	0	3	0	0	wrld_e199c352-7f4b-4829-852f-a09408136648	57215	30648
 54	Guanhao	#005aff	World Government		8	56080	29566	232	498	50	0	0	3	0	0		56196	29815
-55	Karakuri	#000000	Albertis		10	56882	35341	375	471	89	0	0	2	0	0		57070	35577
+55	Karakuri	#000000	Albertis		11	56882	35341	375	471	89	0	0	2	0	0		57070	35577
 56	Marineford	#005aff	World Government	https://vrchat.com/home/world/wrld_470e7acb-bb8e-4e34-8a53-6375951de766 https://vrchat.com/home/world/wrld_6c21730b-d5c0-4b74-a349-4c307d757232	8	59422	30228	495	771	50	0	0	3	0	0	wrld_470e7acb-bb8e-4e34-8a53-6375951de766	59669	30614
 57	Amazon Lily	#009246		https://vrchat.com/home/world/wrld_1e9862ee-a291-4c75-9e3d-3d738ccab493/info	-1	55930	27354	358	655	0	1	0	0	0	0	wrld_1e9862ee-a291-4c75-9e3d-3d738ccab493	56109	27682
-58	St. Poplar	#000000	Albertis		10	53094	30016	232	410	89	0	0	2	0	0		53210	30221
-59	Pucci	#000000	Albertis		10	51814	33327	311	492	89	0	0	2	0	0		51969	33573
-60	San Faldo	#000000	Albertis		10	51179	30303	375	580	89	0	0	2	0	0		51366	30593
+58	St. Poplar	#000000	Albertis		11	53094	30016	232	410	89	0	0	2	0	0		53210	30221
+59	Pucci	#000000	Albertis		11	51814	33327	311	492	89	0	0	2	0	0		51969	33573
+60	San Faldo	#000000	Albertis		11	51179	30303	375	580	89	0	0	2	0	0		51366	30593
 61	Thriller Bark	#005aff #000000	JaxorJax and FOS	https://vrchat.com/home/world/wrld_51f0ee38-4a35-4902-8c22-32d4b81c8560	-1	58719	33252	328	594	0	0	0	3	4	0	wrld_51f0ee38-4a35-4902-8c22-32d4b81c8560	58883	33549
-62	Kuraigana	#000000	Voice Lord	https://vrchat.com/home/world/wrld_03b47262-7778-46a0-b48d-039d88f0f23d	-1	61555	29805	375	553	0	0	0	6	0	0	wrld_03b47262-7778-46a0-b48d-039d88f0f23d	61743	30081
+62	Kuraigana	#000000	Voice Lord	https://vrchat.com/home/world/wrld_03b47262-7778-46a0-b48d-039d88f0f23d	9	61555	29805	375	553	50	0	0	6	0	0	wrld_03b47262-7778-46a0-b48d-039d88f0f23d	61743	30081
 63	Rusukaina	#ffd700			-1	55222	27805	193	396	0	1	0	0	0	0		55318	28003
 64	Impel Down	#009246		https://vrchat.com/home/world/wrld_ec21d012-a10f-4067-ad1d-f9cdebc4d092 https://vrchat.com/home/world/wrld_3807ed86-9e69-499a-87ed-edd018c8e7b6	-1	58408	27361	362	730	0	1	0	0	0	0	wrld_ec21d012-a10f-4067-ad1d-f9cdebc4d092	58589	27726
 65	Angel Island	#ffd700			-1	45578	31750	253	365	0	1	0	0	0	0		45704	31933
@@ -69,7 +69,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 68	Sixis	#005aff	Vanneran		3	56189	42209	416	560	75	0	0	1	0	0		56398	42489
 69	Kumate	#ffd700			-1	56108	49056	536	901	0	1	0	0	0	0		56375	49506
 70	Shimotsuki	#000000	Dim		0	59302	45601	1577	2280	75	0	0	8	0	0		60091	46741
-71	Mirror Ball	#000000	Voice Lord		-1	46526	55527	242	382	0	0	0	6	0	0		46648	55718
+71	Mirror Ball	#000000	Voice Lord		9	46526	55527	242	382	50	0	0	6	0	0		46648	55718
 72	Notice Town	#ffd700			-1	14104	46455	928	1236	0	1	0	0	0	0		14568	47073
 73	Downs Island	#ffd700			-1	11059	46380	628	1099	0	1	0	0	0	0		11373	46929
 74	Ballywood	#009246		https://vrchat.com/home/world/wrld_59fbb8b2-7ede-478b-8fd7-b94aee933d80	-1	23480	14145	1901	3516	0	1	0	0	0	0	wrld_59fbb8b2-7ede-478b-8fd7-b94aee933d80	24431	15902
@@ -112,7 +112,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 111	Porco	#ffd700			-1	4062	34474	553	1017	0	1	0	0	0	0		4338	34983
 112	Mt Kintoki	#ffd700			-1	20370	28228	396	799	0	1	0	0	0	0		20568	28627
 113	Gartel	#ffd700			-1	7741	33669	389	819	0	1	0	0	0	0		7936	34078
-114	Vira	#000000	Albertis / Caine		10	27808	28610	331	949	89	0	0	2	4	0		27974	29085
+114	Vira	#000000	Albertis / Caine		11	27808	28610	331	949	89	0	0	2	4	0		27974	29085
 115	Spider Miles	#009246			-1	11646	53903	1789	2417	0	1	0	0	0	0		12540	55111
 116	Kuen Village	#ffd700			-1	10561	55823	4130	3227	0	1	0	0	0	0		12626	57436
 117	Momoiro	#ffd700			-1	39502	28788	386	874	0	1	0	0	0	0		39695	29225
@@ -123,7 +123,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 122	Scrap Island	#ffd700			-1	53247	34374	307	408	0	1	0	0	0	0		53401	34578
 123	Flying Fish Riders Base	#ffd700			-1	61951	32774	174	307	0	1	0	0	0	0		62038	32928
 124	Rommel	#009246		https://vrchat.com/home/world/wrld_3d335599-c9ea-4954-ae08-f3afc798dbd9 https://vrchat.com/home/world/wrld_33e9863f-13bb-483d-9105-153c922349a5	-1	58214	35355	208	464	0	1	0	0	0	0	wrld_3d335599-c9ea-4954-ae08-f3afc798dbd9	58318	35587
-125	Banaro	#000000	Albertis		10	57258	33621	246	642	89	0	0	2	0	0		57381	33942
+125	Banaro	#000000	Albertis		11	57258	33621	246	642	89	0	0	2	0	0		57381	33942
 126	Vodka	#ffd700			-1	41458	28870	406	642	0	1	0	0	0	0		41661	29190
 127	G-3	#ffd700			-1	59654	34993	188	423	0	1	0	0	0	0		59748	35205
 128	Birka	#009246		https://vrchat.com/home/world/wrld_2c1a2ca1-1d47-4931-af19-5ce3740dee14	-1	46062	34795	300	526	0	1	0	0	0	0	wrld_2c1a2ca1-1d47-4931-af19-5ce3740dee14	46212	35058
