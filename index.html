@@ -48,6 +48,15 @@ html, body { width: 100%; height: 100%; margin: 0; font-family: 'PlayfairDisplay
   box-sizing: border-box;
   touch-action: pan-x pan-y;
 }
+
+/* Experimental perspective view. The map returns to its normal 2D layout by default. */
+#map { transform: none; transform-origin: 50% 62%; transition: transform .35s ease; }
+#map.experimental-3d {
+  transform: perspective(1200px) rotateX(24deg) scale(1.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  #map { transition: none; }
+}
 html, body { min-height: 100%; background: var(--bg); }
 
 .drawing path.leaflet-interactive { pointer-events: none; }
@@ -390,6 +399,7 @@ body { background: var(--bg); }
 
 <!-- NOTE: the icons are set with the ICONS list at the top of the script (URLs of your white images). The emoji below show until then. -->
 <div class="fab-col">
+  <button id="mapModeBtn" class="round-btn" type="button" aria-label="Switch to experimental 3D map" aria-pressed="false" title="Experimental 2D / 3D map">3D</button>
   <button id="searchBtn" class="round-btn" type="button" aria-label="Search"><span class="ico" data-icon="search">🔍</span></button>
   <div id="dcWrap">
     <div id="dcInfo" hidden>
@@ -2806,6 +2816,16 @@ $('searchBtn').addEventListener('click', () => {
   const wasOpen = $('searchFrame').classList.contains('open');
   togglePanel('searchFrame');
   if (!wasOpen) requestAnimationFrame(() => $('sIsland').focus());
+});
+
+const mapModeBtn = $('mapModeBtn');
+mapModeBtn.addEventListener('click', () => {
+  const enabled = $('map').classList.toggle('experimental-3d');
+  mapModeBtn.textContent = enabled ? '2D' : '3D';
+  mapModeBtn.setAttribute('aria-pressed', String(enabled));
+  mapModeBtn.setAttribute('aria-label', enabled ? 'Switch back to 2D map' : 'Switch to experimental 3D map');
+  mapModeBtn.title = enabled ? 'Return to 2D map' : 'Experimental 2D / 3D map';
+  requestAnimationFrame(() => map.invalidateSize({ pan: false }));
 });
 $('settingsBtn').addEventListener('click', () => togglePanel('settingsFrame'));
 document.addEventListener('pointerdown', (e) => { if (!$('searchFrame').contains(e.target)) closeLists(); });
