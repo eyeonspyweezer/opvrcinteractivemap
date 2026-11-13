@@ -350,6 +350,7 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
 #vrcWrap:hover #vrcInfo { width: 230px; }
 /* Search and settings frames, animated. On mouse devices they sit further left so the Discord tab never overlaps them. */
 #searchFrame, #settingsFrame { position: fixed; z-index: 1000; box-sizing: border-box; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); right: calc(28px + var(--fab)); width: min(300px, calc(100vw - var(--fab) - 40px)); max-height: 70dvh; overflow-y: auto; padding: 8px; background: var(--bg); color: var(--sfg); border: 1px solid var(--fg); border-radius: 6px; opacity: 0; visibility: hidden; transform: translateY(14px) scale(.97); transition: opacity .2s ease, transform .2s ease, visibility 0s linear .2s; }
+#settingsFrame { bottom: auto; top: calc(100dvh - 28px - env(safe-area-inset-bottom, 0px) - var(--fab)); }
 #searchFrame.open, #settingsFrame.open { opacity: 1; visibility: visible; transform: none; transition: opacity .2s ease, transform .2s ease, visibility 0s; }
 @media (hover: hover) { #searchFrame, #settingsFrame { right: calc(14px + var(--fab) / 2 + 246px); width: max(180px, min(300px, calc(100vw - var(--fab) / 2 - 280px))); } }
 #settingsFrame label { display: block; margin: 8px 0; }
