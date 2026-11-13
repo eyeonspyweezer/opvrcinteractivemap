@@ -781,7 +781,7 @@ function updateMapFitZoom(mapHeight, fallbackCenter) {
   map.invalidateSize({ pan: false });
   const viewportHeight = map.getSize().y;
   if (!viewportHeight || !mapHeight) return;
-  const fitZoom = Math.log2(viewportHeight / (mapHeight * (4 / 3)));
+  const fitZoom = Math.log2(viewportHeight / (mapHeight * 1.15));
   const currentZoom = map.getZoom();
   map.setMinZoom(fitZoom);
   if (currentZoom < fitZoom) {
@@ -1902,11 +1902,11 @@ let tileLayer = null;
     });
     tileLayer = new Repeating({ tileSize: 256, minZoom: -10 }).addTo(map);
     tileLayer.bringToBack();
-    // Allow up to one-third of the map height to repeat above the original image.
-    const verticalRepeat = height / 3;
+    // Allow up to 15% of the map height to repeat above the original image.
+    const verticalRepeat = height * 0.15;
     const totalMapHeight = height + verticalRepeat;
-    const fitCenter = [height / 3, width / 2];
-    // Keep the vertical duplicate capped at 1/3 height and preserve horizontal wrapping.
+    const fitCenter = [(height - verticalRepeat) / 2, width / 2];
+    // Keep the vertical duplicate capped at 15% height and preserve horizontal wrapping.
     map.setMaxBounds([[-verticalRepeat, -WRAP_COPIES * width], [height, (WRAP_COPIES + 1) * width]]);
     map.options.maxBoundsViscosity = 1;
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -1918,7 +1918,7 @@ let tileLayer = null;
       map.off('moveend', saveLastMapView);
       map.on('moveend', saveLastMapView);
     }));
-    window.addEventListener('resize', () => updateMapFitZoom(totalMapHeight, [height / 2, width / 2]));
+    window.addEventListener('resize', () => updateMapFitZoom(totalMapHeight, fitCenter));
     rebuildGhosts();
     buildOceanWaves();
     requestAnimationFrame(() => animateSunkIslands());
