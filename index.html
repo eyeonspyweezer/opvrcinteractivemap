@@ -355,6 +355,16 @@ a.owner-link { color: var(--sfg); text-decoration: underline; text-decoration-co
   bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   max-height: none;
 }
+#settingsDragHandle {
+  margin: -8px -8px 6px;
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--fg);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+  font-size: 12px;
+  text-align: center;
+}
 #searchFrame.open, #settingsFrame.open { opacity: 1; visibility: visible; transform: none; transition: opacity .2s ease, transform .2s ease, visibility 0s; }
 @media (hover: hover) { #searchFrame, #settingsFrame { right: calc(14px + var(--fab) / 2 + 246px); width: max(180px, min(300px, calc(100vw - var(--fab) / 2 - 280px))); } }
 #settingsFrame label { display: block; margin: 8px 0; }
@@ -457,6 +467,7 @@ body { background: var(--bg); }
   <div class="slist" id="lOwner"></div>
 </div>
 <div id="settingsFrame">
+  <div id="settingsDragHandle" aria-label="Drag settings">Settings</div>
   <details open>
     <summary>Island Appearance</summary>
     <div class="settings-section">
@@ -3034,6 +3045,41 @@ $('searchBtn').addEventListener('click', () => {
 });
 
 $('settingsBtn').addEventListener('click', () => togglePanel('settingsFrame'));
+
+const settingsDrag = { active: false, pointerId: null, startX: 0, startY: 0, left: 0, top: 0 };
+$('settingsDragHandle').addEventListener('pointerdown', (e) => {
+  if (e.button !== undefined && e.button !== 0) return;
+  const frame = $('settingsFrame');
+  const rect = frame.getBoundingClientRect();
+  settingsDrag.active = true;
+  settingsDrag.pointerId = e.pointerId;
+  settingsDrag.startX = e.clientX;
+  settingsDrag.startY = e.clientY;
+  settingsDrag.left = rect.left;
+  settingsDrag.top = rect.top;
+  frame.style.left = rect.left + 'px';
+  frame.style.top = rect.top + 'px';
+  frame.style.right = 'auto';
+  frame.style.bottom = 'auto';
+  e.preventDefault();
+  try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+});
+$('settingsDragHandle').addEventListener('pointermove', (e) => {
+  if (!settingsDrag.active || e.pointerId !== settingsDrag.pointerId) return;
+  const frame = $('settingsFrame');
+  const maxLeft = Math.max(0, window.innerWidth - frame.offsetWidth);
+  const maxTop = Math.max(0, window.innerHeight - frame.offsetHeight);
+  const left = Math.max(0, Math.min(maxLeft, settingsDrag.left + e.clientX - settingsDrag.startX));
+  const top = Math.max(0, Math.min(maxTop, settingsDrag.top + e.clientY - settingsDrag.startY));
+  frame.style.left = left + 'px';
+  frame.style.top = top + 'px';
+});
+$('settingsDragHandle').addEventListener('pointerup', (e) => {
+  if (e.pointerId !== settingsDrag.pointerId) return;
+  settingsDrag.active = false;
+  settingsDrag.pointerId = null;
+  try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+});
 document.addEventListener('pointerdown', (e) => { if (!$('searchFrame').contains(e.target)) closeLists(); });
 
 
