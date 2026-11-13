@@ -393,6 +393,7 @@ body { background: var(--bg); }
   <img class="list-icon" src="VRCTitle.PNG" alt="">
   <div id="listButtons"></div>
   <button id="bountyBtn" class="list-btn" type="button">Bounty List</button>
+  <button id="landMassBtn" class="list-btn" type="button">Land Mass Ranking</button>
   <button id="growthBtn" class="list-btn" type="button">Visitor Growth</button>
   <button id="mentionsBtn" class="list-btn" type="button">Announcement Mentions</button>
   <div id="listLive"></div>
@@ -414,7 +415,7 @@ body { background: var(--bg); }
 
 <!-- NOTE: the icons are set with the ICONS list at the top of the script (URLs of your white images). The emoji below show until then. -->
 <div class="fab-col">
-  <button id="map3dBtn" class="round-btn" type="button" aria-label="3D Globe" aria-pressed="false"><span class="ico" aria-hidden="true">🌐</span></button>
+  <button id="map3dBtn" class="round-btn" type="button" aria-label="3D Globe" aria-pressed="false"><span class="ico" aria-hidden="true">3D</span></button>
   <button id="searchBtn" class="round-btn" type="button" aria-label="Search"><span class="ico" data-icon="search">🔍</span></button>
   <div id="dcWrap">
     <div id="dcInfo" hidden>
@@ -729,6 +730,7 @@ $('listToggle').addEventListener('click', () => {
 });
 function closeInsightPanels() { $('bountyPanel').hidden = true; $('insightPanel').hidden = true; }
 $('bountyBtn').addEventListener('click', () => { const opening = $('bountyPanel').hidden; closeInsightPanels(); $('bountyPanel').hidden = !opening; });
+$('landMassBtn').addEventListener('click', () => openLandMassRanking());
 $('growthBtn').addEventListener('click', () => openVisitorGrowth());
 $('mentionsBtn').addEventListener('click', () => openAnnouncementRankings());
 // Right-click the Bounty List button or panel = open the bounty Google Sheet
@@ -2419,6 +2421,58 @@ async function loadIslandExtraStats() {
   return islandExtraStatsPromise;
 }
 
+// ===== Sidebar insight panels: land-area ranking, visitor growth and Discord announcement mentions =====
+function planarRingArea(ring){
+  if(!Array.isArray(ring)||ring.length<3)return 0;
+  let a=0;
+  for(let i=0;i<ring.length;i++){
+    const [x1,y1]=ring[i]||[],[x2,y2]=ring[(i+1)%ring.length]||[];
+    if(!Number.isFinite(x1)||!Number.isFinite(y1)||!Number.isFinite(x2)||!Number.isFinite(y2))continue;
+    a+=x1*y2-x2*y1;
+  }
+  return Math.abs(a)/2;
+}
+function planarGeometryArea(geometry){
+  if(!geometry)return 0;
+  if(geometry.type==='Polygon'){
+    const rings=geometry.coordinates||[];
+    return Math.max(0,planarRingArea(rings[0])-(rings.slice(1).reduce((sum,r)=>sum+planarRingArea(r),0)));
+  }
+  if(geometry.type==='MultiPolygon'){
+    return (geometry.coordinates||[]).reduce((sum,poly)=>sum+planarGeometryArea({type:'Polygon',coordinates:poly}),0);
+  }
+  return 0;
+}
+function formatMapArea(n){
+  if(n>=1e9)return (n/1e9).toFixed(2)+'B map²';
+  if(n>=1e6)return (n/1e6).toFixed(2)+'M map²';
+  if(n>=1e3)return (n/1e3).toFixed(1)+'K map²';
+  return Math.round(n).toLocaleString()+' map²';
+}
+function openLandMassRanking(){
+  openInsight('Land Mass Ranking',tools=>{tools.textContent='Ranked by total mapped island area. Shared islands are split evenly between their groups.';});
+  const totals=new Map(), totalArea={value:0};
+  drawnItems.eachLayer(layer=>{
+    if(layer._hidden||layer._sunk||layer._destroyed||isGoneStatus(layer))return;
+    const p=layer.feature?.properties||{},area=planarGeometryArea(layer.feature?.geometry);
+    if(!area)return;
+    totalArea.value+=area;
+    const groups=preferMarines(groupsForIsland(p.name,resolveOwner(p))).filter(Boolean);
+    if(!groups.length)return;
+    const share=area/groups.length;
+    groups.forEach(group=>totals.set(group,(totals.get(group)||0)+share));
+  });
+  const rows=[...totals.entries()].sort((a,b)=>b[1]-a[1]).slice(0,20);
+  const box=$('insightRows');box.textContent='';
+  if(!rows.length){box.textContent='No organization/group land-area data available.';return;}
+  rows.forEach(([name,area],i)=>{
+    const el=document.createElement('div');el.className='insight-row';
+    const label=document.createElement('span');label.textContent=(i+1)+'. '+name;
+    const value=document.createElement('strong');value.className='insight-value';
+    value.textContent=formatMapArea(area)+' · '+((area/Math.max(totalArea.value,1))*100).toFixed(1)+'%';
+    el.append(label,value);box.appendChild(el);
+  });
+}
 // ===== Sidebar insight panels: visitor growth and Discord announcement mentions =====
 let growthPeriod='Visits 7d', growthCategory='islands';
 function openInsight(title,buildTools){$('bountyPanel').hidden=true;$('insightTitle').textContent=title;$('insightTools').textContent='';$('insightRows').textContent='Loading…';$('insightPanel').hidden=false;buildTools?.($('insightTools'));}
