@@ -1,0 +1,302 @@
+{
+ "amazon-lily": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "bab0624add8e87ff6923"
+ },
+ "banaro": {
+  "crew": "the-rocks-pirates",
+  "sig": "ef0f0c836c7c599efdd8"
+ },
+ "baratie": {
+  "crew": "the-thriller-bark-pirates",
+  "sig": "8fd7bd32cd8048195f4e"
+ },
+ "baterilla": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "6c2748fa9268501e8c53"
+ },
+ "conomi-islands": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "88908e440dab3547232f"
+ },
+ "cozia": {
+  "crew": "the-marines",
+  "sig": "ef1a01d1bf402638a484"
+ },
+ "dawn": {
+  "crew": "the-marines",
+  "sig": "aeeba4c7bbdbc732ffa4"
+ },
+ "dressrosa": {
+  "crew": "the-marines",
+  "sig": "c5b7dd0871f6342da8c2"
+ },
+ "drum-island": {
+  "crew": "the-world-government",
+  "sig": "8b84a6358d16c2b86832"
+ },
+ "egghead": {
+  "crew": "the-star-pirates",
+  "sig": "a280b4e9253ee9458991"
+ },
+ "elbaph": {
+  "crew": "the-marines",
+  "sig": "53262805f08bb5093ec0"
+ },
+ "enies-lobby": {
+  "crew": "the-world-government",
+  "sig": "47817564e046b2d2f8d9"
+ },
+ "fishman-island": {
+  "crew": "neo-cipher-pol",
+  "sig": "e598679389f9c4155f01"
+ },
+ "florian-triangle": {
+  "crew": "the-world-government",
+  "sig": "ee6b997379ac00d3c60f"
+ },
+ "foodvalten-island": {
+  "crew": "the-marines",
+  "sig": "1668268aa18f162888ae"
+ },
+ "foolshout": {
+  "crew": "the-rocks-pirates",
+  "sig": "084165e9de87e7b2d776"
+ },
+ "frauce": {
+  "crew": "the-world-government",
+  "sig": "8329c6ae9f87bf0bafc5"
+ },
+ "g-16": {
+  "crew": "the-marines",
+  "sig": "cd6d06ea37b1c7fbf1f4"
+ },
+ "g-5": {
+  "crew": "the-marines",
+  "sig": "a71a5aa972423a05092a"
+ },
+ "g-77": {
+  "crew": "the-marines",
+  "sig": "b2fc192f8a2f385dc703"
+ },
+ "g-80": {
+  "crew": "the-marines",
+  "sig": "6013aca6b177e7052f49"
+ },
+ "gecko-islands": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "032c1f9743063da3bcda"
+ },
+ "germa": {
+  "crew": "the-roger-pirates",
+  "sig": "35b49789cf34a9bb0d85"
+ },
+ "goat": {
+  "crew": "the-star-pirates",
+  "sig": "fc536845b9c409b93a3c"
+ },
+ "god-valley": {
+  "crew": "the-rocks-pirates",
+  "sig": "2cbf3233a24db2d6332a"
+ },
+ "green-bit": {
+  "crew": "the-marines",
+  "sig": "552b5cba2b8f641b3315"
+ },
+ "guanhao": {
+  "crew": "the-world-government",
+  "sig": "8792203c6a231f4e5387"
+ },
+ "hachinosu": {
+  "crew": "the-marines",
+  "sig": "01accbc511a2b81e4659"
+ },
+ "ilisia": {
+  "crew": "the-thriller-bark-pirates",
+  "sig": "b0d6eca17b0a70512824"
+ },
+ "jaya": {
+  "crew": "the-rocks-pirates",
+  "sig": "8ac22facfef37d662ab8"
+ },
+ "kano": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "ae16c6b0ca47635d2290"
+ },
+ "karai-bari": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "f9624d5377d719e6307a"
+ },
+ "karakuri": {
+  "crew": "the-rocks-pirates",
+  "sig": "390244ac5d7bc3d0c2e6"
+ },
+ "kenzan": {
+  "crew": "the-rocks-pirates",
+  "sig": "aea3efab44345786b621"
+ },
+ "kuraigana": {
+  "crew": "neo-cipher-pol",
+  "sig": "295c5da99494b6d8c811"
+ },
+ "kyuka": {
+  "crew": "the-rocks-pirates",
+  "sig": "517818b018684a9a7326"
+ },
+ "las-camp-region": {
+  "crew": "the-thriller-bark-pirates",
+  "sig": "a8db159d7658b9518bbd"
+ },
+ "little-garden": {
+  "crew": "the-star-pirates",
+  "sig": "db39f984ff33b8215391"
+ },
+ "lodestar": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "374e2e803b036bd27e18"
+ },
+ "loguetown": {
+  "crew": "the-marines",
+  "sig": "efd91da0690794707c13"
+ },
+ "long-ring-long-land": {
+  "crew": "the-vael-pirates",
+  "sig": "96b5a0c3b77b75428b2f"
+ },
+ "marineford": {
+  "crew": "the-world-government",
+  "sig": "3bd02b0e471286d80011"
+ },
+ "mary-geoise": {
+  "crew": "the-world-government",
+  "sig": "ea0071469097e734115d"
+ },
+ "merveille": {
+  "crew": "the-marines",
+  "sig": "39eb507773f80fd3db16"
+ },
+ "minion": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "5ebcc643a1537145a539"
+ },
+ "mirror-ball": {
+  "crew": "neo-cipher-pol",
+  "sig": "6dba715e41eaba633c85"
+ },
+ "nagagutsu": {
+  "crew": "the-world-government",
+  "sig": "c92f3d86953b1a443252"
+ },
+ "namakura": {
+  "crew": "the-rocks-pirates",
+  "sig": "3a1d1f8cdb66addb7799"
+ },
+ "nanimonai": {
+  "crew": "the-rocks-pirates",
+  "sig": "79ebc116b60ddb25db0c"
+ },
+ "new-marineford": {
+  "crew": "the-marines",
+  "sig": "405edab816a7af01269c"
+ },
+ "ohara": {
+  "crew": "the-marines",
+  "sig": "1104e124c5fc0d350646"
+ },
+ "onigashima": {
+  "crew": "the-marines",
+  "sig": "8572a903ca509e54caff"
+ },
+ "organ": {
+  "crew": "the-star-pirates",
+  "sig": "1a83bbfd1ff21c04eb1c"
+ },
+ "pucci": {
+  "crew": "the-rocks-pirates",
+  "sig": "7664f8547786dedebe40"
+ },
+ "punk-hazard": {
+  "crew": "the-star-pirates",
+  "sig": "f79ccd3b3ef63d63c122"
+ },
+ "red-port": {
+  "crew": "the-world-government",
+  "sig": "b5e2dd554ee1cae988a7"
+ },
+ "reverse-mountain": {
+  "crew": "the-vael-pirates",
+  "sig": "cdb0ecda646ed33680e8"
+ },
+ "roshwan": {
+  "crew": "the-world-government",
+  "sig": "2e840c790a53ce8f8fb3"
+ },
+ "rubeck": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "5ed75d50ecbb37918068"
+ },
+ "san-faldo": {
+  "crew": "the-rocks-pirates",
+  "sig": "3a087c8bad5e99cc547a"
+ },
+ "shimotsuki": {
+  "crew": "the-roger-pirates",
+  "sig": "d3452dd9dc464d286b7b"
+ },
+ "sixis": {
+  "crew": "the-marines",
+  "sig": "21c637fbe0f753a6e57c"
+ },
+ "skypiea": {
+  "crew": "the-marines",
+  "sig": "4dcf42cedebdec39ba59"
+ },
+ "sorbet": {
+  "crew": "the-world-government",
+  "sig": "bfb877f9b7fa5b935f1b"
+ },
+ "st--poplar": {
+  "crew": "the-rocks-pirates",
+  "sig": "0148e85c8c4c60f9ab02"
+ },
+ "swallow": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "3975c2f299695b1953c9"
+ },
+ "tequila-wolf": {
+  "crew": "the-thriller-bark-pirates",
+  "sig": "b9a807a95d8ab206d6b6"
+ },
+ "the-rest-of-wano": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "846a82573759a70a663d"
+ },
+ "thriller-bark": {
+  "crew": "the-world-government",
+  "sig": "b11e04c51fd28f87e5c6"
+ },
+ "vira": {
+  "crew": "the-rocks-pirates",
+  "sig": "d992715bd352b72493bc"
+ },
+ "wano-capital": {
+  "crew": "the-rocks-pirates",
+  "sig": "600c390b3f5dd6632c66"
+ },
+ "water-7": {
+  "crew": "the-tazmanian-pirates",
+  "sig": "b69d89176fa3c1f3bc21"
+ },
+ "whole-cake-island": {
+  "crew": "the-star-pirates",
+  "sig": "efe23798fe680d226433"
+ },
+ "yotsuba-island-region": {
+  "crew": "the-marines",
+  "sig": "447388b1ade839597476"
+ },
+ "zou": {
+  "crew": "the-vael-pirates",
+  "sig": "0e03ceebd4d1afbefb5e"
+ }
+}
