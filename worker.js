@@ -1932,21 +1932,6 @@ function discordAvatarUrl(user) {
   }
 }
 
-function cleanDiscordQuoteText(value) {
-  let text = String(value || "").replace(/\r\n?/g, "\n");
-  text = text.replace(/\`\`\`(?:[a-z0-9_+-]+)?\s*/gi, "");
-  text = text.replace(/\`([^\`]+)\`/g, "$1");
-  text = text.replace(/^\s{0,3}#{1,6}\s+/gm, "");
-  text = text.replace(/\|\|/g, "");
-  text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
-  text = text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
-  text = text.replace(/<((?:https?:\/\/|www\.)[^>]+)>/gi, "$1");
-  text = text.replace(/(\*\*|__|~~)(?=\S)([\s\S]*?\S)\1/g, "$2");
-  text = text.replace(/(^|[\s(])([*_])(?=\S)([^*_]*?\S)\2(?=$|[\s).,!?:;])/g, "$1$3");
-  text = text.replace(/\\([\\\`*_[\]~|])/g, "$1");
-  return text.replace(/\n+/g, " ").replace(/[ \t]+/g, " ").trim();
-}
-
 function quoteTsvLine(quote, displayName, username, messageId, messageUrl, addedAt, quoteAuthorId, quoteAuthorAvatar, submitterId, submitterAvatar, submitterName) {
   const clean = value => String(value || "").replace(/[\r\n\t]+/g, " ").trim();
   return [clean(quote), clean(displayName), clean(username), clean(messageId), clean(messageUrl), clean(addedAt), clean(quoteAuthorId), clean(quoteAuthorAvatar), clean(submitterId), clean(submitterAvatar), clean(submitterName)].join("\t");
@@ -1954,7 +1939,7 @@ function quoteTsvLine(quote, displayName, username, messageId, messageUrl, added
 
 async function addQuoteFromMessage(env, interaction) {
   const message = interaction.data.resolved?.messages?.[interaction.data.target_id];
-  const quote = cleanDiscordQuoteText(message?.content || "");
+  const quote = String(message?.content || "").trim();
   if (!message || !quote) {
     return { type: 4, data: { flags: 64, content: "I couldn't find text in that message to save as a quote." } };
   }
@@ -1964,7 +1949,7 @@ async function addQuoteFromMessage(env, interaction) {
   need(env, ["GITHUB_TOKEN"]);
   const current = await readQuotesFile(env);
   const lines = current.text.split(/\r?\n/).filter(line => line.trim() && !line.trim().startsWith("#"));
-  const normalized = cleanDiscordQuoteText(quote).toLowerCase();
+  const normalized = quote.toLowerCase().replace(/\s+/g, " ").trim();
   if (lines.some(line => line.split("\t")[0].toLowerCase().replace(/\s+/g, " ").trim() === normalized)) {
     return { type: 4, data: { flags: 64, content: "That quote is already in the quote list." } };
   }
@@ -2501,6 +2486,119 @@ async function runDebugCommand(env, command, value) {
   throw new Error("That command is not enabled in the browser tester. Only read-only commands can run here.");
 }
 
+// ---------- World Empty Monitor ----------
+const WORLD_EMPTY_MONITOR_ENABLED = false;
+const WORLD_EMPTY_MONITOR_TEST_ON_DEPLOY = true;
+const WORLD_EMPTY_MONITOR_ALLOW_EMPTY_ALERTS = false; // Keep false until population data is verified trustworthy.
+const WORLD_EMPTY_MONITOR_USER_ID = "";
+const WORLD_EMPTY_MONITOR_CHANNEL_ID = "1571720331721445456";
+const WORLD_EMPTY_MONITOR_WORLD_ID = "wrld_f37dfa48-f423-448a-87b4-fe48d70bbd00";
+const WORLD_EMPTY_MONITOR_STATE_KEY = "world-empty-monitor:v1";
+const WORLD_EMPTY_MONITOR_STATUS_KEY = "world-empty-monitor:status-message";
+
+async function worldMonitorDiscordRequest(env, path, options = {}) {
+  return fetch("https://discord.com/api/v10" + path, {
+    ...options,
+    headers: { Authorization: "Bot " + env.DISCORD_TOKEN, "Content-Type": "application/json", ...(options.headers || {}) }
+  });
+}
+
+async function sendWorldMonitorDM(env, content) {
+  const userId = String(WORLD_EMPTY_MONITOR_USER_ID || "").trim();
+  if (!userId) return { ok: false, skipped: true, reason: "WORLD_EMPTY_MONITOR_USER_ID is blank" };
+  const dmChannel = await worldMonitorDiscordRequest(env, "/users/@me/channels", { method: "POST", body: JSON.stringify({ recipient_id: userId }) });
+  if (!dmChannel.ok) return { ok: false, reason: "Could not open DM channel (" + dmChannel.status + ")" };
+  const dm = await dmChannel.json();
+  const message = await worldMonitorDiscordRequest(env, "/channels/" + dm.id + "/messages", { method: "POST", body: JSON.stringify({ content: String(content).slice(0, 1900) }) });
+  return { ok: message.ok, reason: message.ok ? "" : "Could not send DM (" + message.status + ")" };
+}
+
+async function worldMonitorReadState(env) {
+  if (!env.WORLD_EMPTY_MONITOR_KV) return {};
+  try { return JSON.parse(await env.WORLD_EMPTY_MONITOR_KV.get(WORLD_EMPTY_MONITOR_STATE_KEY) || "{}"); } catch { return {}; }
+}
+async function worldMonitorWriteState(env, state) {
+  if (!env.WORLD_EMPTY_MONITOR_KV) return;
+  await env.WORLD_EMPTY_MONITOR_KV.put(WORLD_EMPTY_MONITOR_STATE_KEY, JSON.stringify(state));
+}
+async function worldMonitorReadStatusMessageId(env) {
+  if (!env.WORLD_EMPTY_MONITOR_KV) return "";
+  return String(await env.WORLD_EMPTY_MONITOR_KV.get(WORLD_EMPTY_MONITOR_STATUS_KEY) || "");
+}
+async function worldMonitorWriteStatusMessageId(env, id) {
+  if (!env.WORLD_EMPTY_MONITOR_KV || !id) return;
+  await env.WORLD_EMPTY_MONITOR_KV.put(WORLD_EMPTY_MONITOR_STATUS_KEY, String(id));
+}
+
+async function worldMonitorGetActivity(env) {
+  try {
+    const response = await fetch("https://api.vrchat.cloud/api/1/worlds/" + encodeURIComponent(WORLD_EMPTY_MONITOR_WORLD_ID), {
+      headers: { "User-Agent": "OPVRCMapBot/1.1 https://discord.gg/TeunYpsHb6", "Accept": "application/json" },
+      cf: { cacheTtl: 300 }
+    });
+    if (!response.ok) return { ok: false, reason: "VRChat returned HTTP " + response.status };
+    const world = await response.json();
+    const total = Number(world.occupants);
+    const publicPlayers = Number(world.publicOccupants);
+    const privatePlayers = Number(world.privateOccupants);
+    if (![total, publicPlayers, privatePlayers].every(Number.isFinite)) return { ok: false, reason: "VRChat returned an invalid population snapshot" };
+    return { ok: true, total, publicPlayers, privatePlayers, name: String(world.name || WORLD_EMPTY_MONITOR_WORLD_ID), checkedAt: new Date().toISOString(), source: "VRChat world endpoint" };
+  } catch (error) { return { ok: false, reason: String(error?.message || error).slice(0, 250) }; }
+}
+
+async function worldMonitorStatusMessage(activity, enabled) {
+  if (!activity.ok) return { content: "🟡 **World monitor:** " + (enabled ? "ON" : "OFF") + "\nWorld: " + WORLD_EMPTY_MONITOR_WORLD_ID + "\nActivity: **unavailable**\nReason: " + activity.reason };
+  return { content: (activity.total > 0 ? "🟢" : "⚪") + " **World monitor:** " + (enabled ? "ON" : "OFF") + "\nWorld: " + activity.name + "\nPlayers reported: **" + activity.total + "**\nPublic: " + activity.publicPlayers + " · Private: " + activity.privatePlayers + "\nChecked: " + activity.checkedAt };
+}
+
+async function worldMonitorUpdateStatus(env, activity, enabled) {
+  const channelId = String(WORLD_EMPTY_MONITOR_CHANNEL_ID || "").trim();
+  if (!channelId) return;
+  const payload = await worldMonitorStatusMessage(activity, enabled);
+  let messageId = await worldMonitorReadStatusMessageId(env);
+  if (messageId) {
+    const edit = await worldMonitorDiscordRequest(env, "/channels/" + channelId + "/messages/" + messageId, { method: "PATCH", body: JSON.stringify(payload) });
+    if (edit.ok) return;
+    messageId = "";
+  }
+  const created = await worldMonitorDiscordRequest(env, "/channels/" + channelId + "/messages", { method: "POST", body: JSON.stringify(payload) });
+  if (created.ok) { const message = await created.json(); await worldMonitorWriteStatusMessageId(env, message.id); }
+}
+
+async function runWorldEmptyMonitor(env) {
+  const activity = await worldMonitorGetActivity(env);
+  const enabled = WORLD_EMPTY_MONITOR_ENABLED;
+  if (WORLD_EMPTY_MONITOR_TEST_ON_DEPLOY && WORLD_EMPTY_MONITOR_USER_ID) {
+    const state = await worldMonitorReadState(env);
+    if (!state.deploymentTestSent) {
+      const testText = activity.ok
+        ? "🧪 **World monitor test**\nThe monitor is installed and can DM you.\n\n**" + activity.name + "**\nPlayers reported: **" + activity.total + "**\nPublic: " + activity.publicPlayers + " · Private: " + activity.privatePlayers + "\n\nMonitoring is currently **" + (enabled ? "ON" : "OFF") + "**."
+        : "🧪 **World monitor test**\nThe monitor is installed and can DM you.\n\nCurrent activity is **unavailable**, so this test will NOT treat the world as empty.\nReason: " + activity.reason + "\n\nMonitoring is currently **" + (enabled ? "ON" : "OFF") + "**.";
+      const sent = await sendWorldMonitorDM(env, testText);
+      if (sent.ok) { state.deploymentTestSent = true; state.deploymentTestAt = new Date().toISOString(); await worldMonitorWriteState(env, state); }
+    }
+  }
+  await worldMonitorUpdateStatus(env, activity, enabled);
+  if (!enabled || !WORLD_EMPTY_MONITOR_ALLOW_EMPTY_ALERTS || !activity.ok) return;
+  const state = await worldMonitorReadState(env);
+  const players = activity.total;
+  if (players > 0) {
+    state.emptyAlertSent = false;
+    state.lastState = "active";
+    state.lastKnownPlayers = players;
+    state.lastActivityAt = activity.checkedAt;
+    await worldMonitorWriteState(env, state);
+    return;
+  }
+  if (state.lastState === "active" && !state.emptyAlertSent) {
+    const sent = await sendWorldMonitorDM(env, "🔴 **World is empty**\n\n**" + activity.name + "** is currently reporting **0 players**.\n\nYou can manually create your Group instance now.\n\nThis alert will not repeat while the world remains empty.");
+    if (sent.ok) { state.emptyAlertSent = true; state.emptyAlertAt = activity.checkedAt; }
+  }
+  state.lastState = "empty";
+  state.lastKnownPlayers = 0;
+  state.lastActivityAt = activity.checkedAt;
+  await worldMonitorWriteState(env, state);
+}
 // ---------- main ----------
 export default {
   async fetch(request, env, ctx) {
@@ -2927,7 +3025,8 @@ export default {
     ctx.waitUntil(Promise.allSettled([
       archiveExpiredScheduleEvents(env),
       sendDueScheduleReminders(env),
-      monitorYouTubeChannels(env)
+      monitorYouTubeChannels(env),
+      runWorldEmptyMonitor(env)
     ]));
   }
 };
