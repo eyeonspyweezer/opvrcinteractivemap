@@ -2490,7 +2490,7 @@ async function runDebugCommand(env, command, value) {
 const WORLD_EMPTY_MONITOR_ENABLED = false;
 const WORLD_EMPTY_MONITOR_TEST_ON_DEPLOY = true;
 const WORLD_EMPTY_MONITOR_ALLOW_EMPTY_ALERTS = false; // Keep false until population data is verified trustworthy.
-const WORLD_EMPTY_MONITOR_USER_ID = "";
+const WORLD_EMPTY_MONITOR_USER_ID = "1013975043346272358";
 const WORLD_EMPTY_MONITOR_CHANNEL_ID = "1571720331721445456";
 const WORLD_EMPTY_MONITOR_WORLD_ID = "wrld_f37dfa48-f423-448a-87b4-fe48d70bbd00";
 const WORLD_EMPTY_MONITOR_STATE_KEY = "world-empty-monitor:v1";
