@@ -1,7 +1,7 @@
 ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unknown	Group1	Group2	Group3	WorldId	LabelX	LabelY
 1	Wano Capital	#000000	Albertis	https://vrchat.com/home/world/wrld_e03a81d6-f39f-49e1-a56d-b6eaf81ad40f	10	21456	32522	270	451	89	0	0	2	0	0	wrld_e03a81d6-f39f-49e1-a56d-b6eaf81ad40f	21591	32747
 2	New Kuraigana	#009246			-1	21222	31402	263	471	0	1	0	0	0	0		21353	31638
-3	The rest of Wano	#000000	VRGoofy	https://vrchat.com/home/world/wrld_6689e02e-6ce0-4a20-abf5-009ea21fa691/info https://vrchat.com/home/world/wrld_7b69f8f5-355a-4396-852f-bdda3571baad/info	8	20811	31095	1649	2929	50	0	0	5	0	0	wrld_6689e02e-6ce0-4a20-abf5-009ea21fa691	21632	32529
+3	The rest of Wano	#000000	VRGoofy	https://vrchat.com/home/world/wrld_6689e02e-6ce0-4a20-abf5-009ea21fa691/info https://vrchat.com/home/world/wrld_7b69f8f5-355a-4396-852f-bdda3571baad/info	-1	20811	31095	1649	2929	0	0	0	5	0	0	wrld_6689e02e-6ce0-4a20-abf5-009ea21fa691	21632	32529
 4	Elbaph	#005aff	Vanneran		4	24308	31334	802	1167	75	0	0	1	0	0		24709	31918
 5	Whole Cake Island	#000000	Reacted	https://vrchat.com/home/world/wrld_87c205de-acc1-49d3-a37d-e63e2a36c87a	7	12687	34037	454	806	50	0	0	4	0	0	wrld_87c205de-acc1-49d3-a37d-e63e2a36c87a	12914	34440
 6	Totto Land	#009246		https://vrchat.com/home/world/wrld_bd2facd6-989c-4dc1-985a-c8941003f730	-1	10888	30419	4253	5898	0	1	0	0	0	0	wrld_bd2facd6-989c-4dc1-985a-c8941003f730	13015	33368
@@ -15,9 +15,9 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 14	Sphinx Island	#ffd700			-1	23948	30556	232	423	0	1	0	0	0	0		24064	30767
 15	G-14	#ffd700			-1	24064	28685	118	232	0	1	0	0	0	0		24123	28801
 16	Hachinosu	#005aff	Zenny	https://vrchat.com/home/world/wrld_6ad100de-9ade-4124-9b61-ac4bbfbac70c https://vrchat.com/home/world/wrld_b14918e6-8a0b-4cc4-8735-978d85b4bdd0 https://vrchat.com/home/world/wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4/info	4	25869	29532	399	826	75	0	0	1	0	0	wrld_6ad100de-9ade-4124-9b61-ac4bbfbac70c	26069	29945
-17	Lodestar	#000000	VRGoofy		8	28487	31334	478	853	50	0	0	5	0	0		28726	31761
+17	Lodestar	#000000	VRGoofy		-1	28487	31334	478	853	0	0	0	5	0	0		28726	31761
 18	Winner Island	#ffd700			-1	23872	34085	287	512	0	1	0	0	0	0		24016	34341
-19	Karai Bari	#000000	VRGoofy		8	16793	31382	355	642	50	0	0	5	0	0		16971	31703
+19	Karai Bari	#000000	VRGoofy		-1	16793	31382	355	642	0	0	0	5	0	0		16971	31703
 20	??? (85)	#ffd700			-1	18541	33566	352	526	0	1	1	0	0	0		18717	33829
 21	Baltigo	#ffd700			-1	19548	27989	246	451	0	1	0	0	0	0		19671	28214
 22	Prodence	#ffd700			-1	8301	29511	519	1038	0	1	0	0	0	0		8561	30030
@@ -65,7 +65,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 64	Impel Down	#009246		https://vrchat.com/home/world/wrld_ec21d012-a10f-4067-ad1d-f9cdebc4d092 https://vrchat.com/home/world/wrld_3807ed86-9e69-499a-87ed-edd018c8e7b6	-1	58408	27361	362	730	0	1	0	0	0	0	wrld_ec21d012-a10f-4067-ad1d-f9cdebc4d092	58589	27726
 65	Angel Island	#ffd700			-1	45578	31750	253	365	0	1	0	0	0	0		45704	31933
 66	Skypiea	#005aff	Zenny	https://vrchat.com/home/world/wrld_cd1be64f-c0fc-4192-bc36-9de1a3207ea6 https://vrchat.com/home/world/wrld_fa4f0202-d231-4337-be70-d1e05c58627d https://vrchat.com/home/world/wrld_4ba6997a-2392-4d5c-bdff-88e8406a2696	4	44929	32085	683	1027	75	0	0	1	0	0	wrld_cd1be64f-c0fc-4192-bc36-9de1a3207ea6	45270	32599
-67	Baratie	#000000	CJ	https://vrchat.com/home/world/wrld_41dd60d4-d5c1-4100-afe5-1501f943e62c https://vrchat.com/home/world/wrld_41dd60d4-d5c1-4100-afe5-1501f943e62c/info	1	49247	41383	812	1625	71	0	0	10	0	0	wrld_41dd60d4-d5c1-4100-afe5-1501f943e62c	49653	42195
+67	Baratie	#000000	CJ	https://vrchat.com/home/world/wrld_41dd60d4-d5c1-4100-afe5-1501f943e62c https://vrchat.com/home/world/wrld_41dd60d4-d5c1-4100-afe5-1501f943e62c/info	1	49247	41383	812	1625	71	0	0	11	0	0	wrld_41dd60d4-d5c1-4100-afe5-1501f943e62c	49653	42195
 68	Sixis	#005aff	Vanneran		4	56189	42209	416	560	75	0	0	1	0	0		56398	42489
 69	Kumate	#ffd700			-1	56108	49056	536	901	0	1	0	0	0	0		56375	49506
 70	Shimotsuki	#000000	Dim		0	59302	45601	1577	2280	75	0	0	8	0	0		60091	46741
@@ -90,9 +90,9 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 89	Boin Archipelago	#009246			-1	36594	28304	1481	1603	0	1	0	0	0	0		37334	29106
 90	Cozia	#005aff	Vanneran		4	38352	55514	1188	1707	75	0	0	1	0	0		38946	56367
 91	Micqueot	#ffd700			-1	22067	61733	618	928	0	1	0	0	0	0		22376	62197
-92	Swallow	#000000	VRGoofy		8	10240	50571	3406	3372	50	0	0	5	0	0		11943	52257
-93	Minion	#000000	VRGoofy		8	12247	53264	2369	2645	50	0	0	5	0	0		13431	54587
-94	Rubeck	#000000	VRGoofy		8	9107	53998	2430	2744	50	0	0	5	0	0		10322	55370
+92	Swallow	#000000	VRGoofy		-1	10240	50571	3406	3372	0	0	0	5	0	0		11943	52257
+93	Minion	#000000	VRGoofy		-1	12247	53264	2369	2645	0	0	0	5	0	0		13431	54587
+94	Rubeck	#000000	VRGoofy		-1	9107	53998	2430	2744	0	0	0	5	0	0		10322	55370
 95	Lvneel	#009246			-1	19428	49179	3441	6663	0	1	0	0	0	0		21149	52510
 96	Whiteland	#ffd700			-1	16500	56469	4587	6444	0	1	0	0	0	0		18794	59691
 97	Pepe	#ffd700			-1	12752	29300	212	642	0	1	0	0	0	0		12858	29620
@@ -100,7 +100,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 99	Soja	#009246			-1	21835	14861	478	696	0	1	0	0	0	0		22074	15210
 100	Gingaball	#ffd700			-1	24248	17667	444	751	0	1	0	0	0	0		24470	18043
 101	Aoi	#ffd700			-1	26514	22282	908	928	0	1	0	0	0	0		26968	22746
-102	Kano	#000000	VRGoofy		8	23415	5775	4205	7496	50	0	0	5	0	0		25518	9523
+102	Kano	#000000	VRGoofy		-1	23415	5775	4205	7496	0	0	0	5	0	0		25518	9523
 103	Cameron	#ffd700			-1	20466	7728	881	2403	0	1	0	0	0	0		20906	8929
 104	Bestland	#ffd700			-1	19647	6239	1270	2130	0	1	0	0	0	0		20282	7304
 105	Ilisia	#009246			-1	6144	8820	4956	12424	0	1	0	0	0	0		8622	15032
@@ -119,7 +119,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 118	Skull (VRC Non-Canon)	#009246			-1	38604	29627	263	464	0	1	0	0	0	0		38736	29859
 119	G-8	#ffd700			-1	47093	31546	352	505	0	1	0	0	0	0		47269	31798
 120	Shift Station	#009246		https://vrchat.com/home/world/wrld_e298813a-be85-4c7a-9071-7c7205c7075a	-1	52346	32215	174	389	0	1	0	0	0	0	wrld_e298813a-be85-4c7a-9071-7c7205c7075a	52433	32409
-121	Water 7	#000000 #005aff	MrKilo19/The World Government	https://vrchat.com/home/world/wrld_98c2438a-caa1-4568-9d0d-b69c2fae09f0 https://vrchat.com/home/world/wrld_e298813a-be85-4c7a-9071-7c7205c7075a/info https://vrchat.com/home/world/wrld_1da039e3-8fe4-41a0-8697-838fd24f3970/info	-1	53216	33675	393	771	0	0	0	5	3	0	wrld_98c2438a-caa1-4568-9d0d-b69c2fae09f0	53413	34061
+121	Water 7	#000000 #005aff	MrKilo19/The World Government	https://vrchat.com/home/world/wrld_98c2438a-caa1-4568-9d0d-b69c2fae09f0 https://vrchat.com/home/world/wrld_e298813a-be85-4c7a-9071-7c7205c7075a/info https://vrchat.com/home/world/wrld_1da039e3-8fe4-41a0-8697-838fd24f3970/info	-1	53216	33675	393	771	0	0	0	10	3	0	wrld_98c2438a-caa1-4568-9d0d-b69c2fae09f0	53413	34061
 122	Scrap Island	#ffd700			-1	53247	34374	307	408	0	1	0	0	0	0		53401	34578
 123	Flying Fish Riders Base	#ffd700			-1	61951	32774	174	307	0	1	0	0	0	0		62038	32928
 124	Rommel	#009246		https://vrchat.com/home/world/wrld_3d335599-c9ea-4954-ae08-f3afc798dbd9 https://vrchat.com/home/world/wrld_33e9863f-13bb-483d-9105-153c922349a5	-1	58214	35355	208	464	0	1	0	0	0	0	wrld_3d335599-c9ea-4954-ae08-f3afc798dbd9	58318	35587
@@ -141,12 +141,12 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 140	Shells Town (G-153)	#009246		https://vrchat.com/home/world/wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4/info	-1	56128	56428	451	928	0	1	0	0	0	0	wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4	56353	56893
 141	Yotsuba Island Region	#005aff	Marines		4	54447	54872	4706	8192	75	0	0	1	0	0		56799	58968
 142	Dawn	#005aff	Vanneran	https://vrchat.com/home/world/wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4/info https://vrchat.com/home/world/wrld_b14918e6-8a0b-4cc4-8735-978d85b4bdd0	4	57432	53629	1754	2840	75	0	0	1	0	0	wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4	58309	55049
-143	Gecko Islands	#000000	VRGoofy	https://vrchat.com/home/world/wrld_bd030540-267b-41d6-b9c8-ad8595ec301c	8	46530	50312	1058	1761	50	0	0	5	0	0	wrld_bd030540-267b-41d6-b9c8-ad8595ec301c	47059	51192
+143	Gecko Islands	#000000	VRGoofy	https://vrchat.com/home/world/wrld_bd030540-267b-41d6-b9c8-ad8595ec301c	-1	46530	50312	1058	1761	0	0	0	5	0	0	wrld_bd030540-267b-41d6-b9c8-ad8595ec301c	47059	51192
 144	Rare Animals	#009246			-1	49629	50544	1044	887	0	1	0	0	0	0		50151	50988
 145	Organ	#000000	Batz	https://vrchat.com/home/world/wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4/info	7	50387	51977	1352	1789	50	0	0	4	0	0	wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4	51063	52872
 146	Frauce	#005aff	World Government		13	41553	55418	6294	7100	50	0	0	3	0	0		44700	58968
 147	G-16	#005aff	Marines		4	43352	51240	389	369	75	0	0	1	0	0		43547	51424
-148	Conomi Islands	#000000	VRGoofy	https://vrchat.com/home/world/wrld_c9730a5f-fbe4-4029-b712-77078b7f69a7 https://vrchat.com/home/world/wrld_4a03ecd9-1336-49e0-9804-2bf7a3447627	8	40393	50325	3188	3714	50	0	0	5	0	0	wrld_c9730a5f-fbe4-4029-b712-77078b7f69a7	41987	52182
+148	Conomi Islands	#000000	VRGoofy	https://vrchat.com/home/world/wrld_c9730a5f-fbe4-4029-b712-77078b7f69a7 https://vrchat.com/home/world/wrld_4a03ecd9-1336-49e0-9804-2bf7a3447627	-1	40393	50325	3188	3714	0	0	0	5	0	0	wrld_c9730a5f-fbe4-4029-b712-77078b7f69a7	41987	52182
 149	Satsuruzo	#009246			-1	58688	57657	553	1597	0	1	0	0	0	0		58964	58455
 150	Nazawaka	#ffd700			-1	62729	58572	778	1242	0	1	0	0	0	0		63118	59193
 151	Oykot	#009246			-1	42475	40823	3202	3290	0	1	0	0	0	0		44076	42468

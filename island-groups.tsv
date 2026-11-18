@@ -1,19 +1,20 @@
 ID	Group	Color	Islands	Flag	FlagAspect	NameRank	ColorRank
 1	The Marines	#005aff	19	4	75	8	1
-2	The Rocks Pirates	#000000	17	10	89	10	11
-3	The World Government	#005aff	17	13	50	18	2
-4	The Star Pirates	#000000	12	7	50	12	13
-5	The Tazmanian Pirates	#000000	11	8	50	14	15
+2	The Rocks Pirates	#000000	17	10	89	11	12
+3	The World Government	#005aff	17	13	50	19	2
+4	The Star Pirates	#000000	12	7	50	13	14
+5	The Monkey Pirates	#000000	10	-1	0	9	10
 6	Neo-Cipher Pol	#000000	3	5	50	4	6
-7	The Vael Pirates	#000000	3	12	57	17	18
-8	The Roger Pirates	#000000	2	0	75	11	12
+7	The Vael Pirates	#000000	3	12	57	18	19
+8	The Roger Pirates	#000000	2	0	75	12	13
 9	Lord Toshi Kingdom	#000000	1	-1	0	3	5
-10	The Thriller Bark Pirates	#000000	1	1	71	15	16
-11	Cross Guild	#000000	0	2	50	1	3
-12	Golden Lion Pirates	#000000	0	-1	0	2	4
-13	The Bloodsail Pirates	#000000	0	9	54	5	7
-14	The Frostbite Pirates	#000000	0	-1	0	6	8
-15	The Infamous Straw Hats	#000000	0	-1	0	7	9
-16	The Requiem Pirates	#000000	0	6	50	9	10
-17	The Straw Hats	#000000	0	3	69	13	14
-18	The Unknown Pirates	#000000	0	11	38	16	17
+10	The Tazmanian Pirates	#000000	1	8	50	15	16
+11	The Thriller Bark Pirates	#000000	1	1	71	16	17
+12	Cross Guild	#000000	0	2	50	1	3
+13	Golden Lion Pirates	#000000	0	-1	0	2	4
+14	The Bloodsail Pirates	#000000	0	9	54	5	7
+15	The Frostbite Pirates	#000000	0	-1	0	6	8
+16	The Infamous Straw Hats	#000000	0	-1	0	7	9
+17	The Requiem Pirates	#000000	0	6	50	10	11
+18	The Straw Hats	#000000	0	3	69	14	15
+19	The Unknown Pirates	#000000	0	11	38	17	18
