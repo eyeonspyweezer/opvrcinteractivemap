@@ -1221,6 +1221,13 @@ const resolveOwner = (p) => {
   return (generated && generated.owner) || p.owner || '';
 };
 const groupsForIsland = (name, owner) => {
+  // Live Google Sheets ownership is authoritative. Only use generated TSV
+  // group assignments when no live owner row exists for this island.
+  const liveOwner = ownerMap.get(islandKey(name));
+  if (liveOwner && liveOwner.trim()) {
+    return ownersOf(liveOwner).flatMap(groupsOf);
+  }
+
   const generated = staticIslandOf(name);
   if (generated && generated.groups.length) return generated.groups;
   return ownersOf(owner).flatMap(groupsOf);
