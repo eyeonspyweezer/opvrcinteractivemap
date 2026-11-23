@@ -3,7 +3,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 2	New Kuraigana	#009246			-1	21222	31402	263	471	0	1	0	0	0	0		21353	31638
 3	The rest of Wano	#000000	VRGoofy	https://vrchat.com/home/world/wrld_6689e02e-6ce0-4a20-abf5-009ea21fa691/info https://vrchat.com/home/world/wrld_7b69f8f5-355a-4396-852f-bdda3571baad/info	10	20811	31095	1649	2929	90	0	0	5	0	0	wrld_6689e02e-6ce0-4a20-abf5-009ea21fa691	21632	32529
 4	Elbaph	#005aff	Vanneran		4	24308	31334	802	1167	75	0	0	1	0	0		24709	31918
-5	Whole Cake Island	#000000	Reacted	https://vrchat.com/home/world/wrld_87c205de-acc1-49d3-a37d-e63e2a36c87a	-1	12687	34037	454	806	0	0	0	4	0	0	wrld_87c205de-acc1-49d3-a37d-e63e2a36c87a	12914	34440
+5	Whole Cake Island	#000000	Reacted	https://vrchat.com/home/world/wrld_87c205de-acc1-49d3-a37d-e63e2a36c87a	7	12687	34037	454	806	50	0	0	4	0	0	wrld_87c205de-acc1-49d3-a37d-e63e2a36c87a	12914	34440
 6	Totto Land	#009246		https://vrchat.com/home/world/wrld_bd2facd6-989c-4dc1-985a-c8941003f730	-1	10888	30419	4253	5898	0	1	0	0	0	0	wrld_bd2facd6-989c-4dc1-985a-c8941003f730	13015	33368
 7	Egghead	#000000 #005aff	Omnus/The World Government	https://vrchat.com/home/world/wrld_0f2f02e4-e196-418a-93a1-617e1100088f/info	-1	22765	29487	481	867	0	0	0	4	3	0	wrld_0f2f02e4-e196-418a-93a1-617e1100088f	23006	29921
 8	Green Bit	#005aff	Zenny	https://vrchat.com/home/world/wrld_aa4cd376-5328-4f9d-85f5-fcd87fd3b4f0	4	5671	30218	251	451	75	0	0	1	0	0	wrld_aa4cd376-5328-4f9d-85f5-fcd87fd3b4f0	5797	30443
@@ -136,14 +136,14 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 135	Mamana	#ffd700			-1	48595	30972	307	710	0	1	0	0	0	0		48748	31327
 136	Nakrowa	#ffd700			-1	46349	32433	246	594	0	1	0	0	0	0		46472	32730
 137	Nagagutsu	#005aff	World Government		14	53240	57022	1768	2574	50	0	0	3	0	0		54124	58309
-138	Goat	#000000	Lambo		-1	56797	55923	526	887	0	0	0	4	0	0		57060	56367
+138	Goat	#000000	Lambo		7	56797	55923	526	887	50	0	0	4	0	0		57060	56367
 139	G-77	#005aff	Marines		4	51943	53602	2765	3907	75	0	0	1	0	0		53326	55556
 140	Shells Town (G-153)	#009246		https://vrchat.com/home/world/wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4/info	-1	56128	56428	451	928	0	1	0	0	0	0	wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4	56353	56893
 141	Yotsuba Island Region	#005aff	Marines		4	54447	54872	4706	8192	75	0	0	1	0	0		56799	58968
 142	Dawn	#005aff	Vanneran	https://vrchat.com/home/world/wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4/info https://vrchat.com/home/world/wrld_b14918e6-8a0b-4cc4-8735-978d85b4bdd0	4	57432	53629	1754	2840	75	0	0	1	0	0	wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4	58309	55049
 143	Gecko Islands	#000000	VRGoofy	https://vrchat.com/home/world/wrld_bd030540-267b-41d6-b9c8-ad8595ec301c	10	46530	50312	1058	1761	90	0	0	5	0	0	wrld_bd030540-267b-41d6-b9c8-ad8595ec301c	47059	51192
 144	Rare Animals	#009246			-1	49629	50544	1044	887	0	1	0	0	0	0		50151	50988
-145	Organ	#000000	Batz	https://vrchat.com/home/world/wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4/info	-1	50387	51977	1352	1789	0	0	0	4	0	0	wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4	51063	52872
+145	Organ	#000000	Batz	https://vrchat.com/home/world/wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4/info	7	50387	51977	1352	1789	50	0	0	4	0	0	wrld_372c0170-c80d-4b85-ac9e-999aeb4016d4	51063	52872
 146	Frauce	#005aff	World Government		14	41553	55418	6294	7100	50	0	0	3	0	0		44700	58968
 147	G-16	#005aff	Marines		4	43352	51240	389	369	75	0	0	1	0	0		43547	51424
 148	Conomi Islands	#000000	VRGoofy	https://vrchat.com/home/world/wrld_c9730a5f-fbe4-4029-b712-77078b7f69a7 https://vrchat.com/home/world/wrld_4a03ecd9-1336-49e0-9804-2bf7a3447627	10	40393	50325	3188	3714	90	0	0	5	0	0	wrld_c9730a5f-fbe4-4029-b712-77078b7f69a7	41987	52182
