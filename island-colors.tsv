@@ -30,7 +30,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 29	New Marineford	#005aff	Marines		4	1505	34133	222	399	75	0	0	1	0	0		1616	34332
 30	Risky Red	#ffd700			-1	3649	32153	297	553	0	1	0	0	0	0		3797	32430
 31	Raijin	#ffd700			-1	3099	30665	399	560	0	1	0	0	0	0		3299	30945
-32	Zou	#000000	Vael D. Yarausy	https://vrchat.com/home/world/wrld_8dc41553-c04a-4c76-b0d8-f3219c57a630 https://vrchat.com/home/world/wrld_9f543068-c9a5-4f60-bb34-b8ae2c1bee28	-1	16565	28665	447	355	0	0	0	7	2	0	wrld_8dc41553-c04a-4c76-b0d8-f3219c57a630	16788	28842
+32	Zou	#000000	Vael D. Yarausy	https://vrchat.com/home/world/wrld_8dc41553-c04a-4c76-b0d8-f3219c57a630 https://vrchat.com/home/world/wrld_9f543068-c9a5-4f60-bb34-b8ae2c1bee28	13	16565	28665	447	355	57	0	0	7	2	0	wrld_8dc41553-c04a-4c76-b0d8-f3219c57a630	16788	28842
 33	G-5	#005aff	Marines		4	1825	28892	207	321	75	0	0	1	0	0		1929	29053
 34	Little Garden	#000000 #005aff	Omnus/The World Government	https://vrchat.com/home/world/wrld_8d3a4215-2432-4020-b66a-3907affe8c9e/info	-1	36773	34734	377	584	0	0	0	4	3	0	wrld_8d3a4215-2432-4020-b66a-3907affe8c9e	36962	35025
 35	Cactus	#009246		https://vrchat.com/home/world/wrld_13ecd901-7c75-4fdb-847b-038b55fa69d0	-1	36406	32682	275	420	0	1	0	0	0	0	wrld_13ecd901-7c75-4fdb-847b-038b55fa69d0	36543	32892
@@ -39,7 +39,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 38	Nanimonai	#000000	Albertis		11	39884	32706	283	532	89	0	0	2	0	0		40026	32972
 39	Drum Island	#005aff #000000	JaxorJax	https://vrchat.com/home/world/wrld_3b8e39d2-d97c-4cac-befe-fb512e75917e https://vrchat.com/home/world/wrld_f6189e1f-f820-483e-9f61-0b71bcecd1de	-1	39014	34597	396	778	0	0	0	3	4	0	wrld_3b8e39d2-d97c-4cac-befe-fb512e75917e	39212	34986
 40	Jaya	#000000 #005aff	Albertis/Zenny	https://vrchat.com/home/world/wrld_598fae77-d05d-4cfa-a808-c2ef9e6fa82e	-1	43649	31395	440	754	0	0	0	2	1	0	wrld_598fae77-d05d-4cfa-a808-c2ef9e6fa82e	43840	31846
-41	Long Ring Long Land	#000000	Vael D. Yarausy		-1	47414	33215	387	754	0	0	0	7	2	0		47608	33592
+41	Long Ring Long Land	#000000	Vael D. Yarausy		13	47414	33215	387	754	57	0	0	7	2	0		47608	33592
 42	Ukkari	#ffd700			-1	44468	33945	311	539	0	1	0	0	0	0		44624	34215
 43	Foolshout	#000000	Albertis / Caine		11	43328	29347	375	689	89	0	0	2	4	0		43516	29692
 44	Alabasta	#800080	Lord Toshi	https://vrchat.com/home/world/wrld_116f85cb-267a-487b-92ab-046ab86daaa2	-1	40799	33559	1123	1577	0	0	0	9	0	0	wrld_116f85cb-267a-487b-92ab-046ab86daaa2	41360	34348
@@ -68,7 +68,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 67	Baratie	#000000	CJ	https://vrchat.com/home/world/wrld_41dd60d4-d5c1-4100-afe5-1501f943e62c https://vrchat.com/home/world/wrld_41dd60d4-d5c1-4100-afe5-1501f943e62c/info	1	49247	41383	812	1625	71	0	0	11	0	0	wrld_41dd60d4-d5c1-4100-afe5-1501f943e62c	49653	42195
 68	Sixis	#005aff	Vanneran		4	56189	42209	416	560	75	0	0	1	0	0		56398	42489
 69	Kumate	#ffd700			-1	56108	49056	536	901	0	1	0	0	0	0		56375	49506
-70	Shimotsuki	#000000	Dim		-1	59302	45601	1577	2280	0	0	0	8	0	0		60091	46741
+70	Shimotsuki	#000000	Dim		0	59302	45601	1577	2280	75	0	0	8	0	0		60091	46741
 71	Mirror Ball	#000000	Voice Lord		5	46526	55527	242	382	50	0	0	6	0	0		46648	55718
 72	Notice Town	#ffd700			-1	14104	46455	928	1236	0	1	0	0	0	0		14568	47073
 73	Downs Island	#ffd700			-1	11059	46380	628	1099	0	1	0	0	0	0		11373	46929
@@ -85,7 +85,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 84	Vespa	#009246			-1	47315	5762	1311	1884	0	1	0	0	0	0		47970	6704
 85	Centaurea	#009246			-1	50858	1870	1932	2990	0	1	0	0	0	0		51824	3365
 86	Tajine	#ffd700			-1	49042	2362	1283	2034	0	1	0	0	0	0		49684	3379
-87	Germa	#000000	Dim	https://vrchat.com/home/world/wrld_94a38c83-c0a2-4da2-aa67-da9e4c0e7ea1	-1	23599	58108	707	2027	0	0	0	8	0	0	wrld_94a38c83-c0a2-4da2-aa67-da9e4c0e7ea1	23953	59121
+87	Germa	#000000	Dim	https://vrchat.com/home/world/wrld_94a38c83-c0a2-4da2-aa67-da9e4c0e7ea1	0	23599	58108	707	2027	75	0	0	8	0	0	wrld_94a38c83-c0a2-4da2-aa67-da9e4c0e7ea1	23953	59121
 88	Sankan	#ffd700			-1	6431	44960	1161	1734	0	1	0	0	0	0		7011	45827
 89	Boin Archipelago	#009246			-1	36594	28304	1481	1603	0	1	0	0	0	0		37334	29106
 90	Cozia	#005aff	Vanneran		4	38352	55514	1188	1707	75	0	0	1	0	0		38946	56367
@@ -282,7 +282,7 @@ ID	Island Name	Color	Owner	Link	Flag	BoxX	BoxY	BoxW	BoxH	FlagAspect	Unowned	Unkn
 281	??? (84)	#ffd700			-1	8977	32836	403	860	0	1	1	0	0	0		9178	33266
 282	Florian Triangle	#005aff	World Government		14	57288	27984	2415	2549	50	0	0	3	0	0		58496	29259
 283	Tequila Wolf	#009246			-1	47049	62804	3536	1830	0	1	0	0	0	0		48817	63719
-284	Reverse Mountain	#000000	Vael D. Yarausy	https://vrchat.com/home/world/wrld_1da039e3-8fe4-41a0-8697-838fd24f3970/info	-1	32064	31812	3058	1038	0	0	0	7	2	0	wrld_1da039e3-8fe4-41a0-8697-838fd24f3970	33594	32331
+284	Reverse Mountain	#000000	Vael D. Yarausy	https://vrchat.com/home/world/wrld_1da039e3-8fe4-41a0-8697-838fd24f3970/info	13	32064	31812	3058	1038	57	0	0	7	2	0	wrld_1da039e3-8fe4-41a0-8697-838fd24f3970	33594	32331
 285	Mary Geoise	#005aff	World Government		14	65453	31088	778	1447	50	0	0	3	0	0		65535	31812
 286	Twin Cape	#ffd700			-1	35116	30801	410	751	0	1	0	0	0	0		35321	31177
 287	Red Port	#005aff	World Government		14	64025	30434	280	915	50	0	0	3	0	0		64165	30891
